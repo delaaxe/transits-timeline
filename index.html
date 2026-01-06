@@ -1,0 +1,2657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transits Timeline</title>
+  <script>
+    if (location.hostname === "transits-timeline.pages.dev" || location.hostname === "www.transits.me") {
+      location.replace(`https://transits.me${location.pathname}${location.search}${location.hash}`);
+    }
+  </script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d1117'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23f0f6fc' stroke-width='2'/%3E%3Cpath d='M6 16h8' stroke='%23f0f6fc' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M20 8l2 4 4 2-4 2-2 4-2-4-4-2 4-2z' fill='%23f0f6fc'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel-bg: #121823;
+      --panel-border: #273142;
+      --control-bg: #0f1520;
+      --control-border: #2f3a4d;
+      --text: #e6edf3;
+      --muted: #9aa7b5;
+      --accent: #f0f6fc;
+      --accent-contrast: #0d1117;
+      --axis-bg: #121823;
+      --axis-line: #c2c9d2;
+      --hover: rgba(255,255,255,0.08);
+      --shadow: 0 10px 24px rgba(0,0,0,.45);
+      --danger: #f87171;
+      --chart-pad: 8px;
+      --axis-pad: 8px;
+      --timeline-nav-h: 32px;
+      --timeline-nav-total: calc(var(--timeline-nav-h) + 10px);
+    }
+    html{ background: var(--bg); }
+    body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 18px; color:var(--text); font-size: 16px; background: var(--bg); }
+    .title{ text-align:center; font-weight: 800; font-size: 34px; line-height: 1.1; letter-spacing: .2px; margin: 10px 0 18px; }
+    .panel{ border:1px solid var(--panel-border); border-radius: 10px; padding: 14px; margin-bottom: 14px; background: var(--panel-bg); }
+    .row{ display:flex; gap:12px; flex-wrap: wrap; align-items:flex-end; }
+    label{ display:block; font-size: 12px; color:var(--muted); margin-bottom: 6px; }
+    input, select, button{ font: inherit; padding: 8px 10px; border:1px solid var(--control-border); border-radius: 8px; background: var(--control-bg); color: var(--text); }
+    input[type="number"]{ width: 110px; }
+    input[type="date"]{ width: 132px; } /* narrower */
+    input[type="time"]{ width: 130px; }
+    .field{ display:flex; flex-direction: column; }
+    .field.small input, .field.small select { width: 160px; }
+    .field.med input, .field.med select { width: 210px; }
+    button{ cursor:pointer; border-color: var(--axis-line); }
+    button:disabled{ opacity:.6; cursor: not-allowed; }
+
+    .status{ margin-top: 10px; color: var(--muted); font-size: 13px; white-space: normal; }
+    .error{ color: var(--danger); }
+
+    .dateAxisScroll{ position: sticky; top: 0; z-index: 3; background: var(--panel-bg); overflow: hidden; border-bottom: 0; }
+    .dateAxisScrollInner{ padding: var(--axis-pad); position: relative; }
+    .timelineNav{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 2px 0 4px;
+      margin-left: calc(var(--aspect-axis-visible-w, var(--aspect-axis-w, 150px)) + var(--axis-pad));
+      margin-right: 6px;
+      user-select: none;
+      min-height: var(--timeline-nav-h);
+    }
+    .timelineNavGroup{ display:flex; gap: 14px; }
+    .timelineNavBtn{
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--axis-line);
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .timelineNavBtn:disabled{ opacity: 0.5; cursor: not-allowed; }
+    #dateAxisSvg{ will-change: transform; position: relative; z-index: 1; }
+    #axisCornerBlock{
+      position: absolute;
+      left: var(--axis-pad);
+      top: var(--axis-pad);
+      width: calc(var(--aspect-axis-visible-w, var(--aspect-axis-w, 150px)) - 1px);
+      height: calc(var(--date-axis-h, 80px) + var(--timeline-nav-total, 0px));
+      background: var(--panel-bg);
+      z-index: 2;
+      pointer-events: none;
+      display: none;
+    }
+    .chartFrame{ position: relative; }
+    .timelineScroll{ border: 0; border-radius: 0; padding: var(--chart-pad); background: var(--panel-bg); overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
+    svg{ display:block; width: 100%; }
+    #aspectAxisWrap{
+      position: absolute;
+      left: var(--chart-pad);
+      top: var(--chart-pad);
+      z-index: 2;
+      overflow: hidden;
+      width: var(--aspect-axis-visible-w, var(--aspect-axis-w, 150px));
+      pointer-events: none;
+    }
+    #aspectAxisSvg{
+      display: block;
+      transform: translateX(var(--aspect-axis-shift, 0px));
+    }
+    #aspectAxisSvg text,
+    #dateAxisSvg text{ font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", "Symbola", system-ui, sans-serif; }
+    .checks{ display:flex; gap: 14px; align-items:center; flex-wrap: wrap; padding: 6px 0 2px 0; }
+    .checks label{ margin: 0; font-size: 13px; color: var(--text); display:flex; gap: 8px; align-items:center; }
+    .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--axis-line); }
+    .optionsRow{ margin-top: 10px; }
+    .rowPlanets{ margin-top: 10px; }
+    #topChecks{ margin-top: 10px; }
+    .aspectDropdown{ position: relative; }
+    .aspectDropdown > summary{
+      list-style: none;
+      cursor: pointer;
+      padding: 6px 10px;
+      border: 1px solid var(--axis-line);
+      border-radius: 8px;
+      background: var(--control-bg);
+      font-size: 13px;
+      color: var(--text);
+      user-select: none;
+    }
+    .aspectDropdown > summary::-webkit-details-marker{ display: none; }
+    .aspectDropdown[open] > summary{ background: var(--axis-line); color: var(--accent-contrast); }
+    .aspectDropdown .aspectPanel{
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      padding: 10px;
+      border: 1px solid var(--control-border);
+      border-radius: 10px;
+      background: var(--panel-bg);
+      box-shadow: var(--shadow);
+      min-width: 220px;
+      z-index: 20;
+    }
+
+    .inlineHint{ font-size: 12px; color: var(--muted); margin-left: 2px; margin-right: 2px; }
+    .chartLinks{ display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+    .chartPrivacy{ margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .inlineDot{ color: var(--muted); margin: 0; }
+    [data-advanced][hidden]{ display: none; }
+
+    
+    .orbField input{ width: 70px !important; }
+    .orbInline{ display:flex; align-items:center; gap: 8px; }
+    .orbInline label{ margin: 0; font-size: 12px; color: var(--muted); }
+    .rxField{ align-self: flex-end; }
+    .rxField label{ visibility: hidden; height: 0; margin: 0; }
+    .smallBtn{ padding: 6px 10px; font-size: 13px; border-radius: 8px; }
+
+    
+    .typeahead{ position: relative; }
+    .suggestBox{
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: var(--panel-bg);
+      border: 1px solid var(--control-border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      max-height: 260px;
+      overflow: auto;
+      z-index: 30;
+    }
+    .suggestItem{ padding: 10px 12px; cursor: pointer; }
+    .suggestItem:hover{ background: var(--hover); }
+    .suggestTitle{ font-size: 14px; }
+    .suggestSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .rowTop{ align-items: flex-end; }
+    .tinyHelp{ font-size: 12px; color: var(--muted); margin-top: 6px; }
+    
+    .chartSummary{
+      font-size: 13px;
+      color: var(--muted);
+      padding: 6px 0 0 0;
+      line-height: 1.35;
+    }
+    .composeHint{
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .composeStopRow{
+      margin-top: 4px;
+      display: flex;
+      justify-content: flex-start;
+    }
+    .btnSmallPrimary{
+      background: var(--axis-line);
+      color: var(--accent-contrast);
+      border: 1px solid var(--axis-line);
+      padding: 7px 10px;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+    .btnSmallPrimary:hover{ opacity: .92; }
+
+    .btnGhost{
+      background: var(--control-bg);
+      border: 1px solid var(--axis-line);
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+
+    .statusRow{ display:flex; align-items:center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    .statusRow .status{ margin-top: 0; }
+    .linkBtn{
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--axis-line);
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 13px;
+    }
+    .linkBtn:hover{ opacity: .75; }
+
+    @media (max-width: 520px){
+      :root{ --chart-pad: 0px; --axis-pad: 0px; }
+      .dateAxisScroll{ border-bottom: 0; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
+      .dateAxisScrollInner{ padding: 0; }
+      .chartFrame{ width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
+      .timelineScroll{ padding: 0; border-radius: 0; width: 100%; margin: 0; }
+      #axisCornerBlock{ display: block; }
+      .timelineNavGroup:last-child .timelineNavBtn:last-child{ margin-right: 10px; }
+      .rowPlanets{ margin-top: 0 !important; }
+      .rowPlanets{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+      .rowPlanets .field:nth-child(3){ grid-column: 1 / -1; }
+      .rowPlanets .field select{ width: 100%; }
+    }
+
+    .chartButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
+    .chartBtn{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--axis-line);
+      background: var(--control-bg);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .chartBtn.active{
+      background: var(--axis-line);
+      color: var(--accent-contrast);
+    }
+    .chartBtn.add{
+      border-style: dashed;
+    }
+    .chartPickers{ display: flex; flex-direction: column; gap: 10px; }
+    .chartPickerLabel{ font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+    .appModeLinks{ display:flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; justify-content: center; }
+    .appModeLink{ text-decoration: underline; }
+    .appModeLink.active{ text-decoration: none; font-weight: 700; }
+
+    .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
+    .presetBtn{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--axis-line);
+      background: var(--control-bg);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .presetBtn.active{
+      background: var(--axis-line);
+      color: var(--accent-contrast);
+    }
+
+    #tooltip{
+      position: fixed; z-index: 9999; left: 0; top: 0; display: none; pointer-events: none;
+      padding: 8px 10px; border-radius: 10px; background: var(--panel-bg); color: var(--text);
+      border: 1px solid var(--panel-border);
+      font-size: 14px; line-height: 1.25; max-width: 360px; box-shadow: 0 14px 30px rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      white-space: normal; visibility: hidden;
+    }
+    #tooltipBackdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9998;
+      display: none;
+    }
+    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+      #tooltipBackdrop{
+        background: rgba(0,0,0,0);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+    }
+    #tooltip.popup{
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 90vw;
+      max-width: 560px;
+      pointer-events: auto;
+    }
+    #tooltip .tooltipClose{
+      position: absolute;
+      right: 10px;
+      top: 8px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+    #tooltip .desc{ opacity: 0.95; margin-top: 6px; }
+    #tooltip .sub{ opacity: 0.85; margin-top: 4px; white-space: normal; }
+    #tooltip .myth{ opacity: 0.9; margin-top: 6px; font-style: italic; }
+    #tooltip .mythToggle{
+      margin-top: 6px;
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+      font: inherit;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .bar{ cursor: default; }
+  </style>
+</head>
+<body>
+
+  <div class="appModeLinks" role="listbox" aria-label="Mode">
+    <button id="appModeChartsBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Charts</button>
+    <span class="inlineDot" aria-hidden="true">·</span>
+    <button id="appModeSkiesBtn" type="button" class="linkBtn appModeLink" aria-selected="false">Skies</button>
+  </div>
+
+  <div class="panel" id="chartsPanel">
+    <div id="chartsSection">
+    <div class="row rowTop">
+      <div class="field med" style="min-width: 260px; flex: 1;">
+        <label>Chart</label>
+        <div class="chartPickers">
+          <div class="chartPicker">
+            <div id="chartButtons" class="chartButtons" role="listbox" aria-label="Chart A"></div>
+            <div class="chartLinks" id="chartLinks">
+              <button id="chartSummaryToggle" type="button" class="linkBtn" aria-expanded="false">Show data</button>
+              <span class="inlineDot" id="composeDot">·</span>
+              <button id="composeToggle" type="button" class="linkBtn" aria-expanded="false">Compose</button>
+              <span class="inlineDot" id="deleteDot">·</span>
+              <button id="deleteChartBtn" type="button" class="linkBtn" title="Delete chart" aria-label="Delete chart">Delete</button>
+            </div>
+            <div id="chartPrivacy" class="chartPrivacy" hidden>Your data is private (stored locally).</div>
+          </div>
+          <div class="chartPicker" id="chartPickerB" hidden>
+            <div class="chartPickerLabel">Compose with</div>
+            <div id="chartButtonsB" class="chartButtons" role="listbox" aria-label="Chart B"></div>
+          </div>
+          <div id="composeHint" class="composeHint" hidden></div>
+          <div id="composeStopRow" class="composeStopRow" hidden>
+            <button id="composeStopBtn" type="button" class="linkBtn">Stop composing</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="chartSummary" class="chartSummary" hidden></div>
+
+    <div id="addChartPanel" class="row rowTop" style="margin-top:10px; display:none;">
+      <div class="field med"><label>Name</label><input id="addChartName" type="text" placeholder="Name" /></div>
+      <div class="field med"><label>Birth date</label><input id="addChartBirthDate" type="date" value="1990-09-01" /></div>
+      <div class="field med"><label>Birth time (local)</label><input id="addChartBirthTime" type="time" value="18:11" step="60" /></div>
+
+      <div class="field med typeahead">
+        <label>Birth place</label>
+        <input id="placeSearch" type="text" placeholder="City, country" autocomplete="off" />
+        <div id="placeSuggest" class="suggestBox" hidden></div>
+      </div>
+
+      <div class="field small"><label>&nbsp;</label><button id="saveChartBtn" type="button" class="btnSmallPrimary">Save</button></div>
+      <div class="field small"><label>&nbsp;</label><button id="cancelAddBtn" type="button" class="btnGhost">Cancel</button></div>
+    </div>
+    </div>
+  </div>
+
+<div id="mainContent">
+  <div class="panel">
+    <div class="row">
+      <div class="field med">
+        <label>Preset</label>
+        <div id="presetButtons" class="presetButtons" role="listbox" aria-label="Preset"></div>
+      </div>
+    </div>
+
+    <div style="margin-top: 10px;">
+      <button id="advancedToggle" type="button" class="linkBtn" aria-expanded="false">Show options</button>
+    </div>
+
+    <div class="row optionsRow" data-advanced>
+      <div class="field"><label>Start</label><input id="rangeStart" type="date" value="2025-10-01" /></div>
+      <div class="field"><label>End</label><input id="rangeEnd" type="date" value="2026-12-31" /></div>
+      <div class="field rxField">
+        <label>&nbsp;</label>
+        <div class="checks" style="padding:0;">
+          <label><input id="includeRxGaps" type="checkbox" checked /> Bridge retrograde gaps</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="row rowPlanets" data-advanced>
+      <div class="field med"><label>Planets</label><select id="transitGroup"></select></div>
+      <div class="field med" id="natalGroupField"><label>Natal targets</label><select id="natalGroup"></select></div>
+      <div class="field">
+        <div class="checks" style="padding:0;">
+          <label><input id="includeMoon" type="checkbox" checked /> Transiting Moon</label>
+          <label><input id="includeChiron" type="checkbox" /> Chiron</label>
+          <label id="includeMCWrap"><input id="includeMC" type="checkbox" checked /> Mc</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="checks" id="topChecks" data-advanced>
+      <details class="aspectDropdown" data-advanced>
+        <summary>Aspects</summary>
+        <div class="aspectPanel" data-advanced>
+          <div class="checks" id="aspectChecks" style="padding:0; gap:12px;"></div>
+          <div class="orbInline orbField" style="margin-top: 8px;">
+            <label for="orb">Orb (°)</label>
+            <input id="orb" type="number" value="1.0" step="0.1" />
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="statusRow" data-advanced>
+      <button id="updateBtn" type="button" class="linkBtn" style="display:none;">Cancel</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div class="dateAxisScroll" id="dateAxisScroll">
+    <div class="dateAxisScrollInner">
+      <div class="timelineNav" data-advanced>
+        <div class="timelineNavGroup">
+          <button class="timelineNavBtn" id="rangeShiftBack" type="button" aria-label="Shift range backward">‹</button>
+          <button class="timelineNavBtn" id="rangeExpandBack" type="button" aria-label="Extend range backward">«</button>
+        </div>
+        <div class="timelineNavGroup">
+          <button class="timelineNavBtn" id="rangeExpandForward" type="button" aria-label="Extend range forward">»</button>
+          <button class="timelineNavBtn" id="rangeShiftForward" type="button" aria-label="Shift range forward">›</button>
+        </div>
+      </div>
+      <svg id="dateAxisSvg" width="1200" height="80" viewBox="0 0 1200 80" role="img" aria-label="Date axis"></svg>
+      <div id="axisCornerBlock" aria-hidden="true"></div>
+    </div>
+  </div>
+  <div class="chartFrame">
+    <div id="aspectAxisWrap">
+      <svg id="aspectAxisSvg" width="160" height="280" viewBox="0 0 160 280" role="img" aria-label="Aspect axis"></svg>
+    </div>
+    <div class="timelineScroll" id="timelineScroll">
+      <svg id="timelineSvg" width="1200" height="280" viewBox="0 0 1200 280" role="img" aria-label="Transit timeline"></svg>
+    </div>
+    <div id="moreWrap" style="margin-top: 8px; display: none; padding-left: 245px;">
+      <button id="showMoreBtn" class="linkBtn" type="button">Show 50 more</button>
+    </div>
+  </div>
+  </div>
+  <div id="tooltipBackdrop" aria-hidden="true"></div>
+  <div id="tooltip" aria-hidden="true"></div>
+
+  <script type="module">
+    import * as ephNS from "https://esm.sh/ephemeris-astronomy@0.1.1";
+    import { awsApiKey } from "./api-key.js";
+    const ephemerisAstronomy = ephNS.default ?? ephNS;
+
+    const defaultPresetKey = "week";
+
+    const planets = [
+      ["sun","Sun"], ["moon","Moon"], ["mercury","Mercury"], ["venus","Venus"], ["mars","Mars"],
+      ["jupiter","Jupiter"], ["saturn","Saturn"], ["uranus","Uranus"], ["neptune","Neptune"], ["pluto","Pluto"],
+      ["chiron","Chiron"],
+      ["mc","Mc"],
+    ];
+    const planetSymbols = {
+      sun: "☉",
+      moon: "☾",
+      mercury: "☿",
+      venus: "♀",
+      mars: "♂",
+      jupiter: "♃",
+      saturn: "♄",
+      uranus: "♅",
+      neptune: "♆",
+      pluto: "♇",
+      chiron: "⚷",
+      mc: "Mc"
+    };
+
+    const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","chiron","mc"];
+    const orderMap = new Map(order.map((k,i)=>[k,i]));
+
+    const aspects = [
+      ["conjunction", "☌ 0°", 0],
+      ["sextile",     "⚹ 60°", 60],
+      ["square",      "□ 90°", 90],
+      ["trine",       "△ 120°", 120],
+      ["opposition",  "☍ 180°", 180],
+      ["quincunx",    "⚻ 150°", 150],
+    ];
+    const aspectColors = {
+      conjunction: "#1d4ed8",
+      sextile: "#15803d",
+      square: "#b91c1c",
+      trine: "#166534",
+      opposition: "#c2410c",
+      quincunx: "#0f766e"
+    };
+
+    // Dropdown groups exclude Chiron/MC; checkbox adds it to both.
+    const baseGroups = [
+      ["luminaries","Luminaries (Sun, Moon)", ["sun","moon"]],
+      ["personal",  "Personal (Sun–Mars)", ["sun","moon","mercury","venus","mars"]],
+      ["classical", "Classical (Sun–Saturn)", ["sun","moon","mercury","venus","mars","jupiter","saturn"]],
+      ["outer",     "Outer (Jupiter–Pluto)", ["jupiter","saturn","uranus","neptune","pluto"]],
+      ["social",    "Social (Jupiter–Saturn)", ["jupiter","saturn"]],
+      ["slow",      "Slow (Saturn–Pluto)",   ["saturn","uranus","neptune","pluto"]],
+      ["all",       "All (Sun-Pluto)", ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"]],
+    ];
+
+    const individualPlanets = planets
+      .map(p => p[0])
+      .filter(k => k !== "chiron" && k !== "mc")
+      .map(k => [k, planetLabel(k), [k]]);
+
+    const sharedGroups = [...baseGroups, ...individualPlanets];
+    const transitGroups = sharedGroups;
+    const natalGroups = sharedGroups;
+
+    const presets = [
+      { key:"today", label:"Today",
+        transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
+        orb:1.5, includeRxGaps:true, includeMoon:true, range:{startOffsetDays:0, endOffsetDays:0},
+        skies:{ transitGroup:"all", includeMoon:true } },
+      { key:"week", label:"Week",
+        transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
+        orb:1.0, includeRxGaps:true, includeMoon:false, range:{startOffsetDays:-1, endOffsetDays:6},
+        skies:{ transitGroup:"all", includeMoon:true } },
+      { key:"month", label:"Month",
+        transitGroup:"classical", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
+        orb:1.0, includeRxGaps:true, includeMoon:false, range:{startOffsetDays:-7, endOffsetDays:29},
+        skies:{ transitGroup:"all", includeMoon:false } },
+      { key:"basic_longterm", label:"Year",
+        transitGroup:"outer", natalGroup:"all", aspects:["conjunction","sextile","square","trine","opposition"],
+        orb:1.0, includeRxGaps:true, includeMoon:false, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
+        skies:{ transitGroup:"outer", includeMoon:false } }
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    let aspectDescriptions = {};
+    let mythDescriptions = {};
+    const el = {
+      appModeChartsBtn: $("appModeChartsBtn"),
+      appModeSkiesBtn: $("appModeSkiesBtn"),
+      chartsPanel: $("chartsPanel"),
+      chartsSection: $("chartsSection"),
+      chartButtons: $("chartButtons"),
+      chartButtonsB: $("chartButtonsB"),
+      chartSummary: $("chartSummary"),
+      chartSummaryToggle: $("chartSummaryToggle"),
+      deleteChartBtn: $("deleteChartBtn"),
+      deleteDot: $("deleteDot"),
+      composeDot: $("composeDot"),
+      composeToggle: $("composeToggle"),
+      chartLinks: $("chartLinks"),
+      chartPrivacy: $("chartPrivacy"),
+      composeHint: $("composeHint"),
+      composeStopRow: $("composeStopRow"),
+      composeStopBtn: $("composeStopBtn"),
+      chartPickerB: $("chartPickerB"),
+      mainContent: $("mainContent"),
+      natalGroupField: $("natalGroupField"),
+      includeMCWrap: $("includeMCWrap"),
+      addChartPanel: $("addChartPanel"),
+      addChartName: $("addChartName"),
+      addChartBirthDate: $("addChartBirthDate"),
+      addChartBirthTime: $("addChartBirthTime"),
+      placeSearch: $("placeSearch"),
+      placeSuggest: $("placeSuggest"),
+      presetButtons: $("presetButtons"),
+      transitGroup: $("transitGroup"),
+      natalGroup: $("natalGroup"),
+      rangeStart: $("rangeStart"),
+      rangeEnd: $("rangeEnd"),
+      orb: $("orb"),
+      includeRxGaps: $("includeRxGaps"),
+      aspectChecks: $("aspectChecks"),
+      advancedToggle: $("advancedToggle"),
+      includeMoon: $("includeMoon"),
+      includeMC: $("includeMC"),
+      includeChiron: $("includeChiron"),
+      updateBtn: $("updateBtn"),
+      status: $("status"),
+      rangeShiftBack: $("rangeShiftBack"),
+      rangeExpandBack: $("rangeExpandBack"),
+      rangeExpandForward: $("rangeExpandForward"),
+      rangeShiftForward: $("rangeShiftForward"),
+      dateAxisSvg: $("dateAxisSvg"),
+      dateAxisScroll: $("dateAxisScroll"),
+      timelineScroll: $("timelineScroll"),
+      aspectAxisSvg: $("aspectAxisSvg"),
+      timelineSvg: $("timelineSvg"),
+      moreWrap: $("moreWrap"),
+      showMoreBtn: $("showMoreBtn")
+    };
+    const tooltip = $("tooltip");
+    const tooltipBackdrop = $("tooltipBackdrop");
+    let activePresetKey = defaultPresetKey;
+    let chartSummaryVisible = false;
+    let appMode = "charts";
+
+    // Cache last computation so "Show more" can paginate without recomputing
+    let cachedResults = null;
+    let currentMaxRows = 50;
+    let transitCache = null;
+    let cachedObserver = null;
+    let cachedNatalLon = null;
+    let isComputing = false;
+    let cancelRequested = false;
+    let pendingUpdate = false;
+    let labelsUseSymbols = false;
+    let currentLayout = null;
+
+    function buildTransitCacheKey({ rangeStartLocal, endExclusive, stepMillis, lon, lat, height, planetsKey }){
+      return [
+        rangeStartLocal.toISOString(),
+        endExclusive.toISOString(),
+        String(stepMillis),
+        String(lon),
+        String(lat),
+        String(height),
+        String(planetsKey || "")
+      ].join("|");
+    }
+
+    function updateShowMore(shown, total){
+      const wrap = el.moreWrap;
+      const btn = el.showMoreBtn;
+      if (!wrap || !btn) return;
+      if (total >= 100 && total > shown){
+        wrap.style.display = "block";
+        btn.textContent = `Show 50 more (showing ${shown} of ${total})`;
+      } else {
+        wrap.style.display = "none";
+      }
+    }
+
+    function renderFromCache(limit){
+      if (!cachedResults){
+        updateShowMore(0, 0);
+        return;
+      }
+      const layout = computeTimelineLayout(el.timelineSvg, false);
+      currentLayout = layout;
+      const threshold = Math.max(0, layout.labelWMax - layout.labelWMin);
+      labelsUseSymbols = !!el.timelineScroll && el.timelineScroll.scrollLeft >= threshold;
+      const total = cachedResults.rules.length;
+      const shown = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
+      const rules = cachedResults.rules.slice(0, shown);
+      const intervals = cachedResults.intervals.slice(0, shown);
+
+      const spanMs = cachedResults.endExclusive.getTime() - cachedResults.start.getTime();
+      const showYear = (spanMs / (365.25 * 24 * 3600 * 1000)) >= 3;
+
+      renderAxisSVG({
+        svg: el.dateAxisSvg,
+        start: cachedResults.start,
+        endExclusive: cachedResults.endExclusive,
+        stepMillis: cachedResults.stepMillis,
+        layout
+      });
+
+      renderLabelsSVG({
+        svg: el.aspectAxisSvg,
+        rules,
+        chartRuler: cachedResults.chartRuler,
+        layout,
+        useSymbols: labelsUseSymbols
+      });
+
+      renderTimelineSVG({
+        svg: el.timelineSvg,
+        start: cachedResults.start,
+        endExclusive: cachedResults.endExclusive,
+        rules,
+        intervalsByRule: intervals,
+        stepMillis: cachedResults.stepMillis,
+        presetKey: cachedResults.presetKey,
+        chartRuler: cachedResults.chartRuler,
+        layout,
+        showYear
+      });
+
+      updateShowMore(shown, total);
+      updateAxisTransform();
+    }
+
+    function updateAxisTransform(){
+      if (!el.dateAxisSvg || !el.timelineScroll) return;
+      const scrollLeft = el.timelineScroll.scrollLeft;
+      const layout = currentLayout;
+      const labelWMax = layout?.labelWMax ?? 150;
+      const labelWMin = layout?.labelWMin ?? 96;
+      const shift = Math.min(Math.max(0, scrollLeft), Math.max(0, labelWMax - labelWMin));
+      el.dateAxisSvg.style.transform = `translate3d(${-Math.round(scrollLeft)}px, 0, 0)`;
+      document.documentElement.style.setProperty("--aspect-axis-visible-w", `${labelWMax - shift}px`);
+      document.documentElement.style.setProperty("--aspect-axis-shift", `${-Math.round(shift)}px`);
+      updateLabelsMode();
+    }
+
+    function symbolsThreshold(){
+      const layout = currentLayout;
+      if (!layout) return 4;
+      return Math.max(0, layout.labelWMax - layout.labelWMin);
+    }
+
+    function updateLabelsMode(){
+      if (!cachedResults || !el.timelineScroll) return;
+      const shouldUseSymbols = el.timelineScroll.scrollLeft >= symbolsThreshold();
+      if (shouldUseSymbols === labelsUseSymbols) return;
+      labelsUseSymbols = shouldUseSymbols;
+      renderFromCache(currentMaxRows);
+    }
+
+    function wireAxisScrollSync(){
+      if (!el.dateAxisScroll || !el.timelineScroll) return;
+      el.timelineScroll.addEventListener("scroll", () => {
+        window.requestAnimationFrame(updateAxisTransform);
+      }, { passive: true });
+      updateAxisTransform();
+    }
+
+    function rangeSpanDays(){
+      const start = parseLocalDateOnly(el.rangeStart.value);
+      const end = parseLocalDateOnly(el.rangeEnd.value);
+      const endExclusive = addDaysLocal(end, 1);
+      return Math.max(1, Math.round((endExclusive.getTime() - start.getTime()) / (24 * 3600 * 1000)));
+    }
+
+    function setRangeDates(start, end){
+      el.rangeStart.value = fmtLocalYYYYMMDD(start);
+      el.rangeEnd.value = fmtLocalYYYYMMDD(end);
+      updateTimeline();
+    }
+
+    function shiftRange(direction){
+      const start = parseLocalDateOnly(el.rangeStart.value);
+      const end = parseLocalDateOnly(el.rangeEnd.value);
+      const delta = rangeSpanDays() * direction;
+      setRangeDates(addDaysLocal(start, delta), addDaysLocal(end, delta));
+    }
+
+    function expandRange(direction){
+      const start = parseLocalDateOnly(el.rangeStart.value);
+      const end = parseLocalDateOnly(el.rangeEnd.value);
+      const delta = rangeSpanDays() * direction;
+      if (direction < 0){
+        setRangeDates(addDaysLocal(start, delta), end);
+      } else {
+        setRangeDates(start, addDaysLocal(end, delta));
+      }
+    }
+
+    function wireRangeNav(){
+      if (el.rangeShiftBack) el.rangeShiftBack.addEventListener("click", () => shiftRange(-1));
+      if (el.rangeShiftForward) el.rangeShiftForward.addEventListener("click", () => shiftRange(1));
+      if (el.rangeExpandBack) el.rangeExpandBack.addEventListener("click", () => expandRange(-1));
+      if (el.rangeExpandForward) el.rangeExpandForward.addEventListener("click", () => expandRange(1));
+    }
+
+
+    function fillSelect(sel, items){
+      sel.innerHTML = "";
+      for (const it of items){
+        const opt = document.createElement("option");
+        opt.value = it[0];
+        opt.textContent = it[1];
+        sel.appendChild(opt);
+      }
+    }
+
+    function planetLabel(key){ return planets.find(p => p[0] === key)?.[1] ?? key; }
+    function aspectAngle(key){ return aspects.find(a => a[0] === key)?.[2] ?? 0; }
+    function aspectSymbol(key){ return aspects.find(a => a[0] === key)?.[1]?.split(" ")[0] ?? "•"; }
+    function mythKeyFor(a, b){
+      const pa = String(a || "");
+      const pb = String(b || "");
+      const ia = orderMap.has(pa) ? orderMap.get(pa) : Number.MAX_SAFE_INTEGER;
+      const ib = orderMap.has(pb) ? orderMap.get(pb) : Number.MAX_SAFE_INTEGER;
+      const [first, second] = (ia === ib) ? [pa, pb] : (ia < ib ? [pa, pb] : [pb, pa]);
+      return `${first}-aspect-${second}`;
+    }
+
+    function addDaysLocal(dateObj, days){
+      const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+      d.setDate(d.getDate() + days);
+      return d;
+    }
+    function parseLocalDateOnly(yyyyMmDd){
+      const [y,m,d] = yyyyMmDd.split("-").map(Number);
+      return new Date(y, m-1, d, 0, 0, 0, 0);
+    }
+    function fmtLocalYYYYMMDD(dateObj){
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth()+1).padStart(2,"0");
+      const day = String(dateObj.getDate()).padStart(2,"0");
+      return `${y}-${m}-${day}`;
+    }
+
+    fillSelect(el.transitGroup, transitGroups.map(g => [g[0], g[1]]));
+    fillSelect(el.natalGroup, natalGroups.map(g => [g[0], g[1]]));
+
+    function renderAspectChecks(selectedKeys){
+      const wrap = el.aspectChecks;
+      wrap.innerHTML = "";
+      for (const [key, label] of aspects){
+        const lab = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = selectedKeys.includes(key);
+        cb.dataset.aspectKey = key;
+        lab.appendChild(cb);
+        const span = document.createElement("span");
+        span.textContent = label;
+        lab.appendChild(span);
+        wrap.appendChild(lab);
+      }
+    }
+
+    function getCheckedAspects(){
+      return Array.from(el.aspectChecks.querySelectorAll("input[type=checkbox]"))
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.aspectKey);
+    }
+
+    async function loadAspectDescriptions(){
+      try{
+        const res = await fetch("aspects.json");
+        if (!res.ok) throw new Error(`Aspect descriptions load failed (${res.status}).`);
+        const data = await res.json();
+        if (data && typeof data === "object") return data;
+      } catch (err){
+        console.warn("Aspect descriptions unavailable:", err);
+      }
+      return {};
+    }
+
+    async function loadMythDescriptions(){
+      try{
+        const res = await fetch("myths.json");
+        if (!res.ok) throw new Error(`Myth descriptions load failed (${res.status}).`);
+        const data = await res.json();
+        if (data && typeof data === "object") return data;
+      } catch (err){
+        console.warn("Myth descriptions unavailable:", err);
+      }
+      return {};
+    }
+
+    function setStatus(msg, isError=false){
+      el.status.textContent = msg;
+      el.status.className = "status" + (isError ? " error" : "");
+    }
+
+    let advancedVisible = false;
+    function setAdvancedVisible(isVisible){
+      advancedVisible = !!isVisible;
+      const nodes = document.querySelectorAll("[data-advanced]");
+      for (const n of nodes) n.hidden = !advancedVisible;
+      if (el.advancedToggle){
+        el.advancedToggle.setAttribute("aria-expanded", advancedVisible ? "true" : "false");
+        el.advancedToggle.textContent = advancedVisible ? "Hide options" : "Show options";
+      }
+    }
+
+    // --- People + Places UI wiring ---
+    const chartsState = {
+      list: [],
+      activeIdA: "",
+      activeIdB: "",
+      mode: "single",
+      addMode: false
+    };
+
+    function getActiveChartA(){
+      return chartsState.list.find(p => p.id === chartsState.activeIdA) || null;
+    }
+
+    function getActiveChartB(){
+      return chartsState.list.find(p => p.id === chartsState.activeIdB) || null;
+    }
+
+    function getActiveChart(){
+      return getActiveChartA();
+    }
+
+    function renderChartButtonsFor(wrap, activeId, { allowAdd=true, disableId=null } = {}){
+      if (!wrap) return;
+      wrap.innerHTML = "";
+      for (const p of chartsState.list){
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chartBtn" + ((!chartsState.addMode && p.id === activeId) ? " active" : "");
+        btn.dataset.chartId = p.id;
+        btn.textContent = p.name || "(unnamed)";
+        btn.setAttribute("role", "option");
+        btn.setAttribute("aria-selected", (!chartsState.addMode && p.id === activeId) ? "true" : "false");
+        if (disableId && p.id === disableId){
+          btn.disabled = true;
+          btn.setAttribute("aria-disabled", "true");
+          btn.style.opacity = "0.5";
+          btn.style.cursor = "not-allowed";
+        }
+        wrap.appendChild(btn);
+      }
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "chartBtn add" + (chartsState.addMode ? " active" : "");
+      addBtn.dataset.chartId = "__add__";
+      addBtn.textContent = "＋ Add";
+      addBtn.setAttribute("role", "option");
+      addBtn.setAttribute("aria-selected", chartsState.addMode ? "true" : "false");
+      if (!allowAdd){
+        addBtn.disabled = true;
+        addBtn.style.visibility = "hidden";
+        addBtn.style.pointerEvents = "none";
+        addBtn.setAttribute("aria-hidden", "true");
+      }
+      wrap.appendChild(addBtn);
+    }
+
+    function buildChartSummaryText(pA, pB){
+      if (chartsState.addMode) return "Add a new chart.";
+      if (!pA) return "";
+      if (appMode !== "charts") return "";
+      if (chartsState.mode === "composite" && !pB) return "Pick two charts to build a composite.";
+      const parts = [];
+      try{
+        if (ephemerisAstronomy && typeof ephemerisAstronomy.getAllPlanets === "function"){
+          if (chartsState.mode === "composite"){
+            if (!pB) throw new Error("Select two charts.");
+            const composite = computeCompositeChart(pA, pB);
+            parts.push(`Composite of ${pA.name} & ${pB.name}`);
+            parts.push(`${zodiacSign(composite.lon.sun)} Sun • ${zodiacSign(composite.lon.moon)} Moon • ${zodiacSign(composite.asc)} Asc`);
+          } else {
+            const birthUTC = parseBirthUTCFor(pA);
+            const allPlanets = ephemerisAstronomy.getAllPlanets(birthUTC, pA.lon, pA.lat, 0);
+            const sunLon = getPlanetLonFromAll(allPlanets, "sun");
+            const moonLon = getPlanetLonFromAll(allPlanets, "moon");
+            const ascLon = calcNatalAscDeg(birthUTC, pA.lon, pA.lat);
+            parts.push(`${zodiacSign(sunLon)} Sun • ${zodiacSign(moonLon)} Moon • ${zodiacSign(ascLon)} Asc`);
+          }
+        }
+      } catch {}
+      if (chartsState.mode !== "composite"){
+        parts.push(`${pA.birthDate} ${pA.birthTime}`);
+        if (pA.placeLabel) parts.push(pA.placeLabel);
+        const cc = fmtCoord(pA.lat, pA.lon);
+        if (cc) parts.push(cc);
+        if (pA.tzName) parts.push(pA.tzName);
+      }
+      return parts.join(" • ");
+    }
+
+    function renderAppModeSection(){
+      const appModeIsCharts = appMode === "charts";
+      if (el.appModeChartsBtn){
+        el.appModeChartsBtn.classList.toggle("active", appModeIsCharts);
+        el.appModeChartsBtn.setAttribute("aria-selected", appModeIsCharts ? "true" : "false");
+      }
+      if (el.appModeSkiesBtn){
+        el.appModeSkiesBtn.classList.toggle("active", !appModeIsCharts);
+        el.appModeSkiesBtn.setAttribute("aria-selected", appModeIsCharts ? "false" : "true");
+      }
+      if (el.chartsPanel) el.chartsPanel.hidden = !appModeIsCharts;
+      if (el.chartsSection) el.chartsSection.hidden = !appModeIsCharts;
+      if (el.natalGroupField){
+        el.natalGroupField.hidden = !appModeIsCharts;
+        el.natalGroupField.style.display = appModeIsCharts ? "" : "none";
+      }
+      if (el.includeMCWrap){
+        el.includeMCWrap.hidden = !appModeIsCharts;
+        el.includeMCWrap.style.display = appModeIsCharts ? "" : "none";
+      }
+    }
+
+    function renderChartsSection(){
+      renderAppModeSection();
+      if (appMode !== "charts") return;
+
+      const canCompare = chartsState.list.length >= 2;
+      if (!canCompare && chartsState.mode !== "single") chartsState.mode = "single";
+
+      const allowAddA = chartsState.mode === "single";
+      const disableA = (chartsState.mode === "composite" && chartsState.activeIdB) ? chartsState.activeIdB : null;
+      renderChartButtonsFor(el.chartButtons, chartsState.activeIdA, { allowAdd: allowAddA, disableId: disableA });
+      renderChartButtonsFor(el.chartButtonsB, chartsState.activeIdB, { allowAdd: false, disableId: chartsState.activeIdA });
+
+      const isComposing = chartsState.mode === "composing";
+      const isComposite = chartsState.mode === "composite";
+      if (el.chartPickerB) el.chartPickerB.hidden = !canCompare || (!isComposing && !isComposite);
+      if (el.composeToggle) el.composeToggle.hidden = !canCompare || isComposing || isComposite;
+      if (el.composeDot) el.composeDot.hidden = !canCompare || isComposing || isComposite;
+      const linksVisible = !(chartsState.addMode || isComposing || isComposite);
+      if (el.chartLinks){
+        el.chartLinks.hidden = !linksVisible;
+        el.chartLinks.style.display = linksVisible ? "flex" : "none";
+      }
+      if (el.chartPrivacy) el.chartPrivacy.hidden = !chartsState.addMode;
+      const needsB = chartsState.mode === "composing" && !chartsState.activeIdB;
+      if (el.composeHint){
+        if (needsB){
+          el.composeHint.textContent = "The composite chart is the relationship of the two chosen charts (midpoints method)";
+          el.composeHint.hidden = false;
+        } else if (chartsState.mode === "composing" || chartsState.mode === "composite"){
+          el.composeHint.textContent = buildChartSummaryText(getActiveChartA(), getActiveChartB());
+          el.composeHint.hidden = false;
+        } else {
+          el.composeHint.hidden = true;
+          el.composeHint.textContent = "";
+        }
+      }
+      if (el.mainContent) el.mainContent.hidden = needsB;
+      if (el.composeStopRow){
+        const showStop = isComposing || isComposite;
+        el.composeStopRow.hidden = !showStop;
+        el.composeStopRow.style.display = showStop ? "flex" : "none";
+      }
+
+
+      if (el.chartSummaryToggle){
+        el.chartSummaryToggle.textContent = chartSummaryVisible ? "Hide data" : "Show data";
+        el.chartSummaryToggle.setAttribute("aria-expanded", chartSummaryVisible ? "true" : "false");
+      }
+
+      const pA = getActiveChartA();
+      const pB = getActiveChartB();
+      const showDelete = linksVisible && !!pA;
+      if (el.deleteChartBtn){
+        el.deleteChartBtn.hidden = !showDelete;
+        el.deleteChartBtn.disabled = !showDelete;
+      }
+      if (el.deleteDot) el.deleteDot.hidden = !showDelete;
+
+      if (el.chartSummary){
+        if (chartsState.mode === "single"){
+          el.chartSummary.textContent = buildChartSummaryText(pA, pB);
+          el.chartSummary.hidden = !chartSummaryVisible;
+        } else {
+          el.chartSummary.hidden = true;
+        }
+      }
+    }
+
+    function setChartSummaryVisible(isVisible){
+      chartSummaryVisible = !!isVisible;
+      renderChartsSection();
+    }
+
+    function zodiacSign(deg){
+      const signs = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+      const idx = Math.floor(wrap360(deg) / 30) % 12;
+      return signs[idx] || "";
+    }
+
+    function renderPresetSection(){
+      el.presetButtons.innerHTML = "";
+      for (const p of presets){
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "presetBtn" + (p.key === activePresetKey ? " active" : "");
+        btn.dataset.presetKey = p.key;
+        btn.textContent = p.label;
+        btn.setAttribute("role", "option");
+        btn.setAttribute("aria-selected", p.key === activePresetKey ? "true" : "false");
+        el.presetButtons.appendChild(btn);
+      }
+    }
+
+    function setAddMode(isAdd){
+      if (appMode !== "charts"){
+        chartsState.addMode = false;
+        el.addChartPanel.style.display = "none";
+        renderChartsSection();
+        return;
+      }
+      chartsState.addMode = isAdd;
+      el.addChartPanel.style.display = isAdd ? "" : "none";
+      if (!isAdd) hideSuggest();
+      renderChartsSection();
+    }
+
+    function setActiveChartA(id){
+      chartsState.activeIdA = id;
+      const p = chartsState.list.find(x => x.id === id);
+      if (p && !isDefaultChart(p)) localStorage.setItem(lastChartKey, id);
+      chartsState.addMode = false;
+      el.addChartPanel.style.display = "none";
+      hideSuggest();
+      renderChartsSection();
+    }
+
+    function setActiveChartB(id){
+      chartsState.activeIdB = id;
+      chartsState.addMode = false;
+      el.addChartPanel.style.display = "none";
+      hideSuggest();
+      if (chartsState.mode === "composing") chartsState.mode = "composite";
+      renderChartsSection();
+    }
+
+    function setMode(modeKey){
+      const canCompare = chartsState.list.length >= 2;
+      if (modeKey === "composing" && canCompare) chartsState.mode = "composing";
+      else if (modeKey === "composite" && canCompare) chartsState.mode = "composite";
+      else chartsState.mode = "single";
+      renderChartsSection();
+    }
+
+    function toggleCompose(){
+      if (chartsState.mode === "single"){
+        chartsState.activeIdB = "";
+        setMode("composing");
+      } else {
+        setMode("single");
+      }
+    }
+
+    function setAppMode(modeKey){
+      appMode = (modeKey === "skies") ? "skies" : "charts";
+      if (appMode !== "charts"){
+        chartsState.addMode = false;
+        chartSummaryVisible = false;
+        if (el.addChartPanel) el.addChartPanel.style.display = "none";
+        activePresetKey = "month";
+      }
+      applyPreset(activePresetKey);
+      renderChartsSection();
+    }
+
+    function fmtCoord(lat, lon){
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
+      const ns = lat >= 0 ? "N" : "S";
+      const ew = lon >= 0 ? "E" : "W";
+      return `${Math.abs(lat).toFixed(4)}°${ns}, ${Math.abs(lon).toFixed(4)}°${ew}`;
+    }
+
+
+    function hideSuggest(){
+      const box = el.placeSuggest;
+      if (!box) return;
+      box.hidden = true;
+      box.innerHTML = "";
+    }
+
+    function escapeHTML(s){
+      return String(s || "").replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function showSuggest(items){
+      const box = el.placeSuggest;
+      box.innerHTML = "";
+      if (!items || items.length === 0){
+        hideSuggest();
+        return;
+      }
+      for (const it of items){
+        const div = document.createElement("div");
+        div.className = "suggestItem";
+        div.innerHTML = `<div class="suggestTitle">${escapeHTML(it.label)}</div>` + (it.sub ? `<div class="suggestSub">${escapeHTML(it.sub)}</div>` : "");
+        div.addEventListener("mousedown", (e) => { e.preventDefault(); selectSuggestion(it); });
+        box.appendChild(div);
+      }
+      box.hidden = false;
+    }
+
+    async function selectSuggestion(it){
+      el.placeSearch.value = it.label;
+      el.placeSearch.dataset.placeId = it.placeId;
+      hideSuggest();
+
+      try{
+        setStatus("Looking up place…");
+        const gp = await awsGetPlace(it.placeId);
+        const pos = extractPosition(gp);
+        if (pos){
+          el.placeSearch.dataset.lon = String(pos[0]);
+          el.placeSearch.dataset.lat = String(pos[1]);
+        }
+        const tzName = gp?.TimeZone?.Name || "";
+        el.placeSearch.dataset.tzName = tzName;
+        setStatus("Place set.");
+      } catch (err){
+        setStatus(String(err?.message || err), true);
+      }
+    }
+
+    function debounce(fn, ms){
+      let t = null;
+      return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), ms);
+      };
+    }
+
+    const runAutocompleteDebounced = debounce(async () => {
+      const q = el.placeSearch.value.trim();
+      if (q.length < 2){
+        hideSuggest();
+        return;
+      }
+      try{
+        const data = await awsAutocomplete(q);
+        const items = (data?.ResultItems || []).map(r => {
+          const label = r?.Address?.Label || r?.Title || "";
+          const sub = (r?.Address?.Country?.Name || r?.Address?.Country?.Code3 || r?.Address?.Country?.Code2 || "");
+          return { placeId: r?.PlaceId || "", label, sub };
+        }).filter(x => x.placeId && x.label);
+        showSuggest(items);
+      } catch {
+        hideSuggest();
+      }
+    }, 250);
+
+    function enterAddMode(){
+      setAddMode(true);
+
+      el.addChartName.value = "";
+      const now = new Date();
+      el.addChartBirthDate.value = fmtLocalYYYYMMDD(now);
+      el.addChartBirthTime.value = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      el.placeSearch.value = "";
+      el.placeSearch.dataset.placeId = "";
+      el.placeSearch.dataset.lon = "";
+      el.placeSearch.dataset.lat = "";
+      el.placeSearch.dataset.tzName = "";
+      hideSuggest();
+
+      setStatus("Fill the fields and click Save.");
+      setTimeout(() => el.addChartName.focus(), 0);
+    }
+
+    function exitAddMode(){
+      setAddMode(false);
+      setStatus("");
+    }
+
+    function switchToChartA(id){
+      if (id === "__add__"){
+        enterAddMode();
+        return;
+      }
+      setActiveChartA(id);
+      updateTimeline();
+    }
+
+    function switchToChartB(id){
+      if (id === "__add__"){
+        enterAddMode();
+        return;
+      }
+      setActiveChartB(id);
+      updateTimeline();
+    }
+
+    function addChartFromForm(){
+      const name = el.addChartName.value.trim() || "New chart";
+      const birthDate = el.addChartBirthDate.value;
+      const birthTime = el.addChartBirthTime.value || "00:00";
+      const placeLabel = el.placeSearch.value.trim();
+      const placeId = el.placeSearch.dataset.placeId || "";
+      const lon = Number(el.placeSearch.dataset.lon || NaN);
+      const lat = Number(el.placeSearch.dataset.lat || NaN);
+      const tzName = el.placeSearch.dataset.tzName || "";
+
+      if (!birthDate) throw new Error("Birth date is required.");
+      if (!placeId || !Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("Pick a birth place from the suggestions.");
+
+      const p = normalizeChart({ id: newId(), name, birthDate, birthTime, placeLabel, placeId, lon, lat, tzName });
+      if (chartsState.list.length === 1 && isDefaultChart(chartsState.list[0])){
+        chartsState.list = [p];
+      } else {
+        chartsState.list.push(p);
+      }
+      saveCharts(chartsState.list);
+
+      setActiveChartA(p.id);
+      updateTimeline();
+    }
+
+    function deleteActiveChart(){
+      const p = getActiveChart();
+      if (!p) return;
+      const ok = confirm(`Delete "${p.name}"?`);
+      if (!ok) return;
+
+      chartsState.list = chartsState.list.filter(x => x.id !== p.id);
+      saveCharts(chartsState.list);
+
+      if (chartsState.list.length === 0){
+        chartsState.activeIdA = "";
+        chartsState.activeIdB = "";
+        localStorage.removeItem(lastChartKey);
+        enterAddMode();
+        return;
+      }
+      setActiveChartA(chartsState.list[0].id);
+      if (!chartsState.list.some(x => x.id === chartsState.activeIdB)){
+        chartsState.activeIdB = chartsState.list[0].id;
+      }
+      updateTimeline();
+    }
+
+    function initCharts(){
+      chartsState.list = loadCharts();
+      if (chartsState.list.length === 0){
+        const seed = normalizeChart({
+          id: newId(),
+          ...defaultChartData
+        });
+        chartsState.list = [seed];
+      }
+      const last = localStorage.getItem(lastChartKey);
+      chartsState.activeIdA = (last && chartsState.list.some(p => p.id === last)) ? last : chartsState.list[0].id;
+      const fallbackB = chartsState.list.find(p => p.id !== chartsState.activeIdA);
+      chartsState.activeIdB = fallbackB ? fallbackB.id : chartsState.activeIdA;
+
+      chartsState.addMode = false;
+      el.addChartPanel.style.display = "none";
+      renderChartsSection();
+      setChartSummaryVisible(false);
+    }
+
+    function wireChartsUI(){
+      el.chartButtons.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-chart-id]");
+        if (!btn) return;
+        switchToChartA(btn.dataset.chartId);
+      });
+      if (el.chartButtonsB){
+        el.chartButtonsB.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-chart-id]");
+          if (!btn) return;
+          if (btn.disabled) return;
+          switchToChartB(btn.dataset.chartId);
+        });
+      }
+      if (el.composeToggle){
+        el.composeToggle.addEventListener("click", () => {
+          toggleCompose();
+          updateTimeline();
+        });
+      }
+      if (el.composeStopBtn){
+        el.composeStopBtn.addEventListener("click", () => {
+          toggleCompose();
+          updateTimeline();
+        });
+      }
+      if (el.appModeChartsBtn){
+        el.appModeChartsBtn.addEventListener("click", () => {
+          setAppMode("charts");
+          updateTimeline();
+        });
+      }
+      if (el.appModeSkiesBtn){
+        el.appModeSkiesBtn.addEventListener("click", () => {
+          setAppMode("skies");
+          updateTimeline();
+        });
+      }
+      if (el.chartSummaryToggle){
+        el.chartSummaryToggle.addEventListener("click", () => {
+          setChartSummaryVisible(!chartSummaryVisible);
+        });
+      }
+      el.deleteChartBtn.addEventListener("click", deleteActiveChart);
+
+      $("saveChartBtn").addEventListener("click", () => {
+        try { addChartFromForm(); }
+        catch (err){ setStatus(String(err?.message || err), true); }
+      });
+
+      $("cancelAddBtn").addEventListener("click", () => {
+        if (chartsState.list.length === 0) return;
+        exitAddMode();
+        renderChartsSection();
+      });
+
+      el.placeSearch.addEventListener("input", () => {
+        el.placeSearch.dataset.placeId = "";
+        el.placeSearch.dataset.lon = "";
+        el.placeSearch.dataset.lat = "";
+        el.placeSearch.dataset.tzName = "";
+        runAutocompleteDebounced();
+      });
+      el.placeSearch.addEventListener("focus", () => runAutocompleteDebounced());
+      document.addEventListener("click", (e) => {
+        const box = el.placeSuggest;
+        const wrap = el.placeSearch.parentElement;
+        if (box && wrap && !wrap.contains(e.target)) hideSuggest();
+      });
+    }
+
+    function wireAdvancedUI(){
+      setAdvancedVisible(false);
+      el.advancedToggle.addEventListener("click", () => {
+        setAdvancedVisible(!advancedVisible);
+      });
+    }
+
+    function wireAutoUpdate(){
+      const updateDebounced = debounce(() => updateTimeline(), 150);
+      el.transitGroup.addEventListener("change", updateTimeline);
+      if (el.natalGroup) el.natalGroup.addEventListener("change", updateTimeline);
+      el.rangeStart.addEventListener("change", updateTimeline);
+      el.rangeEnd.addEventListener("change", updateTimeline);
+      el.orb.addEventListener("input", updateDebounced);
+      el.orb.addEventListener("change", updateTimeline);
+      el.includeRxGaps.addEventListener("change", updateTimeline);
+      el.includeMoon.addEventListener("change", updateTimeline);
+      el.includeMC.addEventListener("change", updateTimeline);
+      el.includeChiron.addEventListener("change", updateTimeline);
+      el.aspectChecks.addEventListener("change", updateTimeline);
+    }
+
+    function wireTooltipDismiss(){
+      window.addEventListener("scroll", () => {
+        if (isCoarsePointer()) hideTooltip();
+      }, { passive: true });
+    }
+
+    function applyPreset(key){
+      const p = presets.find(x => x.key === key) ?? presets[0];
+      activePresetKey = p.key;
+      renderPresetSection();
+
+      const skiesPreset = p.skies || {};
+      const useSkies = appMode === "skies";
+      el.transitGroup.value = useSkies ? (skiesPreset.transitGroup || "all") : p.transitGroup;
+      if (el.natalGroup) el.natalGroup.value = p.natalGroup;
+      el.orb.value = String(p.orb);
+      currentMaxRows = 50;
+      el.includeRxGaps.checked = !!p.includeRxGaps;
+      el.includeMoon.checked = useSkies ? (skiesPreset.includeMoon !== false) : (p.includeMoon !== false);
+      renderAspectChecks(p.aspects);
+
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const start = addDaysLocal(todayStart, p.range.startOffsetDays);
+      const end = addDaysLocal(todayStart, p.range.endOffsetDays);
+      el.rangeStart.value = fmtLocalYYYYMMDD(start);
+      el.rangeEnd.value = fmtLocalYYYYMMDD(end);
+    }
+
+    applyPreset(defaultPresetKey);
+    el.presetButtons.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-preset-key]");
+      if (!btn) return;
+      applyPreset(btn.dataset.presetKey);
+      updateTimeline();
+    });
+
+    // Angular helpers
+    function wrap360(deg){ let x = deg % 360; if (x < 0) x += 360; return x; }
+    function midpointAngle(a, b){
+      const diff = wrap360(b - a);
+      const adj = diff > 180 ? diff - 360 : diff;
+      return wrap360(a + adj / 2);
+    }
+    function angDist(a,b){ const d = Math.abs(wrap360(a - b)); return d > 180 ? 360 - d : d; }
+    function degToRad(d){ return d * Math.PI / 180; }
+    function radToDeg(r){ return r * 180 / Math.PI; }
+
+    function getPlanetLonFromAll(allPlanets, planetKey){
+      const obs = allPlanets?.observed?.[planetKey];
+      if (!obs || typeof obs.apparentLongitudeDd !== "number"){
+        throw new Error(`Couldn't read apparentLongitudeDd for "${planetKey}".`);
+      }
+      return wrap360(obs.apparentLongitudeDd);
+    }
+    let tooltipListenersWired = false;
+    function ensureTooltipListeners(){
+      if (tooltipListenersWired) return;
+      tooltipListenersWired = true;
+      window.addEventListener("scroll", hideTooltip, {passive:true});
+      window.addEventListener("blur", hideTooltip);
+      if (tooltipBackdrop) tooltipBackdrop.addEventListener("click", hideTooltip);
+      tooltip.addEventListener("click", (e) => {
+        const closeBtn = e.target.closest(".tooltipClose");
+        if (closeBtn){
+          hideTooltip();
+          return;
+        }
+        const btn = e.target.closest(".mythToggle");
+        if (!btn || !tooltip.contains(btn)) return;
+        const myth = tooltip.querySelector(".mythHidden");
+        if (!myth) return;
+        const expanded = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", expanded ? "false" : "true");
+        btn.textContent = expanded ? "Mythologically →" : "Mythologically ↓";
+        myth.hidden = expanded;
+      });
+      document.addEventListener("pointerdown", (e) => {
+        if (tooltip.style.display !== "block") return;
+        if (tooltip.contains(e.target)) return;
+        hideTooltip();
+      }, true);
+    }
+
+    
+    // --- Time zone helpers (local time in tzName -> UTC) ---
+    function tzOffsetMinutesAt(utcDate, tzName){
+      const dtf = new Intl.DateTimeFormat("en-US", {
+        timeZone: tzName,
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+      const parts = dtf.formatToParts(utcDate).filter(p => p.type !== "literal");
+      const map = {};
+      for (const p of parts) map[p.type] = p.value;
+      const asUTC = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour, +map.minute, +map.second);
+      return (asUTC - utcDate.getTime()) / 60000;
+    }
+
+    function utcFromLocalPartsInTZ(y, m, d, hh, mm, tzName){
+      const localAsUTC = Date.UTC(y, m-1, d, hh, mm, 0, 0);
+      let off0 = tzOffsetMinutesAt(new Date(localAsUTC), tzName);
+      let utcMillis = localAsUTC - off0 * 60000;
+      let off1 = tzOffsetMinutesAt(new Date(utcMillis), tzName);
+      if (off1 !== off0){
+        utcMillis = localAsUTC - off1 * 60000;
+      }
+      return new Date(utcMillis);
+    }
+
+
+    function parseBirthUTCFor(p){
+      if (!p) throw new Error("Pick a chart first.");
+      const dateStr = p.birthDate;
+      const timeStr = p.birthTime || "00:00";
+      const [y,m,d] = dateStr.split("-").map(Number);
+      const [hh,mm] = timeStr.split(":").map(Number);
+
+      if (p.tzName){
+        return utcFromLocalPartsInTZ(y, m, d, hh, mm, p.tzName);
+      }
+      const tz = Number(p.tzOffset || 0);
+      const utcMillis = Date.UTC(y, m-1, d, hh - tz, mm, 0, 0);
+      return new Date(utcMillis);
+    }
+
+    // MC calculation (mean sidereal time + mean obliquity)
+    function julianDay(dateObj){ return (dateObj.getTime() / 86400000) + 2440587.5; }
+    function meanObliquityDeg(t){
+      const sec = 21.448 - 46.8150*t - 0.00059*t*t + 0.001813*t*t*t;
+      return 23 + (26/60) + (sec/3600);
+    }
+    function gmstDeg(jd){
+      const t = (jd - 2451545.0) / 36525.0;
+      let gmst = 280.46061837
+        + 360.98564736629 * (jd - 2451545.0)
+        + 0.000387933 * t*t
+        - (t*t*t) / 38710000.0;
+      return wrap360(gmst);
+    }
+    function calcNatalMCDeg(birthUTC, lonDeg){
+      const jd = julianDay(birthUTC);
+      const t = (jd - 2451545.0) / 36525.0;
+      const eps = degToRad(meanObliquityDeg(t));
+      const lst = degToRad(wrap360(gmstDeg(jd) + lonDeg)); // east-positive
+      const lam = Math.atan2(Math.sin(lst) * Math.cos(eps), Math.cos(lst));
+      return wrap360(radToDeg(lam));
+    }
+
+    function calcNatalAscDeg(birthUTC, lonDeg, latDeg){
+      const jd = julianDay(birthUTC);
+      const t = (jd - 2451545.0) / 36525.0;
+      const eps = degToRad(meanObliquityDeg(t));
+      const lst = degToRad(wrap360(gmstDeg(jd) + lonDeg)); // east-positive
+      const phi = degToRad(latDeg);
+
+      // Ascendant (ecliptic longitude rising) - standard formula
+      const ascRad = Math.atan2(
+        -Math.cos(lst),
+        (Math.sin(lst) * Math.cos(eps)) + (Math.tan(phi) * Math.sin(eps))
+      ) + Math.PI;
+
+      return wrap360(radToDeg(ascRad));
+    }
+
+    function chartRulerFromAsc(ascDeg){
+      const sign = Math.floor(wrap360(ascDeg) / 30); // 0=Aries..11=Pisces
+      const rulers = ["mars","venus","mercury","moon","sun","mercury","venus","mars","jupiter","saturn","saturn","jupiter"]; // traditional
+      return rulers[sign] || null;
+    }
+
+    function computeCompositeChart(pA, pB){
+      const birthUTCA = parseBirthUTCFor(pA);
+      const birthUTCB = parseBirthUTCFor(pB);
+      const allA = ephemerisAstronomy.getAllPlanets(birthUTCA, pA.lon, pA.lat, 0);
+      const allB = ephemerisAstronomy.getAllPlanets(birthUTCB, pB.lon, pB.lat, 0);
+      const lon = {};
+      for (const k of order){
+        if (k === "mc") continue;
+        lon[k] = midpointAngle(getPlanetLonFromAll(allA, k), getPlanetLonFromAll(allB, k));
+      }
+      const mcA = calcNatalMCDeg(birthUTCA, pA.lon);
+      const mcB = calcNatalMCDeg(birthUTCB, pB.lon);
+      lon.mc = midpointAngle(mcA, mcB);
+      const ascA = calcNatalAscDeg(birthUTCA, pA.lon, pA.lat);
+      const ascB = calcNatalAscDeg(birthUTCB, pB.lon, pB.lat);
+      const asc = midpointAngle(ascA, ascB);
+      const compLon = midpointAngle(pA.lon, pB.lon);
+      const compLat = (Number.isFinite(pA.lat) && Number.isFinite(pB.lat)) ? ((pA.lat + pB.lat) / 2) : (Number(pA.lat) || 0);
+      return { lon, asc, mc: lon.mc, location: { lon: compLon, lat: compLat } };
+    }
+
+    function groupByKey(list){
+      const m = new Map();
+      for (const [key, label, arr] of list) m.set(key, arr);
+      return m;
+    }
+    const transitGroupMap = groupByKey(transitGroups);
+    const natalGroupMap = groupByKey(natalGroups);
+
+    function uniquePush(arr, v){ if (!arr.includes(v)) arr.push(v); }
+
+    function buildCandidateRules(){
+      let transitPlanets = [...(transitGroupMap.get($("transitGroup").value) ?? transitGroupMap.get("outer") ?? [])];
+      const natalTargets = [...(natalGroupMap.get($("natalGroup").value) ?? natalGroupMap.get("classical") ?? [])];
+
+      if (el.includeChiron.checked){
+        uniquePush(transitPlanets, "chiron");
+        uniquePush(natalTargets, "chiron");
+      }
+      if (el.includeMC.checked){
+        uniquePush(natalTargets, "mc");
+      }
+      if (!el.includeMoon.checked){
+        transitPlanets = transitPlanets.filter(p => p !== "moon");
+      }
+
+      const aspects = getCheckedAspects();
+      const orb = Number($("orb").value || 1.0);
+
+      const rules = [];
+      for (const tp of transitPlanets){
+        for (const np of natalTargets){
+          for (const asp of aspects){
+            rules.push({ transit: tp, natal: np, aspect: asp, orb });
+          }
+        }
+      }
+      return rules;
+    }
+
+    function buildSkyRules(){
+      let skyPlanets = [...(transitGroupMap.get($("transitGroup").value) ?? transitGroupMap.get("outer") ?? [])];
+      if (el.includeChiron.checked){
+        uniquePush(skyPlanets, "chiron");
+      }
+      if (!el.includeMoon.checked){
+        skyPlanets = skyPlanets.filter(p => p !== "moon");
+      }
+      skyPlanets = skyPlanets.filter(p => p !== "mc");
+      const aspects = getCheckedAspects();
+      const orb = Number($("orb").value || 1.0);
+      const rules = [];
+      for (let i=0; i<skyPlanets.length; i++){
+        for (let j=i+1; j<skyPlanets.length; j++){
+          for (const asp of aspects){
+            rules.push({ transit: skyPlanets[i], aspect: asp, natal: skyPlanets[j], orb });
+          }
+        }
+      }
+      return rules;
+    }
+
+    function groupActiveIntervalsWithExact(flagsIn, deltasIn, sampleTimes, endExclusive, bridgeTinyGaps){
+      const intervals = [];
+      if (!sampleTimes.length) return intervals;
+
+      const flags = flagsIn.slice();
+      const deltas = deltasIn.slice();
+      if (bridgeTinyGaps){
+        for (let i=1; i<flags.length-1; i++){
+          if (!flags[i] && flags[i-1] && flags[i+1]){
+            flags[i] = true;
+            deltas[i] = Math.min(deltas[i-1], deltas[i+1]);
+          }
+        }
+      }
+
+      let inRun = false;
+      let runStart = null;
+      let minDelta = Infinity;
+      let exactTime = null;
+      let lastActiveSample = null;
+      let runClippedStart = false;
+      for (let i=0; i<flags.length; i++){
+        const active = flags[i];
+        if (active){
+          if (!inRun){
+            inRun = true;
+            runStart = sampleTimes[i];
+            minDelta = deltas[i];
+            exactTime = sampleTimes[i];
+            lastActiveSample = sampleTimes[i];
+            runClippedStart = (i === 0);
+          } else if (deltas[i] < minDelta){
+            minDelta = deltas[i];
+            exactTime = sampleTimes[i];
+          }
+          lastActiveSample = sampleTimes[i];
+        } else if (inRun){
+          inRun = false;
+          const exactAtBoundary = runClippedStart && exactTime && exactTime.getTime() === runStart.getTime();
+          intervals.push([runStart, sampleTimes[i], exactTime, exactAtBoundary]);
+          runStart = null;
+          minDelta = Infinity;
+          exactTime = null;
+          lastActiveSample = null;
+          runClippedStart = false;
+        }
+      }
+      if (inRun){
+        const exactAtBoundary = runClippedStart
+          ? (exactTime && exactTime.getTime() === runStart.getTime())
+          : (exactTime && lastActiveSample && exactTime.getTime() === lastActiveSample.getTime());
+        intervals.push([runStart, endExclusive, exactTime, exactAtBoundary]);
+      }
+      return intervals;
+    }
+
+    // Tooltip formatting
+    const locale = "en-US";
+
+    // --- Charts (localStorage) ---
+    const chartsKey = "tt_charts";
+    const lastChartKey = "tt_last_chart";
+
+    function safeJSONParse(s, fallback){
+      try { return JSON.parse(s); } catch { return fallback; }
+    }
+
+    function newId(){
+      return "c_" + Math.random().toString(36).slice(2, 9) + "_" + Date.now().toString(36);
+    }
+
+    const defaultChartData = {
+      name: "Elon Musk",
+      birthDate: "1971-06-28",
+      birthTime: "07:30",
+      placeLabel: "Pretoria, South Africa",
+      lon: 28.2293,
+      lat: -25.7479,
+      tzName: "Africa/Johannesburg",
+      isDefault: true
+    };
+
+    function isDefaultChart(p){
+      return !!p?.isDefault;
+    }
+
+    function normalizeChart(p){
+      // Accept both old and new shapes
+      return {
+        id: p.id || newId(),
+        name: p.name || "(unnamed)",
+        birthDate: p.birthDate || p.date || "1990-09-01",
+        birthTime: p.birthTime || p.time || "18:11",
+        placeLabel: p.placeLabel || p.place || "",
+        placeId: p.placeId || "",
+        lon: Number.isFinite(+p.lon) ? +p.lon : (Number.isFinite(+p.longitude) ? +p.longitude : 0),
+        lat: Number.isFinite(+p.lat) ? +p.lat : (Number.isFinite(+p.latitude) ? +p.latitude : 0),
+        tzName: p.tzName || p.timeZoneName || "",
+        tzOffset: Number.isFinite(+p.tzOffset) ? +p.tzOffset : (Number.isFinite(+p.tz) ? +p.tz : 0),
+        isDefault: !!p.isDefault
+      };
+    }
+
+    function loadCharts(){
+      const raw = localStorage.getItem(chartsKey);
+      const arr = raw ? safeJSONParse(raw, []) : [];
+      if (Array.isArray(arr) && arr.length > 0){
+        const normalized = arr.map(normalizeChart);
+        const filtered = normalized.filter((p) => !isDefaultChart(p));
+        if (filtered.length !== normalized.length){
+          localStorage.setItem(chartsKey, JSON.stringify(filtered));
+        }
+        const last = localStorage.getItem(lastChartKey);
+        if (last && normalized.some((p) => p.id === last && isDefaultChart(p))){
+          localStorage.removeItem(lastChartKey);
+        }
+        if (filtered.length === 0) localStorage.removeItem(lastChartKey);
+        return filtered;
+      }
+
+      const legacyChartsKey = "tt_people_v2";
+      const legacyLastKey = "tt_last_person_v2";
+      const legacyRaw = localStorage.getItem(legacyChartsKey);
+      const legacyArr = legacyRaw ? safeJSONParse(legacyRaw, []) : [];
+      if (Array.isArray(legacyArr) && legacyArr.length > 0){
+        localStorage.setItem(chartsKey, JSON.stringify(legacyArr));
+        const legacyLast = localStorage.getItem(legacyLastKey);
+        if (legacyLast) localStorage.setItem(lastChartKey, legacyLast);
+        localStorage.removeItem(legacyChartsKey);
+        localStorage.removeItem(legacyLastKey);
+        return legacyArr.map(normalizeChart).filter((p) => !isDefaultChart(p));
+      }
+
+      return [];
+    }
+
+    function saveCharts(charts){
+      localStorage.setItem(chartsKey, JSON.stringify(charts));
+    }
+
+    // --- Amazon Location Places V2 (API key auth) ---
+    const awsRegion = "us-east-1";
+    const awsPlacesBase = `https://places.geo.${awsRegion}.amazonaws.com/v2`;
+
+    async function awsAutocomplete(query){
+      const url = `${awsPlacesBase}/autocomplete?key=${encodeURIComponent(awsApiKey)}`;
+      const body = {
+        QueryText: query,
+        MaxResults: 8,
+        IntendedUse: "SingleUse",
+        Filter: { IncludePlaceTypes: ["Locality"] }
+      };
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok){
+        const t = await res.text().catch(()=> "");
+        throw new Error(`Places Autocomplete failed (${res.status}): ${t || res.statusText}`);
+      }
+      return await res.json();
+    }
+
+    async function awsGetPlace(placeId){
+      const url = `${awsPlacesBase}/place/${encodeURIComponent(placeId)}?key=${encodeURIComponent(awsApiKey)}&additional-features=TimeZone`;
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok){
+        const t = await res.text().catch(()=> "");
+        throw new Error(`Places GetPlace failed (${res.status}): ${t || res.statusText}`);
+      }
+      return await res.json();
+    }
+
+    function extractPosition(getPlaceJson){
+      const pos = getPlaceJson?.Position
+        || getPlaceJson?.MainAddress?.AccessPoints?.[0]?.Position
+        || getPlaceJson?.AccessPoints?.[0]?.Position
+        || getPlaceJson?.MainAddress?.Position;
+      if (Array.isArray(pos) && pos.length === 2) return pos;
+      return null;
+    }
+    function fmtDatePretty(d, includeYear){
+      return d.toLocaleDateString(locale, {
+        month: "short",
+        day: "numeric",
+        ...(includeYear ? { year: "numeric" } : {})
+      });
+    }
+    function fmtTimePretty(d){
+      return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    function formatRangePretty(a, b, showTime, showYear){
+      const sameYear = a.getFullYear() === b.getFullYear();
+      const includeYear = showYear || !sameYear;
+
+      const sameDay = sameYear && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+      const aDT = `${fmtDatePretty(a, includeYear)}, ${fmtTimePretty(a)}`;
+      const bDT = `${fmtDatePretty(b, includeYear)}, ${fmtTimePretty(b)}`;
+
+      if (showTime){
+        if (sameDay){
+          return `${fmtDatePretty(a, includeYear)}, ${fmtTimePretty(a)} – ${fmtTimePretty(b)}`;
+        }
+        return `${aDT} – ${bDT}`;
+      } else {
+        if (a.getTime() === b.getTime()) return fmtDatePretty(a, includeYear);
+        return `${fmtDatePretty(a, includeYear)} – ${fmtDatePretty(b, includeYear)}`;
+      }
+    }
+    function formatExactPretty(exact, rangeStart, rangeEnd, showYear){
+      if (!exact) return "";
+      const sameYear = rangeStart.getFullYear() === rangeEnd.getFullYear();
+      const includeYear = showYear || !sameYear;
+      const sameDay = sameYear
+        && rangeStart.getMonth() === rangeEnd.getMonth()
+        && rangeStart.getDate() === rangeEnd.getDate();
+      if (sameDay) return fmtTimePretty(exact);
+      return `${fmtDatePretty(exact, includeYear)}, ${fmtTimePretty(exact)}`;
+    }
+
+    // Tooltip UI
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+    function setTooltipContent(title, desc, range, myth, popupMode, exactLabel){
+      const safeMyth = myth ? escapeHtml(myth) : "";
+      const useToggle = !!safeMyth && !!(popupMode || isCoarsePointer());
+      const useInline = !!safeMyth && !useToggle;
+      const mythHtml = useInline
+        ? `<div class="myth"><em>${safeMyth}</em></div>`
+        : (useToggle
+          ? `<button type="button" class="mythToggle" aria-expanded="false">Mythologically →</button><div class="myth mythHidden" hidden><em>${safeMyth}</em></div>`
+          : "");
+      const exactHtml = exactLabel ? ` <span class="sub">(${escapeHtml("exact: " + exactLabel)})</span>` : "";
+      const closeBtn = popupMode ? `<button type="button" class="tooltipClose" aria-label="Close">✕</button>` : "";
+      tooltip.innerHTML = `${closeBtn}<div>${escapeHtml(title)}</div>`
+        + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
+        + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
+        + mythHtml;
+    }
+    function moveTooltip(clientX, clientY, popupMode){
+      const pad = 10;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const baseX = (Number.isFinite(clientX) ? clientX : (vw / 2));
+      const baseY = (Number.isFinite(clientY) ? clientY : (vh / 2));
+      if (popupMode){
+        tooltip.style.left = "50%";
+        tooltip.style.top = "50%";
+        return;
+      }
+      let x = baseX + 12;
+      let y = baseY + 12;
+      const r = tooltip.getBoundingClientRect();
+      if (x + r.width + pad > vw) x = baseX - r.width - 12;
+      if (y + r.height + pad > vh) y = baseY - r.height - 12;
+      x = Math.max(pad, Math.min(x, vw - r.width - pad));
+      y = Math.max(pad, Math.min(y, vh - r.height - pad));
+      tooltip.style.left = x + "px";
+      tooltip.style.top = y + "px";
+    }
+    function isCoarsePointer(){
+      return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    }
+    let tooltipHideTimer = null;
+    function clearTooltipTimer(){
+      if (tooltipHideTimer){
+        window.clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = null;
+      }
+    }
+    function showTooltip(e, title, desc, range, popupMode, myth, exactLabel){
+      setTooltipContent(title, desc, range, myth, popupMode, exactLabel);
+      tooltip.style.display = "block";
+      tooltip.style.visibility = "hidden";
+      tooltip.classList.toggle("popup", !!popupMode);
+      if (tooltipBackdrop) tooltipBackdrop.style.display = popupMode ? "block" : "none";
+      clearTooltipTimer();
+      requestAnimationFrame(() => {
+        moveTooltip(e?.clientX, e?.clientY, popupMode);
+        tooltip.style.visibility = "visible";
+      });
+    }
+
+    function aspectDeltaAt(time, rule, observer){
+      if (!observer) return null;
+      const allPlanets = ephemerisAstronomy.getAllPlanets(time, observer.lon, observer.lat, observer.height);
+      const tLon = getPlanetLonFromAll(allPlanets, rule.transit);
+      const nLon = (appMode === "skies")
+        ? getPlanetLonFromAll(allPlanets, rule.natal)
+        : (cachedNatalLon ? cachedNatalLon[rule.natal] : null);
+      if (nLon === null || nLon === undefined) return null;
+      const d = angDist(tLon, nLon);
+      return Math.abs(d - aspectAngle(rule.aspect));
+    }
+
+    function refineExactMinute(approx, rangeStart, rangeEnd, stepMillis, rule){
+      if (!approx || !cachedObserver) return approx;
+      const lo = Math.max(rangeStart.getTime(), approx.getTime() - stepMillis);
+      const hi = Math.min(rangeEnd.getTime(), approx.getTime() + stepMillis);
+      let t = approx.getTime();
+      let step = Math.max(60000, Math.min(stepMillis / 2, (hi - lo) / 2));
+      for (let i=0; i<20 && step > 60000; i++){
+        const t1 = Math.max(lo, t - step);
+        const t2 = Math.min(hi, t + step);
+        const d1 = aspectDeltaAt(new Date(t1), rule, cachedObserver);
+        const d2 = aspectDeltaAt(new Date(t2), rule, cachedObserver);
+        if (d1 === null || d2 === null) break;
+        t = (d1 <= d2) ? t1 : t2;
+        step = Math.max(60000, Math.floor(step / 2));
+      }
+      return new Date(Math.round(t / 60000) * 60000);
+    }
+    function hideTooltip(){
+      tooltip.style.display = "none";
+      tooltip.style.visibility = "hidden";
+      tooltip.classList.remove("popup");
+      if (tooltipBackdrop) tooltipBackdrop.style.display = "none";
+    }
+
+    // SVG helpers
+    const svgNs = "http://www.w3.org/2000/svg";
+    function svgEl(name, attrs={}){
+      const el = document.createElementNS(svgNs, name);
+      for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+      return el;
+    }
+    function clearSvg(svg){
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+    }
+
+    function computeTimelineLayout(svg, useSymbols=false){
+      const containerW = svg.parentElement
+        ? Math.max(320, svg.parentElement.clientWidth - 16)
+        : 1200;
+      const isCompact = containerW < 520;
+      const labelWMax = isCompact ? 130 : 150;
+      const labelWMin = isCompact ? 78 : 96;
+      const labelW = labelWMax;
+      const marginL = 0;
+      const marginR = 12;
+      const marginT = isCompact ? 8 : 14;
+      const rowH = isCompact ? 22 : 20;
+      const rowGap = isCompact ? 8 : 10;
+      const bottomPad = isCompact ? 14 : 18;
+      const axisY = marginT + (isCompact ? 8 : 12);
+      const totalW = Math.max(600, Math.floor(containerW));
+      const timelineW = Math.max(360, totalW - marginL - labelW - marginR);
+
+      return {
+        containerW,
+        isCompact,
+        labelW,
+        labelWMax,
+        labelWMin,
+        marginL,
+        marginR,
+        marginT,
+        rowH,
+        rowGap,
+        bottomPad,
+        axisY,
+        totalW,
+        timelineW
+      };
+    }
+
+    function pickStep(totalUnits, timelineW, minBoxPx, niceSteps){
+      const idealCount = Math.max(1, Math.floor(timelineW / minBoxPx));
+      const rawStep = Math.max(1, Math.ceil(totalUnits / idealCount));
+      for (const s of niceSteps){
+        if (s >= rawStep) return s;
+      }
+      return niceSteps[niceSteps.length - 1];
+    }
+
+    function getMonthStartsLocal(start, endExclusive, stepMonths=1){
+      const out = [];
+      const d = new Date(start.getFullYear(), start.getMonth(), 1, 0, 0, 0, 0);
+      if (d < start) d.setMonth(d.getMonth() + 1);
+      while (d < endExclusive){
+        out.push(new Date(d.getTime()));
+        d.setMonth(d.getMonth() + stepMonths);
+      }
+      return out;
+    }
+    function getDayStartsLocal(start, endExclusive, stepDays=1){
+      const out = [];
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+      if (d < start) d.setDate(d.getDate() + 1);
+      while (d < endExclusive){
+        out.push(new Date(d.getTime()));
+        d.setDate(d.getDate() + stepDays);
+      }
+      return out;
+    }
+    function getHourStartsLocal(start, endExclusive, stepHours=1){
+      const out = [];
+      const d = new Date(start.getTime());
+      d.setMinutes(0,0,0);
+      if (d <= start) d.setHours(d.getHours() + 1);
+      while (d < endExclusive){
+        out.push(new Date(d.getTime()));
+        d.setHours(d.getHours() + stepHours);
+      }
+      return out;
+    }
+
+    function renderAxisSVG({svg, start, endExclusive, stepMillis, layout}){
+      clearSvg(svg);
+
+      const { totalW, timelineW, labelW, marginL, axisY, isCompact } = layout;
+      const x0 = marginL + labelW;
+      const axisHeight = axisY + 40 + (isCompact ? 6 : 8);
+      document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
+      svg.setAttribute("viewBox", `0 0 ${totalW} ${axisHeight}`);
+      svg.setAttribute("width", String(totalW));
+      svg.setAttribute("height", String(axisHeight));
+      svg.style.width = `${totalW}px`;
+      svg.style.height = `${axisHeight}px`;
+      svg.appendChild(svgEl("rect", {x:0, y:0, width: totalW, height: axisHeight, fill:"var(--axis-bg)"}));
+
+      const startMs = start.getTime();
+      const endMs = endExclusive.getTime();
+      const spanMs = Math.max(1, endMs - startMs);
+      const spanDays = spanMs / (24*3600*1000);
+      const dateToX = (d) => x0 + ((d.getTime() - startMs) / spanMs) * timelineW;
+      const topLabelByMs = new Set();
+
+      svg.appendChild(svgEl("rect", {x:x0, y:axisY, width:timelineW, height:40, fill:"var(--axis-bg)"}));
+      svg.appendChild(svgEl("line", {x1:x0, y1:axisY + 40, x2:x0 + timelineW, y2:axisY + 40, stroke:"var(--axis-line)", "stroke-width":"1.5"}));
+
+      const axisLabelSize = isCompact ? 15 : 18;
+      const axisTitleSize = isCompact ? 16 : 20;
+      const minBoxPx = axisLabelSize * 2.7;
+      const minLabelPx = axisLabelSize * 2.2;
+      const monthLabelPx = axisLabelSize * 1.6;
+
+      const useHours = (spanDays <= 2 && stepMillis < 24*3600*1000);
+      const useDays  = (!useHours) && (spanDays <= 45);
+
+      const boundaries = (() => {
+        if (useHours){
+          const totalHours = spanMs / (3600 * 1000);
+          const stepHours = pickStep(totalHours, timelineW, minBoxPx, [1,2,3,4,6,8,12,24]);
+          return [start, ...getHourStartsLocal(start, endExclusive, stepHours), endExclusive];
+        }
+        if (useDays){
+          const totalDays = spanDays;
+          const stepDays = pickStep(totalDays, timelineW, minBoxPx, [1,2,3,4,5,7,10,14,21,30]);
+          return [start, ...getDayStartsLocal(start, endExclusive, stepDays), endExclusive];
+        }
+        const totalMonths = spanDays / 30.44;
+        const stepMonths = pickStep(totalMonths, timelineW, minBoxPx, [1,2,3,4,6,12]);
+        return [start, ...getMonthStartsLocal(start, endExclusive, stepMonths), endExclusive];
+      })();
+
+      if (useHours){
+        const dateLabel = start.toLocaleDateString(locale, {month:"short", day:"numeric", year:"numeric"});
+        const t = svgEl("text", { x: x0 + 6, y: axisY - 6, "font-size": String(axisTitleSize), "font-weight":"700", fill:"var(--text)" });
+        t.textContent = dateLabel;
+        svg.appendChild(t);
+      }
+
+      if (useDays){
+        for (let i=0; i<boundaries.length-1; i++){
+          const a = boundaries[i];
+          const prev = boundaries[i-1];
+          const monthChanged = (!prev) || (prev.getMonth() !== a.getMonth()) || (prev.getFullYear() !== a.getFullYear());
+          if (monthChanged) topLabelByMs.add(a.getTime());
+        }
+      }
+      if (!useHours && !useDays){
+        const months = getMonthStartsLocal(start, endExclusive);
+        for (const m of months){
+          if (m.getMonth() === 0) topLabelByMs.add(m.getTime());
+        }
+      }
+
+      for (let i=0; i<boundaries.length-1; i++){
+        const a = boundaries[i];
+        const xa = dateToX(a);
+        const xb = dateToX(boundaries[i+1]);
+        const w = Math.max(0.5, xb - xa);
+        const isTopLabeled = topLabelByMs.has(a.getTime());
+        const tickY1 = isTopLabeled ? axisY : (axisY + 20);
+        svg.appendChild(svgEl("line", {x1:xa, y1:tickY1, x2:xa, y2:axisY + 40, stroke:"var(--axis-line)", "stroke-width":"1"}));
+
+        let label = "";
+        let shouldLabel = false;
+
+        if (useHours){
+          const hh = a.getHours();
+          label = `${String(hh).padStart(2,"0")}:00`;
+          shouldLabel = (w >= minLabelPx);
+        } else if (useDays){
+          const mon = a.toLocaleString(locale, {month:"short"});
+          const dow = a.toLocaleString(locale, {weekday:"short"});
+
+          // Don't repeat the month on every tick: show month only at changes.
+          const prev = boundaries[i-1];
+          const monthChanged = (!prev) || (prev.getMonth() !== a.getMonth()) || (prev.getFullYear() !== a.getFullYear());
+
+          if (spanDays <= 10){
+            label = `${dow} ${a.getDate()}`;
+          } else {
+            label = `${a.getDate()}`;
+          }
+
+          shouldLabel = (w >= minLabelPx);
+          if (monthChanged){
+            const mtX = Math.max(x0 + 6, xa - 6);
+            const mt = svgEl("text", { x: mtX, y: axisY - 6, "font-size": String(axisTitleSize), "font-weight":"700", fill:"var(--text)" });
+            mt.textContent = mon;
+            svg.appendChild(mt);
+          }
+        } else {
+          label = a.toLocaleString(locale, {month:"short"});
+          shouldLabel = (w >= monthLabelPx);
+        }
+
+        if (shouldLabel){
+          const txt = svgEl("text", {x: xa + 6, y: axisY + 25, "font-size": String(axisLabelSize), fill:"var(--text)"});
+          txt.textContent = label;
+          svg.appendChild(txt);
+        }
+      }
+
+      if (!useHours && !useDays){
+        const months = getMonthStartsLocal(start, endExclusive);
+        for (const m of months){
+          if (m.getMonth() === 0){
+            const yearX = Math.max(x0 + 6, dateToX(m) - 6);
+            const t = svgEl("text", { x: yearX, y: axisY - 6, "font-size": String(axisTitleSize), "font-weight":"700", fill:"var(--text)" });
+            t.textContent = String(m.getFullYear());
+            svg.appendChild(t);
+          }
+        }
+      }
+    }
+
+    function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=false}){
+      if (!svg) return;
+      clearSvg(svg);
+      const { labelW, rowH, rowGap, bottomPad, isCompact } = layout;
+      const n = rules.length;
+      const rowsY0 = isCompact ? 6 : 8;
+      const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
+
+      document.documentElement.style.setProperty("--aspect-axis-w", `${labelW}px`);
+      svg.setAttribute("viewBox", `0 0 ${labelW} ${totalH}`);
+      svg.setAttribute("width", String(labelW));
+      svg.setAttribute("height", String(totalH));
+      svg.style.width = `${labelW}px`;
+      svg.style.height = `${totalH}px`;
+      svg.appendChild(svgEl("rect", {x:0, y:0, width: labelW, height: totalH, fill:"var(--axis-bg)"}));
+
+      const labelX = labelW - 8;
+
+      const labelFontSize = isCompact ? 17 : 20;
+      for (let idx=0; idx<rules.length; idx++){
+        const r = rules[idx];
+        const y = rowsY0 + idx*(rowH+rowGap);
+        const t = svgEl("text", {
+          x: labelX,
+          y: y + rowH/2 + 4,
+          "font-size": String(labelFontSize),
+          fill:"var(--text)",
+          "text-anchor":"end"
+        });
+
+        const transitLabel = useSymbols ? (planetSymbols[r.transit] || planetLabel(r.transit)) : planetLabel(r.transit);
+        const natalLabel = useSymbols ? (planetSymbols[r.natal] || planetLabel(r.natal)) : planetLabel(r.natal);
+        const parts = [
+          { text: transitLabel + " " },
+          { text: aspectSymbol(r.aspect) + " " },
+          { text: natalLabel, underline: (!useSymbols && chartRuler && r.natal === chartRuler) }
+        ];
+
+        for (const p of parts){
+          const sp = document.createElementNS(svgNs, "tspan");
+          sp.textContent = p.text;
+          if (p.underline) sp.setAttribute("text-decoration", "underline");
+          t.appendChild(sp);
+        }
+
+        svg.appendChild(t);
+      }
+    }
+
+    function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByRule, stepMillis, presetKey, chartRuler, layout, showYear}){
+      clearSvg(svg);
+
+      const { totalW, timelineW, labelW, marginL, rowH, rowGap, bottomPad, isCompact } = layout;
+      const x0 = marginL + labelW;
+
+      const n = rules.length;
+      const rowsY0 = isCompact ? 6 : 8;
+      const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
+
+      svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
+      svg.setAttribute("width", String(totalW));
+      svg.setAttribute("height", String(totalH));
+      svg.style.width = `${totalW}px`;
+      svg.style.height = `${totalH}px`;
+      svg.appendChild(svgEl("rect", {x:0, y:0, width: totalW, height: totalH, fill:"var(--panel-bg)"}));
+
+      const startMs = start.getTime();
+      const endMs = endExclusive.getTime();
+      const spanMs = Math.max(1, endMs - startMs);
+      const dateToX = (d) => x0 + ((d.getTime() - startMs) / spanMs) * timelineW;
+
+      for (let idx=0; idx<rules.length; idx++){
+        const r = rules[idx];
+        const y = rowsY0 + idx*(rowH+rowGap);
+
+        svg.appendChild(svgEl("line", {
+          x1:x0, y1:y + rowH/2, x2:x0 + timelineW, y2:y + rowH/2,
+          stroke:"var(--muted)", "stroke-width":"1", "stroke-dasharray":"2,6"
+        }));
+
+        const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`;
+
+        const intervals = intervalsByRule[idx] ?? [];
+        for (const [a,b,exact,exactAtBoundary] of intervals){
+          const xa = dateToX(a);
+          const xb = dateToX(b);
+          const w = Math.max(1, xb - xa);
+
+          const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
+          const barColor = isReturn ? "#d4a017" : (aspectColors[r.aspect] || "var(--text)");
+          const rect = svgEl("rect", { x: xa, y: y + 4, width: w, height: rowH - 8, fill: barColor, class: "bar" });
+
+          const showTime = stepMillis < 24*3600*1000;
+          const endApprox = new Date(Math.max(a.getTime(), b.getTime() - stepMillis));
+          const rangeText = formatRangePretty(a, endApprox, showTime, showYear);
+          const descKey = `${r.transit}-${r.aspect}-${r.natal}`;
+          const descText = aspectDescriptions[descKey] || "";
+          const mythKey = mythKeyFor(r.transit, r.natal);
+          const mythText = mythDescriptions[mythKey] || "";
+
+          let exactLabelCache = null;
+          const getExactLabel = () => {
+            if (exactLabelCache !== null) return exactLabelCache;
+            if (!exact) return "";
+            const refined = refineExactMinute(exact, a, endApprox, stepMillis, r);
+            exactLabelCache = formatExactPretty(refined, a, endApprox, showYear);
+            return exactLabelCache;
+          };
+
+          rect.addEventListener("pointerenter", (e) => {
+            if (isCoarsePointer()) return;
+            showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
+          });
+          rect.addEventListener("pointermove", (e) => {
+            if (tooltip.style.display === "block" && !isCoarsePointer()) moveTooltip(e.clientX, e.clientY);
+          });
+          rect.addEventListener("pointerleave", () => {
+            if (isCoarsePointer()) return;
+            hideTooltip();
+          });
+          rect.addEventListener("pointerdown", (e) => {
+            if (isCoarsePointer()){
+              showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel());
+            }
+          });
+
+          rect.addEventListener("click", (e) => {
+            showTooltip(e, rowLabel, descText, rangeText, isCoarsePointer(), mythText, getExactLabel());
+            clearTooltipTimer();
+            if (!isCoarsePointer()){
+              tooltipHideTimer = window.setTimeout(hideTooltip, 2200);
+            }
+          });
+
+          svg.appendChild(rect);
+          if (exact && !exactAtBoundary && exact >= a && exact <= b){
+            const xExact = dateToX(exact);
+            if (xExact >= xa && xExact <= xb){
+              const cy = y + rowH / 2;
+            svg.appendChild(svgEl("circle", {
+              cx: xExact,
+              cy,
+              r: 3.5,
+              fill: "var(--text)",
+              stroke: barColor,
+              "stroke-width": "1.5",
+              "pointer-events": "none"
+            }));
+            }
+          }
+        }
+      }
+
+      const now = new Date();
+      if (now >= start && now < endExclusive){
+        const xNow = dateToX(now);
+        const yTop = 0;
+        const yBottom = totalH - 10;
+
+        svg.appendChild(svgEl("line", {
+          x1: xNow, y1: yTop, x2: xNow, y2: yBottom,
+          stroke: "var(--accent)",
+          "stroke-width": "1",
+          "stroke-dasharray": "4,6",
+          opacity: "0.7"
+        }));
+      }
+
+      svg.addEventListener("pointerleave", () => {
+        if (isCoarsePointer()) return;
+        hideTooltip();
+      });
+      ensureTooltipListeners();
+    }
+
+    async function updateTimeline(){
+      if (isComputing){
+        cancelRequested = true;
+        pendingUpdate = true;
+        return;
+      }
+      try{
+        if (!ephemerisAstronomy || typeof ephemerisAstronomy.getAllPlanets !== "function"){
+          throw new Error("Ephemeris library didn't load correctly (no getAllPlanets).");
+        }
+
+        isComputing = true;
+        cancelRequested = false;
+        pendingUpdate = false;
+        el.updateBtn.style.display = "inline-block";
+        el.updateBtn.disabled = false;
+        setStatus("Computing…");
+
+        const chartA = getActiveChartA();
+        const chartB = getActiveChartB();
+        const isChartsMode = appMode === "charts";
+        const isComposite = isChartsMode && chartsState.mode === "composite";
+        if (isChartsMode && !chartA) throw new Error("Pick a chart first.");
+        if (isComposite && !chartB) throw new Error("Pick two charts for composite.");
+        let lon = Number(chartA?.lon || 0);
+        let lat = Number(chartA?.lat || 0);
+        const height = 0;
+        cachedObserver = { lon, lat, height };
+        let composite = null;
+        if (isComposite){
+          composite = computeCompositeChart(chartA, chartB);
+          lon = composite.location.lon;
+          lat = composite.location.lat;
+          cachedObserver = { lon, lat, height };
+        }
+
+        currentMaxRows = 50;
+        const includeRxGaps = el.includeRxGaps.checked;
+
+        const birthUTC = (isChartsMode && chartA) ? parseBirthUTCFor(chartA) : null;
+
+        const rangeStartLocal = parseLocalDateOnly(el.rangeStart.value);
+        const rangeEndLocal = parseLocalDateOnly(el.rangeEnd.value);
+        const endExclusive = addDaysLocal(rangeEndLocal, 1);
+        if (!(rangeStartLocal < endExclusive)) throw new Error("Timeline end must be after start.");
+
+        const candidateRules = (appMode === "skies") ? buildSkyRules() : buildCandidateRules();
+        const aspectsChecked = getCheckedAspects();
+        if (aspectsChecked.length === 0) throw new Error("Select at least one aspect.");
+
+        const preset = presets.find(p => p.key === activePresetKey) ?? presets[0];
+        const rangeDays = (endExclusive.getTime() - rangeStartLocal.getTime()) / (24 * 3600 * 1000);
+        const stepDaysBase = preset?.stepDays ?? 1;
+        const rangeYears = rangeDays / 365.25;
+        const minStepDays = rangeYears > 4 ? 4 : (rangeYears > 2 ? 2 : 1);
+        const stepDays = Math.max(minStepDays, stepDaysBase);
+
+        let stepMillis;
+        if (rangeDays <= 8){
+          stepMillis = 1 * 3600 * 1000;
+        } else if (rangeDays <= 35){
+          stepMillis = 3 * 3600 * 1000;
+        } else {
+          stepMillis = Math.max(1, Number(stepDays)) * 24 * 3600 * 1000;
+        }
+
+        const transitPlanetsAll = (appMode === "skies")
+          ? Array.from(new Set(candidateRules.flatMap(r => [r.transit, r.natal])))
+          : Array.from(new Set(candidateRules.map(r => r.transit)));
+        const transitPlanetsFiltered = transitPlanetsAll.filter(p => p !== "mc");
+        const planetsKey = transitPlanetsFiltered.slice().sort().join(",");
+        const cacheKey = buildTransitCacheKey({ rangeStartLocal, endExclusive, stepMillis, lon, lat, height, planetsKey });
+        let sampleTimes;
+        let transitLonBySample;
+
+        if (transitCache && transitCache.key === cacheKey){
+          sampleTimes = transitCache.sampleTimes;
+          transitLonBySample = transitCache.transitLonBySample;
+        } else {
+          sampleTimes = [];
+          for (let t = rangeStartLocal.getTime(); t < endExclusive.getTime(); t += stepMillis){
+            sampleTimes.push(new Date(t));
+          }
+          if (sampleTimes.length === 0) throw new Error("Range too small to sample.");
+
+          transitLonBySample = {};
+          for (const p of transitPlanetsFiltered) transitLonBySample[p] = new Array(sampleTimes.length);
+
+          for (let i=0; i<sampleTimes.length; i++){
+            if (cancelRequested) throw new Error("Cancelled");
+            const d = sampleTimes[i];
+            if (i % 120 === 0) await new Promise(r => setTimeout(r, 0));
+            const allPlanets = ephemerisAstronomy.getAllPlanets(d, lon, lat, height);
+            for (const p of transitPlanetsFiltered){
+              transitLonBySample[p][i] = getPlanetLonFromAll(allPlanets, p);
+            }
+            if (i % 10 === 0 || i === sampleTimes.length - 1){
+              setStatus(`Computing… ${i+1}/${sampleTimes.length}`);
+            }
+          }
+
+          transitCache = { key: cacheKey, sampleTimes, transitLonBySample };
+        }
+
+        const natalTargets = Array.from(new Set(candidateRules.map(r => r.natal)));
+        const transitPlanets = Array.from(new Set(candidateRules.map(r => r.transit)));
+
+        let chartRulerKey = null;
+        const natalLon = {};
+        if (appMode === "skies"){
+          chartRulerKey = null;
+          cachedNatalLon = null;
+        } else if (isComposite && composite){
+          for (const k of natalTargets){
+            natalLon[k] = (k === "mc") ? composite.mc : composite.lon[k];
+          }
+          chartRulerKey = chartRulerFromAsc(composite.asc);
+          cachedNatalLon = natalLon;
+        } else {
+          const birthAllPlanets = ephemerisAstronomy.getAllPlanets(birthUTC, lon, lat, height);
+          for (const k of natalTargets){
+            if (k === "mc"){
+              natalLon[k] = calcNatalMCDeg(birthUTC, lon);
+            } else {
+              natalLon[k] = getPlanetLonFromAll(birthAllPlanets, k);
+            }
+          }
+          chartRulerKey = chartRulerFromAsc(calcNatalAscDeg(birthUTC, lon, lat));
+          cachedNatalLon = natalLon;
+        }
+
+        const rulesOut = [];
+        const intervalsByRule = [];
+        const firstHitByRule = [];
+
+        for (let rIdx=0; rIdx<candidateRules.length; rIdx++){
+          if (cancelRequested) throw new Error("Cancelled");
+          const r = candidateRules[rIdx];
+          const asp = aspectAngle(r.aspect);
+          const orb = Number(r.orb);
+
+          const flags = new Array(sampleTimes.length).fill(false);
+          const deltas = new Array(sampleTimes.length).fill(0);
+          for (let i=0; i<sampleTimes.length; i++){
+            if (cancelRequested) throw new Error("Cancelled");
+            const tLon = transitLonBySample[r.transit][i];
+            const nLon = (appMode === "skies")
+              ? transitLonBySample[r.natal][i]
+              : natalLon[r.natal];
+            const d = angDist(tLon, nLon);
+            const delta = Math.abs(d - asp);
+            deltas[i] = delta;
+            if (delta <= orb) flags[i] = true;
+          }
+
+          const intervals = groupActiveIntervalsWithExact(flags, deltas, sampleTimes, endExclusive, includeRxGaps);
+          if (intervals.length > 0){
+            rulesOut.push(r);
+            intervalsByRule.push(intervals);
+            firstHitByRule.push(intervals[0][0].getTime());
+          }
+        }
+
+        const idxs = rulesOut.map((_, i) => i);
+        idxs.sort((a,b) => {
+          const da = firstHitByRule[a] - firstHitByRule[b];
+          if (da !== 0) return da;
+          const pa = (orderMap.get(rulesOut[a].transit) ?? 999) - (orderMap.get(rulesOut[b].transit) ?? 999);
+          if (pa !== 0) return pa;
+          return (orderMap.get(rulesOut[a].natal) ?? 999) - (orderMap.get(rulesOut[b].natal) ?? 999);
+        });
+
+        const rulesSorted = idxs.map(i => rulesOut[i]);
+        const intervalsSorted = idxs.map(i => intervalsByRule[i]);
+
+        // Cache full matches, then render up to the current maxRows
+        cachedResults = {
+          start: rangeStartLocal,
+          endExclusive,
+          stepMillis,
+          presetKey: activePresetKey,
+          rules: rulesSorted,
+          intervals: intervalsSorted,
+          chartRuler: chartRulerKey
+        };
+
+        renderFromCache(currentMaxRows);
+
+        const totalMatches = rulesSorted.length;
+        const showTime = stepMillis < 24*3600*1000;
+        const stepLabel = showTime ? `${Math.round(stepMillis/(3600*1000))}h` : `${Math.round(stepMillis/(24*3600*1000))}d`;
+        const orbLabel = `${Number(el.orb.value || 0).toFixed(1)}°`;
+        setStatus(`Done • ${stepLabel} step • ${orbLabel} orb • ${totalMatches} matches`);
+
+      } catch (err){
+        if (cancelRequested && String(err?.message || err) === "Cancelled"){
+          setStatus("Cancelled.");
+          cachedResults = null;
+          updateShowMore(0, 0);
+          return;
+        }
+        console.error(err);
+        setStatus(String(err?.message || err), true);
+        cachedResults = null;
+        updateShowMore(0, 0);
+      } finally {
+        isComputing = false;
+        cancelRequested = false;
+        el.updateBtn.style.display = "none";
+        el.updateBtn.disabled = false;
+        if (pendingUpdate){
+          pendingUpdate = false;
+          updateTimeline();
+        }
+      }
+    }
+
+    if (el.showMoreBtn){
+      el.showMoreBtn.addEventListener("click", () => {
+        currentMaxRows = currentMaxRows + 50;
+        renderFromCache(currentMaxRows);
+      });
+    }
+
+    // init charts UI
+    aspectDescriptions = await loadAspectDescriptions();
+    mythDescriptions = await loadMythDescriptions();
+    initCharts();
+    wireChartsUI();
+    wireAdvancedUI();
+    wireAutoUpdate();
+    wireAxisScrollSync();
+    wireRangeNav();
+    wireTooltipDismiss();
+
+    el.updateBtn.addEventListener("click", () => {
+      if (!isComputing) return;
+      cancelRequested = true;
+      setStatus("Cancelling…");
+    });
+    updateTimeline();
+  </script>
+</body>
+</html>
