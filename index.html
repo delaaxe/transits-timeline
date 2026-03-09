@@ -2051,20 +2051,56 @@
 
     function refineExactMinute(approx, rangeStart, rangeEnd, stepMillis, rule){
       if (!approx || !cachedObserver) return approx;
-      const lo = Math.max(rangeStart.getTime(), approx.getTime() - stepMillis);
-      const hi = Math.min(rangeEnd.getTime(), approx.getTime() + stepMillis);
-      let t = approx.getTime();
-      let step = Math.max(60000, Math.min(stepMillis / 2, (hi - lo) / 2));
-      for (let i=0; i<20 && step > 60000; i++){
-        const t1 = Math.max(lo, t - step);
-        const t2 = Math.min(hi, t + step);
+      const lo = Math.min(rangeStart.getTime(), rangeEnd.getTime());
+      const hi = Math.max(rangeStart.getTime(), rangeEnd.getTime());
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi < lo) return approx;
+
+      let a = lo;
+      let b = hi;
+      let bestT = approx.getTime();
+      let bestD = aspectDeltaAt(new Date(bestT), rule, cachedObserver);
+      if (bestD === null) return approx;
+
+      // Deterministic bracketed search to reduce expensive ephemeris evaluations.
+      for (let i=0; i<22 && (b - a) > (2 * 60000); i++){
+        const t1 = Math.floor(a + (b - a) / 3);
+        const t2 = Math.floor(b - (b - a) / 3);
         const d1 = aspectDeltaAt(new Date(t1), rule, cachedObserver);
         const d2 = aspectDeltaAt(new Date(t2), rule, cachedObserver);
+        if (d1 !== null && d1 < bestD){ bestD = d1; bestT = t1; }
+        if (d2 !== null && d2 < bestD){ bestD = d2; bestT = t2; }
         if (d1 === null || d2 === null) break;
-        t = (d1 <= d2) ? t1 : t2;
-        step = Math.max(60000, Math.floor(step / 2));
+        if (d1 <= d2){
+          b = t2;
+        } else {
+          a = t1;
+        }
       }
-      return new Date(Math.round(t / 60000) * 60000);
+
+      const fineLo = Math.max(lo, Math.floor(a / 60000) * 60000);
+      const fineHi = Math.min(hi, Math.ceil(b / 60000) * 60000);
+      for (let t = fineLo; t <= fineHi; t += 60000){
+        const d = aspectDeltaAt(new Date(t), rule, cachedObserver);
+        if (d === null) continue;
+        if (d < bestD){
+          bestD = d;
+          bestT = t;
+        }
+      }
+
+      // Final local refinement to lock onto the closest minute as accurately as possible.
+      const secLo = Math.max(lo, bestT - 60000);
+      const secHi = Math.min(hi, bestT + 60000);
+      for (let t = secLo; t <= secHi; t += 10000){
+        const d = aspectDeltaAt(new Date(t), rule, cachedObserver);
+        if (d === null) continue;
+        if (d < bestD){
+          bestD = d;
+          bestT = t;
+        }
+      }
+
+      return new Date(Math.round(bestT / 60000) * 60000);
     }
     function hideTooltip(){
       tooltip.style.display = "none";
@@ -2398,7 +2434,10 @@
           const getExactLabel = () => {
             if (exactLabelCache !== null) return exactLabelCache;
             if (!exact) return "";
-            const refined = refineExactMinute(exact, a, endApprox, stepMillis, r);
+            const refineWindowMs = 24 * 3600 * 1000;
+            const refineStart = new Date(exact.getTime() - refineWindowMs);
+            const refineEnd = new Date(exact.getTime() + refineWindowMs);
+            const refined = refineExactMinute(exact, refineStart, refineEnd, stepMillis, r);
             exactLabelCache = formatExactPretty(refined, a, endApprox, showYear);
             return exactLabelCache;
           };
@@ -2528,10 +2567,8 @@
         const stepDays = Math.max(minStepDays, stepDaysBase);
 
         let stepMillis;
-        if (rangeDays <= 8){
+        if (rangeDays <= 35){
           stepMillis = 1 * 3600 * 1000;
-        } else if (rangeDays <= 35){
-          stepMillis = 3 * 3600 * 1000;
         } else {
           stepMillis = Math.max(1, Number(stepDays)) * 24 * 3600 * 1000;
         }
