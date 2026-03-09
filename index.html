@@ -387,6 +387,21 @@
       }
     }
     .bar{ cursor: pointer; }
+    .installHint{
+      margin: 18px 0 22px;
+      padding: 10px 12px;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      background: var(--panel-bg);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .installHintTitle{
+      color: var(--text);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 <body>
@@ -526,6 +541,10 @@
       <button id="showMoreBtn" class="linkBtn" type="button">Show 50 more</button>
     </div>
   </div>
+  </div>
+  <div id="installHint" class="installHint" hidden>
+    <div class="installHintTitle">Add this app to your home screen</div>
+    <div id="installHintText"></div>
   </div>
   <div id="tooltipBackdrop" aria-hidden="true"></div>
   <div id="tooltip" aria-hidden="true"></div>
@@ -676,6 +695,8 @@
     };
     const tooltip = $("tooltip");
     const tooltipBackdrop = $("tooltipBackdrop");
+    const installHint = $("installHint");
+    const installHintText = $("installHintText");
     let activePresetKey = defaultPresetKey;
     let chartSummaryVisible = false;
     let appMode = "charts";
@@ -2150,6 +2171,31 @@
       const ua = navigator.userAgent || "";
       return /Android/i.test(ua) || isIOSLike();
     }
+    function isRunningAsPWA(){
+      return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+        || (window.matchMedia && window.matchMedia("(display-mode: fullscreen)").matches)
+        || window.navigator.standalone === true;
+    }
+    let hasBeforeInstallPrompt = false;
+    function updateInstallHint(){
+      if (!installHint || !installHintText) return;
+      const ua = navigator.userAgent || "";
+      const isAndroid = /Android/i.test(ua);
+      const isIOS = isIOSLike();
+      const standalone = isRunningAsPWA();
+      const canShow = !standalone && (isIOS || isAndroid || hasBeforeInstallPrompt);
+      if (!canShow){
+        installHint.hidden = true;
+        installHintText.textContent = "";
+        return;
+      }
+      if (isIOS){
+        installHintText.textContent = "Tap Share, then Add to Home Screen.";
+      } else {
+        installHintText.textContent = "Open the browser menu, then tap Add to Home screen or Install app.";
+      }
+      installHint.hidden = false;
+    }
     function isMultiDayLocal(start, end){
       if (!(start instanceof Date) || !(end instanceof Date)) return false;
       return start.getFullYear() !== end.getFullYear()
@@ -2987,6 +3033,15 @@
     wireRangeNav();
     wireTooltipDismiss();
     wireStaleRefreshOnRefocus();
+    window.addEventListener("beforeinstallprompt", () => {
+      hasBeforeInstallPrompt = true;
+      updateInstallHint();
+    });
+    window.addEventListener("appinstalled", () => {
+      hasBeforeInstallPrompt = false;
+      updateInstallHint();
+    });
+    updateInstallHint();
 
     el.updateBtn.addEventListener("click", () => {
       if (!isComputing) return;
