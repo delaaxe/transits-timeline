@@ -337,17 +337,17 @@
       line-height: 1.4;
       display: block;
     }
-    #tooltip .tooltipActionsLabel{ margin-right: 8px; }
+    #tooltip .tooltipActionsLabel{ margin-right: 0; }
     #tooltip .tooltipActionsSep{
       opacity: 0.75;
-      margin: 0 8px;
+      margin: 0;
     }
     #tooltip .tooltipAction{
       color: var(--text);
       text-decoration: underline;
       font-size: 13px;
       display: inline-block;
-      padding: 6px 10px;
+      padding: 6px 4px;
       border-radius: 6px;
       margin: 2px 0;
     }
@@ -2180,9 +2180,9 @@
             const segmentAppLink = segmentIOS
               ? `<a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Segment</a>`
               : "Segment";
-            appLinksHtml = `<div class="tooltipActions">Open in Google Calendar app: ${exactAppLink} · ${segmentAppLink}</div>`;
+            appLinksHtml = `<div class="tooltipActions">Open in Google Calendar app: ${exactAppLink}<span class="tooltipActionsSep">•</span>${segmentAppLink}</div>`;
           }
-          calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Add to Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">·</span>${segmentLink}</div>${appLinksHtml}</div>`;
+          calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Add to Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}</div>${appLinksHtml}</div>`;
         }
       }
       tooltip.innerHTML = `${closeBtn}<div>${escapeHtml(title)}</div>`
