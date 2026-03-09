@@ -281,7 +281,7 @@
       position: fixed; z-index: 9999; left: 0; top: 0; display: none; pointer-events: none;
       padding: 8px 10px; border-radius: 10px; background: var(--panel-bg); color: var(--text);
       border: 1px solid var(--panel-border);
-      font-size: 14px; line-height: 1.25; max-width: 360px; box-shadow: 0 14px 30px rgba(0,0,0,0.55);
+      font-size: 14px; line-height: 1.25; width: 90vw; max-width: 560px; box-shadow: 0 14px 30px rgba(0,0,0,0.55);
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       white-space: normal; visibility: hidden;
     }
@@ -302,8 +302,6 @@
     #tooltip.popup{
       left: 50%; top: 50%;
       transform: translate(-50%, -50%);
-      width: 90vw;
-      max-width: 560px;
       pointer-events: auto;
     }
     #tooltip .tooltipClose{
@@ -331,7 +329,7 @@
       text-decoration: underline;
       cursor: pointer;
     }
-    .bar{ cursor: default; }
+    .bar{ cursor: pointer; }
   </style>
 </head>
 <body>
@@ -1984,13 +1982,10 @@
     }
     function setTooltipContent(title, desc, range, myth, popupMode, exactLabel){
       const safeMyth = myth ? escapeHtml(myth) : "";
-      const useToggle = !!safeMyth && !!(popupMode || isCoarsePointer());
-      const useInline = !!safeMyth && !useToggle;
-      const mythHtml = useInline
-        ? `<div class="myth"><em>${safeMyth}</em></div>`
-        : (useToggle
-          ? `<button type="button" class="mythToggle" aria-expanded="false">Mythologically →</button><div class="myth mythHidden" hidden><em>${safeMyth}</em></div>`
-          : "");
+      const useToggle = !!safeMyth;
+      const mythHtml = useToggle
+        ? `<button type="button" class="mythToggle" aria-expanded="false">Mythologically →</button><div class="myth mythHidden" hidden><em>${safeMyth}</em></div>`
+        : "";
       const exactHtml = exactLabel ? ` <span class="sub">(${escapeHtml("exact: " + exactLabel)})</span>` : "";
       const closeBtn = popupMode ? `<button type="button" class="tooltipClose" aria-label="Close">✕</button>` : "";
       tooltip.innerHTML = `${closeBtn}<div>${escapeHtml(title)}</div>`
@@ -2413,10 +2408,13 @@
             showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
           });
           rect.addEventListener("pointermove", (e) => {
-            if (tooltip.style.display === "block" && !isCoarsePointer()) moveTooltip(e.clientX, e.clientY);
+            if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
+              moveTooltip(e.clientX, e.clientY);
+            }
           });
           rect.addEventListener("pointerleave", () => {
             if (isCoarsePointer()) return;
+            if (tooltip.classList.contains("popup")) return;
             hideTooltip();
           });
           rect.addEventListener("pointerdown", (e) => {
@@ -2426,11 +2424,8 @@
           });
 
           rect.addEventListener("click", (e) => {
-            showTooltip(e, rowLabel, descText, rangeText, isCoarsePointer(), mythText, getExactLabel());
+            showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel());
             clearTooltipTimer();
-            if (!isCoarsePointer()){
-              tooltipHideTimer = window.setTimeout(hideTooltip, 2200);
-            }
           });
 
           svg.appendChild(rect);
@@ -2469,6 +2464,7 @@
 
       svg.addEventListener("pointerleave", () => {
         if (isCoarsePointer()) return;
+        if (tooltip.classList.contains("popup")) return;
         hideTooltip();
       });
       ensureTooltipListeners();
