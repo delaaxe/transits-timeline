@@ -35,15 +35,14 @@
       --timeline-nav-h: 32px;
       --timeline-nav-total: calc(var(--timeline-nav-h) + 10px);
     }
-    html, body{
+    html{
       min-height: 100%;
-      background-color: var(--bg);
+      background: var(--bg);
     }
-    html{ height: 100%; }
-    html{ background: var(--bg); }
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      margin: 0 18px 18px;
+      margin: 0 18px;
+      padding: 0 0 18px;
       color:var(--text);
       font-size: 16px;
       background: var(--bg);
@@ -56,13 +55,6 @@
       background: var(--bg);
       z-index: -1;
       pointer-events: none;
-    }
-    @supports (-webkit-touch-callout: none){
-      html{ height: -webkit-fill-available; }
-      body{ min-height: -webkit-fill-available; }
-    }
-    @supports (height: 100dvh){
-      body{ min-height: 100dvh; }
     }
     .title{ text-align:center; font-weight: 800; font-size: 34px; line-height: 1.1; letter-spacing: .2px; margin: 10px 0 18px; }
     .panel{ border:1px solid var(--panel-border); border-radius: 10px; padding: 14px; margin-bottom: 14px; background: var(--panel-bg); }
