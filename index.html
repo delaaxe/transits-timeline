@@ -2646,45 +2646,56 @@
             segmentEnd: endApprox,
             exactTime: getRefinedExactDate()
           });
-
-          rect.addEventListener("pointerenter", (e) => {
-            if (isCoarsePointer()) return;
-            showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
-          });
-          rect.addEventListener("pointermove", (e) => {
-            if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
-              moveTooltip(e.clientX, e.clientY);
-            }
-          });
-          rect.addEventListener("pointerleave", () => {
-            if (isCoarsePointer()) return;
-            if (tooltip.classList.contains("popup")) return;
-            hideTooltip();
-          });
-          rect.addEventListener("pointerdown", (e) => {
-            if (isCoarsePointer()){
+          const bindSegmentTooltipEvents = (target) => {
+            target.addEventListener("pointerenter", (e) => {
+              if (isCoarsePointer()) return;
+              showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
+            });
+            target.addEventListener("pointermove", (e) => {
+              if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
+                moveTooltip(e.clientX, e.clientY);
+              }
+            });
+            target.addEventListener("pointerleave", () => {
+              if (isCoarsePointer()) return;
+              if (tooltip.classList.contains("popup")) return;
+              hideTooltip();
+            });
+            target.addEventListener("pointerdown", (e) => {
+              if (isCoarsePointer()){
+                showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
+              }
+            });
+            target.addEventListener("click", (e) => {
               showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
-            }
-          });
+            });
+          };
 
-          rect.addEventListener("click", (e) => {
-            showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
-          });
+          bindSegmentTooltipEvents(rect);
 
           svg.appendChild(rect);
           if (exact && !exactAtBoundary && exact >= a && exact <= b){
             const xExact = dateToX(exact);
             if (xExact >= xa && xExact <= xb){
               const cy = y + rowH / 2;
-            svg.appendChild(svgEl("circle", {
-              cx: xExact,
-              cy,
-              r: 3.5,
-              fill: "var(--text)",
-              stroke: barColor,
-              "stroke-width": "1.5",
-              "pointer-events": "none"
-            }));
+              const hitCircle = svgEl("circle", {
+                cx: xExact,
+                cy,
+                r: 10,
+                fill: "transparent",
+                class: "bar"
+              });
+              bindSegmentTooltipEvents(hitCircle);
+              svg.appendChild(hitCircle);
+              svg.appendChild(svgEl("circle", {
+                cx: xExact,
+                cy,
+                r: 3.5,
+                fill: "var(--text)",
+                stroke: barColor,
+                "stroke-width": "1.5",
+                "pointer-events": "none"
+              }));
             }
           }
         }
