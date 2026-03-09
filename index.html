@@ -365,7 +365,7 @@
   <div class="appModeLinks" role="listbox" aria-label="Mode">
     <button id="appModeChartsBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Charts</button>
     <span class="inlineDot" aria-hidden="true">•</span>
-    <button id="appModeSkiesBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
+    <button id="appModeWorldBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
   </div>
 
   <div class="panel" id="chartsPanel">
@@ -573,19 +573,19 @@
       { key:"today", label:"Today",
         transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
         orb:1.5, includeRxGaps:true, includeMoon:true, range:{startOffsetDays:0, endOffsetDays:0},
-        skies:{ transitGroup:"all", includeMoon:true } },
+        world:{ transitGroup:"all", includeMoon:true } },
       { key:"week", label:"Week",
         transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
         orb:1.0, includeRxGaps:true, includeMoon:false, range:{startOffsetDays:-1, endOffsetDays:6},
-        skies:{ transitGroup:"all", includeMoon:true } },
+        world:{ transitGroup:"all", includeMoon:true } },
       { key:"month", label:"Month",
         transitGroup:"classical", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
         orb:1.0, includeRxGaps:true, includeMoon:false, range:{startOffsetDays:-7, endOffsetDays:29},
-        skies:{ transitGroup:"all", includeMoon:false } },
+        world:{ transitGroup:"all", includeMoon:false } },
       { key:"basic_longterm", label:"Year",
         transitGroup:"outer", natalGroup:"all", aspects:["conjunction","sextile","square","trine","opposition"],
         orb:1.0, includeRxGaps:true, includeMoon:false, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
-        skies:{ transitGroup:"outer", includeMoon:false } }
+        world:{ transitGroup:"outer", includeMoon:false } }
     ];
 
     const $ = (id) => document.getElementById(id);
@@ -593,7 +593,7 @@
     let mythDescriptions = {};
     const el = {
       appModeChartsBtn: $("appModeChartsBtn"),
-      appModeSkiesBtn: $("appModeSkiesBtn"),
+      appModeWorldBtn: $("appModeWorldBtn"),
       chartsPanel: $("chartsPanel"),
       chartsSection: $("chartsSection"),
       chartButtons: $("chartButtons"),
@@ -1052,9 +1052,9 @@
         el.appModeChartsBtn.classList.toggle("active", appModeIsCharts);
         el.appModeChartsBtn.setAttribute("aria-selected", appModeIsCharts ? "true" : "false");
       }
-      if (el.appModeSkiesBtn){
-        el.appModeSkiesBtn.classList.toggle("active", !appModeIsCharts);
-        el.appModeSkiesBtn.setAttribute("aria-selected", appModeIsCharts ? "false" : "true");
+      if (el.appModeWorldBtn){
+        el.appModeWorldBtn.classList.toggle("active", !appModeIsCharts);
+        el.appModeWorldBtn.setAttribute("aria-selected", appModeIsCharts ? "false" : "true");
       }
       if (el.chartsPanel) el.chartsPanel.hidden = !appModeIsCharts;
       if (el.chartsSection) el.chartsSection.hidden = !appModeIsCharts;
@@ -1227,7 +1227,7 @@
     }
 
     function setAppMode(modeKey){
-      appMode = (modeKey === "skies") ? "skies" : "charts";
+      appMode = (modeKey === "world") ? "world" : "charts";
       if (appMode !== "charts"){
         chartsState.addMode = false;
         chartSummaryVisible = false;
@@ -1463,9 +1463,9 @@
           updateTimeline();
         });
       }
-      if (el.appModeSkiesBtn){
-        el.appModeSkiesBtn.addEventListener("click", () => {
-          setAppMode("skies");
+      if (el.appModeWorldBtn){
+        el.appModeWorldBtn.addEventListener("click", () => {
+          setAppMode("world");
           updateTimeline();
         });
       }
@@ -1535,14 +1535,14 @@
       activePresetKey = p.key;
       renderPresetSection();
 
-      const skiesPreset = p.skies || {};
-      const useSkies = appMode === "skies";
-      el.transitGroup.value = useSkies ? (skiesPreset.transitGroup || "all") : p.transitGroup;
+      const worldPreset = p.world || {};
+      const useWorld = appMode === "world";
+      el.transitGroup.value = useWorld ? (worldPreset.transitGroup || "all") : p.transitGroup;
       if (el.natalGroup) el.natalGroup.value = p.natalGroup;
       el.orb.value = String(p.orb);
       currentMaxRows = 50;
       el.includeRxGaps.checked = !!p.includeRxGaps;
-      el.includeMoon.checked = useSkies ? (skiesPreset.includeMoon !== false) : (p.includeMoon !== false);
+      el.includeMoon.checked = useWorld ? (worldPreset.includeMoon !== false) : (p.includeMoon !== false);
       renderAspectChecks(p.aspects);
 
       const today = new Date();
@@ -2208,7 +2208,7 @@
       if (!observer) return null;
       const allPlanets = ephemerisAstronomy.getAllPlanets(time, observer.lon, observer.lat, observer.height);
       const tLon = getPlanetLonFromAll(allPlanets, rule.transit);
-      const nLon = (appMode === "skies")
+      const nLon = (appMode === "world")
         ? getPlanetLonFromAll(allPlanets, rule.natal)
         : (cachedNatalLon ? cachedNatalLon[rule.natal] : null);
       if (nLon === null || nLon === undefined) return null;
@@ -2597,7 +2597,7 @@
           const mythKey = mythKeyFor(r.transit, r.natal);
           const mythText = mythDescriptions[mythKey] || "";
           const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
-          const calendarTitle = (appMode === "skies") ? `${glyphTitleCore} world` : glyphTitleCore;
+          const calendarTitle = (appMode === "world") ? `${glyphTitleCore} world` : glyphTitleCore;
 
           let exactLabelCache = null;
           let refinedExactDateCache = undefined;
@@ -2736,7 +2736,7 @@
         const endExclusive = addDaysLocal(rangeEndLocal, 1);
         if (!(rangeStartLocal < endExclusive)) throw new Error("Timeline end must be after start.");
 
-        const candidateRules = (appMode === "skies") ? buildSkyRules() : buildCandidateRules();
+        const candidateRules = (appMode === "world") ? buildSkyRules() : buildCandidateRules();
         const aspectsChecked = getCheckedAspects();
         if (aspectsChecked.length === 0) throw new Error("Select at least one aspect.");
 
@@ -2754,7 +2754,7 @@
           stepMillis = Math.max(1, Number(stepDays)) * 24 * 3600 * 1000;
         }
 
-        const transitPlanetsAll = (appMode === "skies")
+        const transitPlanetsAll = (appMode === "world")
           ? Array.from(new Set(candidateRules.flatMap(r => [r.transit, r.natal])))
           : Array.from(new Set(candidateRules.map(r => r.transit)));
         const transitPlanetsFiltered = transitPlanetsAll.filter(p => p !== "mc");
@@ -2797,7 +2797,7 @@
 
         let chartRulerKey = null;
         const natalLon = {};
-        if (appMode === "skies"){
+        if (appMode === "world"){
           chartRulerKey = null;
           cachedNatalLon = null;
         } else if (isComposite && composite){
@@ -2834,7 +2834,7 @@
           for (let i=0; i<sampleTimes.length; i++){
             if (cancelRequested) throw new Error("Cancelled");
             const tLon = transitLonBySample[r.transit][i];
-            const nLon = (appMode === "skies")
+            const nLon = (appMode === "world")
               ? transitLonBySample[r.natal][i]
               : natalLon[r.natal];
             const d = angDist(tLon, nLon);
