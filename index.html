@@ -660,6 +660,8 @@
     let isComputing = false;
     let cancelRequested = false;
     let pendingUpdate = false;
+    let lastTimelineRefreshAt = 0;
+    let lastRefocusCheckAt = 0;
     let labelsUseSymbols = false;
     let currentLayout = null;
 
@@ -1528,6 +1530,27 @@
       window.addEventListener("scroll", () => {
         if (isCoarsePointer()) hideTooltip();
       }, { passive: true });
+    }
+
+    function maybeRefreshTimelineOnRefocus(){
+      if (document.visibilityState === "hidden") return;
+      if (isComputing) return;
+      const now = Date.now();
+      if ((now - lastRefocusCheckAt) < 1500) return;
+      lastRefocusCheckAt = now;
+      if (!lastTimelineRefreshAt || (now - lastTimelineRefreshAt) > (60 * 60 * 1000)){
+        updateTimeline();
+      }
+    }
+
+    function wireStaleRefreshOnRefocus(){
+      window.addEventListener("focus", maybeRefreshTimelineOnRefocus);
+      window.addEventListener("pageshow", maybeRefreshTimelineOnRefocus);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible"){
+          maybeRefreshTimelineOnRefocus();
+        }
+      });
     }
 
     function applyPreset(key){
@@ -2875,6 +2898,7 @@
         };
 
         renderFromCache(currentMaxRows);
+        lastTimelineRefreshAt = Date.now();
 
         const totalMatches = rulesSorted.length;
         const showTime = stepMillis < 24*3600*1000;
@@ -2922,6 +2946,7 @@
     wireAxisScrollSync();
     wireRangeNav();
     wireTooltipDismiss();
+    wireStaleRefreshOnRefocus();
 
     el.updateBtn.addEventListener("click", () => {
       if (!isComputing) return;
