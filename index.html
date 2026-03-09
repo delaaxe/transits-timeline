@@ -34,7 +34,7 @@
       --timeline-nav-total: calc(var(--timeline-nav-h) + 10px);
     }
     html{ background: var(--bg); }
-    body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 18px; color:var(--text); font-size: 16px; background: var(--bg); }
+    body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0 18px 18px; color:var(--text); font-size: 16px; background: var(--bg); }
     .title{ text-align:center; font-weight: 800; font-size: 34px; line-height: 1.1; letter-spacing: .2px; margin: 10px 0 18px; }
     .panel{ border:1px solid var(--panel-border); border-radius: 10px; padding: 14px; margin-bottom: 14px; background: var(--panel-bg); }
     .row{ display:flex; gap:12px; flex-wrap: wrap; align-items:flex-end; }
@@ -254,8 +254,8 @@
     }
     .chartPickers{ display: flex; flex-direction: column; gap: 10px; }
     .chartPickerLabel{ font-size: 12px; color: var(--muted); margin: 0 0 6px; }
-    .appModeLinks{ display:flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; justify-content: center; }
-    .appModeLink{ text-decoration: underline; }
+    .appModeLinks{ display:flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 10px; justify-content: center; }
+    .appModeLink{ text-decoration: underline; font-size: 15px; }
     .appModeLink.active{ text-decoration: none; font-weight: 700; }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
@@ -334,7 +334,7 @@
   <div class="appModeLinks" role="listbox" aria-label="Mode">
     <button id="appModeChartsBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Charts</button>
     <span class="inlineDot" aria-hidden="true">·</span>
-    <button id="appModeSkiesBtn" type="button" class="linkBtn appModeLink" aria-selected="false">Skies</button>
+    <button id="appModeSkiesBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
   </div>
 
   <div class="panel" id="chartsPanel">
