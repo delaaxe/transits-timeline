@@ -329,6 +329,15 @@
       text-decoration: underline;
       cursor: pointer;
     }
+    #tooltip .tooltipActions{
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    #tooltip .tooltipAction{
+      color: var(--text);
+      text-decoration: underline;
+      font-size: 13px;
+    }
     .bar{ cursor: pointer; }
   </style>
 </head>
@@ -1564,6 +1573,35 @@
           hideTooltip();
           return;
         }
+        const calendarLink = e.target.closest("a[data-gcal-web]");
+        if (calendarLink && isMobileCalendarTarget()){
+          const webUrl = calendarLink.getAttribute("data-gcal-web") || "";
+          const deepLink = googleCalendarMobileDeepLink(webUrl);
+          const isIOS = isIOSLike();
+          e.preventDefault();
+          let appOpened = false;
+          const onVis = () => {
+            if (document.visibilityState === "hidden") appOpened = true;
+          };
+          document.addEventListener("visibilitychange", onVis, { once: true });
+          if (deepLink){
+            window.location.href = deepLink;
+            if (isIOS){
+              const iosDeep = googleCalendarIOSDeepLinks(webUrl);
+              if (iosDeep.secondary){
+                window.setTimeout(() => {
+                  if (!appOpened) window.location.href = iosDeep.secondary;
+                }, 250);
+              }
+            }
+          }
+          if (!isIOS){
+            window.setTimeout(() => {
+              if (!appOpened) window.location.href = webUrl;
+            }, 800);
+          }
+          return;
+        }
         const btn = e.target.closest(".mythToggle");
         if (!btn || !tooltip.contains(btn)) return;
         const myth = tooltip.querySelector(".mythHidden");
@@ -1980,7 +2018,74 @@
     function escapeHtml(s){
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     }
-    function setTooltipContent(title, desc, range, myth, popupMode, exactLabel){
+    function toGoogleCalUtcStamp(dateObj){
+      if (!(dateObj instanceof Date) || !Number.isFinite(dateObj.getTime())) return "";
+      const y = dateObj.getUTCFullYear();
+      const m = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(dateObj.getUTCDate()).padStart(2, "0");
+      const hh = String(dateObj.getUTCHours()).padStart(2, "0");
+      const mm = String(dateObj.getUTCMinutes()).padStart(2, "0");
+      const ss = String(dateObj.getUTCSeconds()).padStart(2, "0");
+      return `${y}${m}${d}T${hh}${mm}${ss}Z`;
+    }
+    function toGoogleCalDateStampLocal(dateObj){
+      if (!(dateObj instanceof Date) || !Number.isFinite(dateObj.getTime())) return "";
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const d = String(dateObj.getDate()).padStart(2, "0");
+      return `${y}${m}${d}`;
+    }
+    function googleCalendarUrl({ title, details, start, end, allDay=false }){
+      const startStamp = allDay ? toGoogleCalDateStampLocal(start) : toGoogleCalUtcStamp(start);
+      const endStamp = allDay ? toGoogleCalDateStampLocal(end) : toGoogleCalUtcStamp(end);
+      if (!startStamp || !endStamp) return "";
+      const params = new URLSearchParams({
+        action: "TEMPLATE",
+        text: title || "Transit",
+        details: details || "",
+        dates: `${startStamp}/${endStamp}`
+      });
+      return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    }
+    function isIOSLike(){
+      const ua = navigator.userAgent || "";
+      const isIPadOSDesktopUA = (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+      return /iPhone|iPad|iPod/i.test(ua) || isIPadOSDesktopUA;
+    }
+    function googleCalendarMobileDeepLink(webUrl){
+      if (!webUrl) return "";
+      const qIndex = webUrl.indexOf("?");
+      const query = qIndex >= 0 ? webUrl.slice(qIndex + 1) : "";
+      const ua = navigator.userAgent || "";
+      const isAndroid = /Android/i.test(ua);
+      if (isAndroid){
+        return `intent://calendar.google.com/calendar/render?${query}#Intent;scheme=https;package=com.google.android.calendar;end`;
+      }
+      if (isIOSLike()){
+        return `googlecalendar://calendar/render?${query}`;
+      }
+      return "";
+    }
+    function googleCalendarIOSDeepLinks(webUrl){
+      if (!webUrl) return { primary: "", secondary: "" };
+      const qIndex = webUrl.indexOf("?");
+      const query = qIndex >= 0 ? webUrl.slice(qIndex + 1) : "";
+      return {
+        primary: googleCalendarMobileDeepLink(webUrl),
+        secondary: `comgooglecalendar://calendar/render?${query}`
+      };
+    }
+    function isMobileCalendarTarget(){
+      const ua = navigator.userAgent || "";
+      return /Android/i.test(ua) || isIOSLike();
+    }
+    function isMultiDayLocal(start, end){
+      if (!(start instanceof Date) || !(end instanceof Date)) return false;
+      return start.getFullYear() !== end.getFullYear()
+        || start.getMonth() !== end.getMonth()
+        || start.getDate() !== end.getDate();
+    }
+    function setTooltipContent(title, desc, range, myth, popupMode, exactLabel, calendarData){
       const safeMyth = myth ? escapeHtml(myth) : "";
       const useToggle = !!safeMyth;
       const mythHtml = useToggle
@@ -1988,10 +2093,61 @@
         : "";
       const exactHtml = exactLabel ? ` <span class="sub">(${escapeHtml("exact: " + exactLabel)})</span>` : "";
       const closeBtn = popupMode ? `<button type="button" class="tooltipClose" aria-label="Close">✕</button>` : "";
+      let calendarHtml = "";
+      if (popupMode && calendarData){
+        const titleText = String(calendarData.title || title || "Transit");
+        const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
+        const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
+        const detailsText = [firstLine, desc || "", mythLine].filter(Boolean).join("\n\n");
+        const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
+        const segmentEndForCalendar = segmentAllDay
+          ? new Date(calendarData.segmentEnd.getFullYear(), calendarData.segmentEnd.getMonth(), calendarData.segmentEnd.getDate() + 1)
+          : calendarData.segmentEnd;
+        const segmentUrl = googleCalendarUrl({
+          title: titleText,
+          details: detailsText,
+          start: calendarData.segmentStart,
+          end: segmentEndForCalendar,
+          allDay: segmentAllDay
+        });
+        const exactDate = calendarData.exactTime instanceof Date ? calendarData.exactTime : null;
+        const exactUrl = exactDate ? googleCalendarUrl({
+          title: titleText,
+          details: detailsText,
+          start: exactDate,
+          end: exactDate,
+          allDay: false
+        }) : "";
+        if (segmentUrl || exactUrl){
+          const desktopLinkAttrs = isMobileCalendarTarget() ? "" : ` target="_blank" rel="noopener noreferrer"`;
+          const exactDeep = googleCalendarMobileDeepLink(exactUrl);
+          const segmentDeep = googleCalendarMobileDeepLink(segmentUrl);
+          const exactLink = exactUrl
+            ? `<a class="tooltipAction" href="${escapeHtml(exactDeep || exactUrl)}" data-gcal-web="${escapeHtml(exactUrl)}"${desktopLinkAttrs}>Exact</a>`
+            : "Exact";
+          const segmentLink = segmentUrl
+            ? `<a class="tooltipAction" href="${escapeHtml(segmentDeep || segmentUrl)}" data-gcal-web="${escapeHtml(segmentUrl)}"${desktopLinkAttrs}>Segment</a>`
+            : "Segment";
+          let appLinksHtml = "";
+          const exactIOS = exactUrl ? googleCalendarIOSDeepLinks(exactUrl).primary : "";
+          const segmentIOS = segmentUrl ? googleCalendarIOSDeepLinks(segmentUrl).primary : "";
+          if (exactIOS || segmentIOS){
+            const exactAppLink = exactIOS
+              ? `<a class="tooltipAction" href="${escapeHtml(exactIOS)}">Exact</a>`
+              : "Exact";
+            const segmentAppLink = segmentIOS
+              ? `<a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Segment</a>`
+              : "Segment";
+            appLinksHtml = `<div class="tooltipActions">Open in Google Calendar app: ${exactAppLink} · ${segmentAppLink}</div>`;
+          }
+          calendarHtml = `<div class="tooltipActions">Add to Google Calendar: ${exactLink} · ${segmentLink}</div>${appLinksHtml}`;
+        }
+      }
       tooltip.innerHTML = `${closeBtn}<div>${escapeHtml(title)}</div>`
         + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
         + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
-        + mythHtml;
+        + mythHtml
+        + calendarHtml;
     }
     function moveTooltip(clientX, clientY, popupMode){
       const pad = 10;
@@ -2017,20 +2173,12 @@
     function isCoarsePointer(){
       return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
     }
-    let tooltipHideTimer = null;
-    function clearTooltipTimer(){
-      if (tooltipHideTimer){
-        window.clearTimeout(tooltipHideTimer);
-        tooltipHideTimer = null;
-      }
-    }
-    function showTooltip(e, title, desc, range, popupMode, myth, exactLabel){
-      setTooltipContent(title, desc, range, myth, popupMode, exactLabel);
+    function showTooltip(e, title, desc, range, popupMode, myth, exactLabel, calendarData=null){
+      setTooltipContent(title, desc, range, myth, popupMode, exactLabel, calendarData);
       tooltip.style.display = "block";
       tooltip.style.visibility = "hidden";
       tooltip.classList.toggle("popup", !!popupMode);
       if (tooltipBackdrop) tooltipBackdrop.style.display = popupMode ? "block" : "none";
-      clearTooltipTimer();
       requestAnimationFrame(() => {
         moveTooltip(e?.clientX, e?.clientY, popupMode);
         tooltip.style.visibility = "visible";
@@ -2429,18 +2577,33 @@
           const descText = aspectDescriptions[descKey] || "";
           const mythKey = mythKeyFor(r.transit, r.natal);
           const mythText = mythDescriptions[mythKey] || "";
+          const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
+          const calendarTitle = (appMode === "skies") ? `${glyphTitleCore} world` : glyphTitleCore;
 
           let exactLabelCache = null;
-          const getExactLabel = () => {
-            if (exactLabelCache !== null) return exactLabelCache;
-            if (!exact) return "";
+          let refinedExactDateCache = undefined;
+          const getRefinedExactDate = () => {
+            if (!exact) return null;
+            if (refinedExactDateCache !== undefined) return refinedExactDateCache;
             const refineWindowMs = 24 * 3600 * 1000;
             const refineStart = new Date(exact.getTime() - refineWindowMs);
             const refineEnd = new Date(exact.getTime() + refineWindowMs);
-            const refined = refineExactMinute(exact, refineStart, refineEnd, stepMillis, r);
+            refinedExactDateCache = refineExactMinute(exact, refineStart, refineEnd, stepMillis, r);
+            return refinedExactDateCache;
+          };
+          const getExactLabel = () => {
+            if (exactLabelCache !== null) return exactLabelCache;
+            if (!exact) return "";
+            const refined = getRefinedExactDate();
             exactLabelCache = formatExactPretty(refined, a, endApprox, showYear);
             return exactLabelCache;
           };
+          const buildCalendarData = () => ({
+            title: calendarTitle,
+            segmentStart: a,
+            segmentEnd: endApprox,
+            exactTime: getRefinedExactDate()
+          });
 
           rect.addEventListener("pointerenter", (e) => {
             if (isCoarsePointer()) return;
@@ -2458,13 +2621,12 @@
           });
           rect.addEventListener("pointerdown", (e) => {
             if (isCoarsePointer()){
-              showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel());
+              showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
             }
           });
 
           rect.addEventListener("click", (e) => {
-            showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel());
-            clearTooltipTimer();
+            showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
           });
 
           svg.appendChild(rect);
