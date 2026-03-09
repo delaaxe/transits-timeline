@@ -180,6 +180,11 @@
       color: var(--muted);
       padding: 6px 0 0 0;
       line-height: 1.35;
+      white-space: pre-line;
+    }
+    .symbolGlyphText{
+      font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", "Symbola", system-ui, sans-serif;
+      font-size: 14px;
     }
     .composeHint{
       margin-top: 8px;
@@ -333,7 +338,7 @@
 
   <div class="appModeLinks" role="listbox" aria-label="Mode">
     <button id="appModeChartsBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Charts</button>
-    <span class="inlineDot" aria-hidden="true">·</span>
+    <span class="inlineDot" aria-hidden="true">•</span>
     <button id="appModeSkiesBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
   </div>
 
@@ -940,26 +945,65 @@
       wrap.appendChild(addBtn);
     }
 
-    function buildChartSummaryText(pA, pB){
+    const signSymbols = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
+    const summaryPlanetOrder = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"];
+    const summaryPointSymbols = { asc: "Ac", mc: "Mc" };
+
+    function zodiacSignSymbol(deg){
+      const idx = Math.floor(wrap360(deg) / 30) % 12;
+      return signSymbols[idx] || "";
+    }
+
+    function buildSymbolPlacementsLine(lonByKey){
+      const pieces = [];
+      for (const k of summaryPlanetOrder){
+        const lon = lonByKey?.[k];
+        if (!Number.isFinite(lon)) continue;
+        const planetGlyph = planetSymbols[k];
+        if (!planetGlyph) continue;
+        pieces.push(`${planetGlyph}\u00A0${zodiacSignSymbol(lon)}`);
+      }
+      if (Number.isFinite(lonByKey?.asc)){
+        pieces.push(`${summaryPointSymbols.asc}\u00A0${zodiacSignSymbol(lonByKey.asc)}`);
+      }
+      if (Number.isFinite(lonByKey?.mc)){
+        pieces.push(`${summaryPointSymbols.mc}\u00A0${zodiacSignSymbol(lonByKey.mc)}`);
+      }
+      return pieces.join(" • ");
+    }
+
+    function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = {}){
       if (chartsState.addMode) return "Add a new chart.";
       if (!pA) return "";
       if (appMode !== "charts") return "";
       if (chartsState.mode === "composite" && !pB) return "Pick two charts to build a composite.";
       const parts = [];
+      let placementsLine = "";
       try{
         if (ephemerisAstronomy && typeof ephemerisAstronomy.getAllPlanets === "function"){
           if (chartsState.mode === "composite"){
             if (!pB) throw new Error("Select two charts.");
             const composite = computeCompositeChart(pA, pB);
             parts.push(`Composite of ${pA.name} & ${pB.name}`);
-            parts.push(`${zodiacSign(composite.lon.sun)} Sun • ${zodiacSign(composite.lon.moon)} Moon • ${zodiacSign(composite.asc)} Asc`);
+            if (includePlacementsLine){
+              placementsLine = buildSymbolPlacementsLine({
+                ...composite.lon,
+                asc: composite.asc,
+                mc: composite.mc
+              });
+            }
           } else {
             const birthUTC = parseBirthUTCFor(pA);
             const allPlanets = ephemerisAstronomy.getAllPlanets(birthUTC, pA.lon, pA.lat, 0);
-            const sunLon = getPlanetLonFromAll(allPlanets, "sun");
-            const moonLon = getPlanetLonFromAll(allPlanets, "moon");
-            const ascLon = calcNatalAscDeg(birthUTC, pA.lon, pA.lat);
-            parts.push(`${zodiacSign(sunLon)} Sun • ${zodiacSign(moonLon)} Moon • ${zodiacSign(ascLon)} Asc`);
+            if (includePlacementsLine){
+              const lonByKey = {};
+              for (const key of summaryPlanetOrder){
+                lonByKey[key] = getPlanetLonFromAll(allPlanets, key);
+              }
+              lonByKey.asc = calcNatalAscDeg(birthUTC, pA.lon, pA.lat);
+              lonByKey.mc = calcNatalMCDeg(birthUTC, pA.lon);
+              placementsLine = buildSymbolPlacementsLine(lonByKey);
+            }
           }
         }
       } catch {}
@@ -968,9 +1012,12 @@
         if (pA.placeLabel) parts.push(pA.placeLabel);
         const cc = fmtCoord(pA.lat, pA.lon);
         if (cc) parts.push(cc);
-        if (pA.tzName) parts.push(pA.tzName);
       }
-      return parts.join(" • ");
+      const firstLine = parts.join(" • ");
+      if (includePlacementsLine && placementsLine){
+        return firstLine ? `${firstLine}\n${placementsLine}` : placementsLine;
+      }
+      return firstLine;
     }
 
     function renderAppModeSection(){
@@ -1055,7 +1102,23 @@
 
       if (el.chartSummary){
         if (chartsState.mode === "single"){
-          el.chartSummary.textContent = buildChartSummaryText(pA, pB);
+          const summaryText = buildChartSummaryText(pA, pB, { includePlacementsLine: true });
+          const splitAt = summaryText.indexOf("\n");
+          if (splitAt >= 0){
+            const metaLine = summaryText.slice(0, splitAt);
+            const glyphLine = summaryText.slice(splitAt + 1);
+            el.chartSummary.textContent = "";
+            if (metaLine){
+              el.chartSummary.appendChild(document.createTextNode(metaLine));
+              el.chartSummary.appendChild(document.createElement("br"));
+            }
+            const glyphSpan = document.createElement("span");
+            glyphSpan.className = "symbolGlyphText";
+            glyphSpan.textContent = glyphLine;
+            el.chartSummary.appendChild(glyphSpan);
+          } else {
+            el.chartSummary.textContent = summaryText;
+          }
           el.chartSummary.hidden = !chartSummaryVisible;
         } else {
           el.chartSummary.hidden = true;
@@ -1153,7 +1216,7 @@
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
       const ns = lat >= 0 ? "N" : "S";
       const ew = lon >= 0 ? "E" : "W";
-      return `${Math.abs(lat).toFixed(4)}°${ns}, ${Math.abs(lon).toFixed(4)}°${ew}`;
+      return `${Math.abs(lat).toFixed(2)}°${ns}, ${Math.abs(lon).toFixed(2)}°${ew}`;
     }
 
 
