@@ -486,6 +486,7 @@
         <div class="checks" style="padding:0;">
           <label><input id="includeMoon" type="checkbox" checked /> Transiting Moon</label>
           <label><input id="includeChiron" type="checkbox" checked /> Chiron</label>
+          <label><input id="includeNode" type="checkbox" /> Node</label>
           <label id="includeMCWrap"><input id="includeMC" type="checkbox" checked /> Mc</label>
         </div>
       </div>
@@ -555,6 +556,7 @@
     const planets = [
       ["sun","Sun"], ["moon","Moon"], ["mercury","Mercury"], ["venus","Venus"], ["mars","Mars"],
       ["jupiter","Jupiter"], ["saturn","Saturn"], ["uranus","Uranus"], ["neptune","Neptune"], ["pluto","Pluto"],
+      ["node","Node"],
       ["chiron","Chiron"],
       ["mc","Mc"],
     ];
@@ -569,11 +571,12 @@
       uranus: "♅",
       neptune: "♆",
       pluto: "♇",
+      node: "☊",
       chiron: "⚷",
       mc: "Mc"
     };
 
-    const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","chiron","mc"];
+    const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc"];
     const orderMap = new Map(order.map((k,i)=>[k,i]));
 
     const aspects = [
@@ -593,7 +596,7 @@
       quincunx: "#0f766e"
     };
 
-    // Dropdown groups exclude Chiron/MC; checkbox adds it to both.
+    // Dropdown groups exclude Node/Chiron/MC; checkboxes add them.
     const baseGroups = [
       ["luminaries","Luminaries (Sun, Moon)", ["sun","moon"]],
       ["personal",  "Personal (Sun–Mars)", ["sun","moon","mercury","venus","mars"]],
@@ -606,7 +609,7 @@
 
     const individualPlanets = planets
       .map(p => p[0])
-      .filter(k => k !== "chiron" && k !== "mc")
+      .filter(k => k !== "node" && k !== "chiron" && k !== "mc")
       .map(k => [k, planetLabel(k), [k]]);
 
     const sharedGroups = [...baseGroups, ...individualPlanets];
@@ -674,6 +677,7 @@
       includeMoon: $("includeMoon"),
       includeMC: $("includeMC"),
       includeChiron: $("includeChiron"),
+      includeNode: $("includeNode"),
       updateBtn: $("updateBtn"),
       status: $("status"),
       rangeShiftBack: $("rangeShiftBack"),
@@ -1567,6 +1571,7 @@
       el.includeMoon.addEventListener("change", updateTimeline);
       el.includeMC.addEventListener("change", updateTimeline);
       el.includeChiron.addEventListener("change", updateTimeline);
+      el.includeNode.addEventListener("change", updateTimeline);
       el.aspectChecks.addEventListener("change", updateTimeline);
     }
 
@@ -1645,6 +1650,20 @@
         throw new Error(`Couldn't read apparentLongitudeDd for "${planetKey}".`);
       }
       return wrap360(obs.apparentLongitudeDd);
+    }
+    function calcMeanNodeDeg(dateObj){
+      const t = (julianDay(dateObj) - 2451545.0) / 36525.0;
+      return wrap360(
+        125.04455501
+        - 1934.1361849 * t
+        + 0.0020762 * t * t
+        + (t * t * t) / 467410
+        - (t * t * t * t) / 60616000
+      );
+    }
+    function getBodyLonFromAll(allPlanets, planetKey, dateObj){
+      if (planetKey === "node") return calcMeanNodeDeg(dateObj);
+      return getPlanetLonFromAll(allPlanets, planetKey);
     }
     let tooltipListenersWired = false;
     function ensureTooltipListeners(){
@@ -1818,7 +1837,7 @@
       const lon = {};
       for (const k of order){
         if (k === "mc") continue;
-        lon[k] = midpointAngle(getPlanetLonFromAll(allA, k), getPlanetLonFromAll(allB, k));
+        lon[k] = midpointAngle(getBodyLonFromAll(allA, k, birthUTCA), getBodyLonFromAll(allB, k, birthUTCB));
       }
       const mcA = calcNatalMCDeg(birthUTCA, pA.lon);
       const mcB = calcNatalMCDeg(birthUTCB, pB.lon);
@@ -1849,6 +1868,10 @@
         uniquePush(transitPlanets, "chiron");
         uniquePush(natalTargets, "chiron");
       }
+      if (el.includeNode.checked){
+        uniquePush(transitPlanets, "node");
+        uniquePush(natalTargets, "node");
+      }
       if (el.includeMC.checked){
         uniquePush(natalTargets, "mc");
       }
@@ -1863,6 +1886,7 @@
       for (const tp of transitPlanets){
         for (const np of natalTargets){
           for (const asp of aspects){
+            if (tp === "node" && asp !== "conjunction") continue;
             rules.push({ transit: tp, natal: np, aspect: asp, orb });
           }
         }
@@ -1875,6 +1899,9 @@
       if (el.includeChiron.checked){
         uniquePush(skyPlanets, "chiron");
       }
+      if (el.includeNode.checked){
+        uniquePush(skyPlanets, "node");
+      }
       if (!el.includeMoon.checked){
         skyPlanets = skyPlanets.filter(p => p !== "moon");
       }
@@ -1885,6 +1912,7 @@
       for (let i=0; i<skyPlanets.length; i++){
         for (let j=i+1; j<skyPlanets.length; j++){
           for (const asp of aspects){
+            if ((skyPlanets[i] === "node" || skyPlanets[j] === "node") && asp !== "conjunction") continue;
             rules.push({ transit: skyPlanets[i], aspect: asp, natal: skyPlanets[j], orb });
           }
         }
@@ -2329,9 +2357,9 @@
     function aspectDeltaAt(time, rule, observer){
       if (!observer) return null;
       const allPlanets = ephemerisAstronomy.getAllPlanets(time, observer.lon, observer.lat, observer.height);
-      const tLon = getPlanetLonFromAll(allPlanets, rule.transit);
+      const tLon = getBodyLonFromAll(allPlanets, rule.transit, time);
       const nLon = (appMode === "world")
-        ? getPlanetLonFromAll(allPlanets, rule.natal)
+        ? getBodyLonFromAll(allPlanets, rule.natal, time)
         : (cachedNatalLon ? cachedNatalLon[rule.natal] : null);
       if (nLon === null || nLon === undefined) return null;
       const d = angDist(tLon, nLon);
@@ -2914,7 +2942,7 @@
             if (i % 120 === 0) await new Promise(r => setTimeout(r, 0));
             const allPlanets = ephemerisAstronomy.getAllPlanets(d, lon, lat, height);
             for (const p of transitPlanetsFiltered){
-              transitLonBySample[p][i] = getPlanetLonFromAll(allPlanets, p);
+              transitLonBySample[p][i] = getBodyLonFromAll(allPlanets, p, d);
             }
             if (i % 10 === 0 || i === sampleTimes.length - 1){
               setStatus(`Computing… ${i+1}/${sampleTimes.length}`);
@@ -2944,7 +2972,7 @@
             if (k === "mc"){
               natalLon[k] = calcNatalMCDeg(birthUTC, lon);
             } else {
-              natalLon[k] = getPlanetLonFromAll(birthAllPlanets, k);
+              natalLon[k] = getBodyLonFromAll(birthAllPlanets, k, birthUTC);
             }
           }
           chartRulerKey = chartRulerFromAsc(calcNatalAscDeg(birthUTC, lon, lat));
