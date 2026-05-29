@@ -170,8 +170,6 @@
     .orbField input{ width: 70px !important; }
     .orbInline{ display:flex; align-items:center; gap: 8px; }
     .orbInline label{ margin: 0; font-size: 12px; color: var(--muted); }
-    .rxField{ align-self: flex-end; }
-    .rxField label{ visibility: hidden; height: 0; margin: 0; }
     .smallBtn{ padding: 6px 10px; font-size: 13px; border-radius: 8px; }
 
     
@@ -479,12 +477,6 @@
     <div class="row optionsRow" data-advanced>
       <div class="field"><label>Start</label><input id="rangeStart" type="date" value="2025-10-01" /></div>
       <div class="field"><label>End</label><input id="rangeEnd" type="date" value="2026-12-31" /></div>
-      <div class="field rxField">
-        <label>&nbsp;</label>
-        <div class="checks" style="padding:0;">
-          <label><input id="includeRxGaps" type="checkbox" checked /> Bridge retrograde gaps</label>
-        </div>
-      </div>
     </div>
 
     <div class="row rowPlanets" data-advanced>
@@ -624,19 +616,19 @@
     const presets = [
       { key:"today", label:"Today",
         transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.5, includeRxGaps:true, includeMoon:true, includeChiron:true, range:{startOffsetDays:0, endOffsetDays:0},
+        orb:1.5, includeMoon:true, includeChiron:true, range:{startOffsetDays:0, endOffsetDays:0},
         world:{ transitGroup:"all", includeMoon:true, includeChiron:true } },
       { key:"week", label:"Week",
         transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.0, includeRxGaps:true, includeMoon:false, includeChiron:true, range:{startOffsetDays:-1, endOffsetDays:6},
+        orb:1.0, includeMoon:false, includeChiron:true, range:{startOffsetDays:-1, endOffsetDays:6},
         world:{ transitGroup:"all", includeMoon:false, includeChiron:true } },
       { key:"month", label:"Month",
         transitGroup:"classical", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.0, includeRxGaps:true, includeMoon:false, includeChiron:true, range:{startOffsetDays:-7, endOffsetDays:29},
+        orb:1.0, includeMoon:false, includeChiron:true, range:{startOffsetDays:-7, endOffsetDays:29},
         world:{ transitGroup:"all", includeMoon:false, includeChiron:true } },
       { key:"basic_longterm", label:"Year",
         transitGroup:"outer", natalGroup:"all", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.0, includeRxGaps:true, includeMoon:false, includeChiron:true, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
+        orb:1.0, includeMoon:false, includeChiron:true, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
         world:{ transitGroup:"outer", includeMoon:false, includeChiron:true } }
     ];
 
@@ -677,7 +669,6 @@
       rangeStart: $("rangeStart"),
       rangeEnd: $("rangeEnd"),
       orb: $("orb"),
-      includeRxGaps: $("includeRxGaps"),
       aspectChecks: $("aspectChecks"),
       advancedToggle: $("advancedToggle"),
       includeMoon: $("includeMoon"),
@@ -1573,7 +1564,6 @@
       el.rangeEnd.addEventListener("change", updateTimeline);
       el.orb.addEventListener("input", updateDebounced);
       el.orb.addEventListener("change", updateTimeline);
-      el.includeRxGaps.addEventListener("change", updateTimeline);
       el.includeMoon.addEventListener("change", updateTimeline);
       el.includeMC.addEventListener("change", updateTimeline);
       el.includeChiron.addEventListener("change", updateTimeline);
@@ -1618,7 +1608,6 @@
       if (el.natalGroup) el.natalGroup.value = p.natalGroup;
       el.orb.value = String(p.orb);
       currentMaxRows = 50;
-      el.includeRxGaps.checked = !!p.includeRxGaps;
       el.includeMoon.checked = useWorld ? (worldPreset.includeMoon !== false) : (p.includeMoon !== false);
       el.includeChiron.checked = useWorld ? (worldPreset.includeChiron !== false) : (p.includeChiron !== false);
       renderAspectChecks(p.aspects);
@@ -2871,7 +2860,6 @@
         }
 
         currentMaxRows = 50;
-        const includeRxGaps = el.includeRxGaps.checked;
 
         const birthUTC = (isChartsMode && chartA) ? parseBirthUTCFor(chartA) : null;
 
@@ -2987,7 +2975,7 @@
             if (delta <= orb) flags[i] = true;
           }
 
-          const intervals = groupActiveIntervalsWithExact(flags, deltas, sampleTimes, endExclusive, includeRxGaps);
+          const intervals = groupActiveIntervalsWithExact(flags, deltas, sampleTimes, endExclusive, true);
           if (intervals.length > 0){
             rulesOut.push(r);
             intervalsByRule.push(intervals);
