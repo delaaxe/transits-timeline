@@ -337,6 +337,23 @@
       cursor: pointer;
       padding: 2px 4px;
     }
+    #tooltip .tooltipTitle{ font-size: 16px; }
+    #tooltip.popup .tooltipTitle{ cursor: pointer; }
+    #tooltip .copiedHint{
+      margin-left: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      opacity: 0;
+      transition: none;
+    }
+    #tooltip .copiedHint.visible{
+      opacity: 0.65;
+      transition: none;
+    }
+    #tooltip .copiedHint.fading{
+      opacity: 0;
+      transition: opacity 700ms ease;
+    }
     #tooltip .desc{ opacity: 0.95; margin-top: 6px; }
     #tooltip .sub{ opacity: 0.85; margin-top: 4px; white-space: normal; }
     #tooltip .myth{ opacity: 0.9; margin-top: 6px; font-style: italic; }
@@ -1657,6 +1674,20 @@
           hideTooltip();
           return;
         }
+        const titleEl = e.target.closest(".tooltipTitle");
+        if (titleEl && tooltip.classList.contains("popup")){
+          copyTextToClipboard(titleEl.dataset.copyText || titleEl.textContent || "");
+          const copiedHint = tooltip.querySelector(".copiedHint");
+          if (copiedHint){
+            copiedHint.classList.remove("fading");
+            copiedHint.classList.add("visible");
+            window.setTimeout(() => {
+              copiedHint.classList.remove("visible");
+              copiedHint.classList.add("fading");
+            }, 900);
+          }
+          return;
+        }
         const calendarLink = e.target.closest("a[data-gcal-web]");
         if (calendarLink && isMobileCalendarTarget()){
           const webUrl = calendarLink.getAttribute("data-gcal-web") || "";
@@ -2102,6 +2133,22 @@
     function escapeHtml(s){
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     }
+    async function copyTextToClipboard(text){
+      if (!text) return;
+      if (navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
     function toGoogleCalUtcStamp(dateObj){
       if (!(dateObj instanceof Date) || !Number.isFinite(dateObj.getTime())) return "";
       const y = dateObj.getUTCFullYear();
@@ -2235,8 +2282,8 @@
             ? `<a class="tooltipAction" href="${escapeHtml(exactDeep || exactUrl)}" data-gcal-web="${escapeHtml(exactUrl)}"${desktopLinkAttrs}>Exact</a>`
             : "Exact";
           const segmentLink = segmentUrl
-            ? `<a class="tooltipAction" href="${escapeHtml(segmentDeep || segmentUrl)}" data-gcal-web="${escapeHtml(segmentUrl)}"${desktopLinkAttrs}>Segment</a>`
-            : "Segment";
+            ? `<a class="tooltipAction" href="${escapeHtml(segmentDeep || segmentUrl)}" data-gcal-web="${escapeHtml(segmentUrl)}"${desktopLinkAttrs}>Period</a>`
+            : "Period";
           let appLinksHtml = "";
           const exactIOS = exactUrl ? googleCalendarIOSDeepLinks(exactUrl).primary : "";
           const segmentIOS = segmentUrl ? googleCalendarIOSDeepLinks(segmentUrl).primary : "";
@@ -2245,14 +2292,14 @@
               ? `<a class="tooltipAction" href="${escapeHtml(exactIOS)}">Exact</a>`
               : "Exact";
             const segmentAppLink = segmentIOS
-              ? `<a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Segment</a>`
-              : "Segment";
+              ? `<a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Period</a>`
+              : "Period";
             appLinksHtml = `<div class="tooltipActions">Open in Google Calendar app: ${exactAppLink}<span class="tooltipActionsSep">•</span>${segmentAppLink}</div>`;
           }
           calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Add to Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}</div>${appLinksHtml}</div>`;
         }
       }
-      tooltip.innerHTML = `${closeBtn}<div>${escapeHtml(title)}</div>`
+      tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(title)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
         + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
         + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
         + mythHtml
