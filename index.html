@@ -390,11 +390,6 @@
       margin: 2px 0;
     }
     #tooltip .tooltipAction:active{ background: var(--hover); }
-    @media (hover: none) and (pointer: coarse){
-      #tooltip .tooltipAction{
-        padding: 8px 10px;
-      }
-    }
     .bar{ cursor: pointer; }
     .installHint{
       margin: 18px 0 0;
@@ -2294,9 +2289,9 @@
             const segmentAppLink = segmentIOS
               ? `<a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Period</a>`
               : "Period";
-            appLinksHtml = `<div class="tooltipActions">Open in Google Calendar app: ${exactAppLink}<span class="tooltipActionsSep">•</span>${segmentAppLink}</div>`;
+            appLinksHtml = `/ native: ${exactAppLink}<span class="tooltipActionsSep">•</span>${segmentAppLink}`;
           }
-          calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Add to Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}</div>${appLinksHtml}</div>`;
+          calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}${appLinksHtml}</div></div>`;
         }
       }
       tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(title)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
