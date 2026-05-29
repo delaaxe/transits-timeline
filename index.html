@@ -493,7 +493,7 @@
       <div class="field">
         <div class="checks" style="padding:0;">
           <label><input id="includeMoon" type="checkbox" checked /> Transiting Moon</label>
-          <label><input id="includeChiron" type="checkbox" /> Chiron</label>
+          <label><input id="includeChiron" type="checkbox" checked /> Chiron</label>
           <label id="includeMCWrap"><input id="includeMC" type="checkbox" checked /> Mc</label>
         </div>
       </div>
@@ -624,20 +624,20 @@
     const presets = [
       { key:"today", label:"Today",
         transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.5, includeRxGaps:true, includeMoon:true, range:{startOffsetDays:0, endOffsetDays:0},
-        world:{ transitGroup:"all", includeMoon:true } },
+        orb:1.5, includeRxGaps:true, includeMoon:true, includeChiron:true, range:{startOffsetDays:0, endOffsetDays:0},
+        world:{ transitGroup:"all", includeMoon:true, includeChiron:true } },
       { key:"week", label:"Week",
         transitGroup:"personal", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.0, includeRxGaps:true, includeMoon:false, range:{startOffsetDays:-1, endOffsetDays:6},
-        world:{ transitGroup:"all", includeMoon:false } },
+        orb:1.0, includeRxGaps:true, includeMoon:false, includeChiron:true, range:{startOffsetDays:-1, endOffsetDays:6},
+        world:{ transitGroup:"all", includeMoon:false, includeChiron:true } },
       { key:"month", label:"Month",
         transitGroup:"classical", natalGroup:"classical", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.0, includeRxGaps:true, includeMoon:false, range:{startOffsetDays:-7, endOffsetDays:29},
-        world:{ transitGroup:"all", includeMoon:false } },
+        orb:1.0, includeRxGaps:true, includeMoon:false, includeChiron:true, range:{startOffsetDays:-7, endOffsetDays:29},
+        world:{ transitGroup:"all", includeMoon:false, includeChiron:true } },
       { key:"basic_longterm", label:"Year",
         transitGroup:"outer", natalGroup:"all", aspects:["conjunction","sextile","square","trine","opposition"],
-        orb:1.0, includeRxGaps:true, includeMoon:false, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
-        world:{ transitGroup:"outer", includeMoon:false } }
+        orb:1.0, includeRxGaps:true, includeMoon:false, includeChiron:true, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
+        world:{ transitGroup:"outer", includeMoon:false, includeChiron:true } }
     ];
 
     const $ = (id) => document.getElementById(id);
@@ -1620,6 +1620,7 @@
       currentMaxRows = 50;
       el.includeRxGaps.checked = !!p.includeRxGaps;
       el.includeMoon.checked = useWorld ? (worldPreset.includeMoon !== false) : (p.includeMoon !== false);
+      el.includeChiron.checked = useWorld ? (worldPreset.includeChiron !== false) : (p.includeChiron !== false);
       renderAspectChecks(p.aspects);
 
       const today = new Date();
