@@ -278,8 +278,16 @@
     }
     .chartPickers{ display: flex; flex-direction: column; gap: 10px; }
     .chartPickerLabel{ font-size: 12px; color: var(--muted); margin: 0 0 6px; }
-    .appModeLinks{ display:flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 10px; justify-content: center; }
+    .appModeLinks{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      column-gap: 10px;
+      align-items: center;
+      margin: 10px 0 10px;
+    }
     .appModeLink{ text-decoration: underline; font-size: 15px; }
+    .appModeLink:first-child{ justify-self: end; }
+    .appModeLink:last-child{ justify-self: start; }
     .appModeLink.active{ text-decoration: none; font-weight: 700; }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
