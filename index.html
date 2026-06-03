@@ -409,13 +409,13 @@
 <body>
 
   <div class="appModeLinks" role="listbox" aria-label="Mode">
-    <button id="appModeChartsBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Charts</button>
+    <button id="appModePersonalBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Personal</button>
     <span class="inlineDot" aria-hidden="true">•</span>
     <button id="appModeWorldBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
   </div>
 
-  <div class="panel" id="chartsPanel">
-    <div id="chartsSection">
+  <div class="panel" id="personalPanel">
+    <div id="personalSection">
     <div class="row rowTop">
       <div class="field med" style="min-width: 260px; flex: 1;">
         <label>Chart</label>
@@ -639,10 +639,10 @@
     let aspectDescriptions = {};
     let mythDescriptions = {};
     const el = {
-      appModeChartsBtn: $("appModeChartsBtn"),
+      appModePersonalBtn: $("appModePersonalBtn"),
       appModeWorldBtn: $("appModeWorldBtn"),
-      chartsPanel: $("chartsPanel"),
-      chartsSection: $("chartsSection"),
+      personalPanel: $("personalPanel"),
+      personalSection: $("personalSection"),
       chartButtons: $("chartButtons"),
       chartButtonsB: $("chartButtonsB"),
       chartSummary: $("chartSummary"),
@@ -698,7 +698,7 @@
     const installHintText = $("installHintText");
     let activePresetKey = defaultPresetKey;
     let chartSummaryVisible = false;
-    let appMode = "charts";
+    let appMode = "personal";
 
     // Cache last computation so "Show more" can paginate without recomputing
     let cachedResults = null;
@@ -1052,7 +1052,7 @@
     function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = {}){
       if (chartsState.addMode) return "Add a new chart.";
       if (!pA) return "";
-      if (appMode !== "charts") return "";
+      if (appMode !== "personal") return "";
       if (chartsState.mode === "composite" && !pB) return "Pick two charts to build a composite.";
       const parts = [];
       let placementsLine = "";
@@ -1098,30 +1098,30 @@
     }
 
     function renderAppModeSection(){
-      const appModeIsCharts = appMode === "charts";
-      if (el.appModeChartsBtn){
-        el.appModeChartsBtn.classList.toggle("active", appModeIsCharts);
-        el.appModeChartsBtn.setAttribute("aria-selected", appModeIsCharts ? "true" : "false");
+      const appModeIsPersonal = appMode === "personal";
+      if (el.appModePersonalBtn){
+        el.appModePersonalBtn.classList.toggle("active", appModeIsPersonal);
+        el.appModePersonalBtn.setAttribute("aria-selected", appModeIsPersonal ? "true" : "false");
       }
       if (el.appModeWorldBtn){
-        el.appModeWorldBtn.classList.toggle("active", !appModeIsCharts);
-        el.appModeWorldBtn.setAttribute("aria-selected", appModeIsCharts ? "false" : "true");
+        el.appModeWorldBtn.classList.toggle("active", !appModeIsPersonal);
+        el.appModeWorldBtn.setAttribute("aria-selected", appModeIsPersonal ? "false" : "true");
       }
-      if (el.chartsPanel) el.chartsPanel.hidden = !appModeIsCharts;
-      if (el.chartsSection) el.chartsSection.hidden = !appModeIsCharts;
+      if (el.personalPanel) el.personalPanel.hidden = !appModeIsPersonal;
+      if (el.personalSection) el.personalSection.hidden = !appModeIsPersonal;
       if (el.natalGroupField){
-        el.natalGroupField.hidden = !appModeIsCharts;
-        el.natalGroupField.style.display = appModeIsCharts ? "" : "none";
+        el.natalGroupField.hidden = !appModeIsPersonal;
+        el.natalGroupField.style.display = appModeIsPersonal ? "" : "none";
       }
       if (el.includeMCWrap){
-        el.includeMCWrap.hidden = !appModeIsCharts;
-        el.includeMCWrap.style.display = appModeIsCharts ? "" : "none";
+        el.includeMCWrap.hidden = !appModeIsPersonal;
+        el.includeMCWrap.style.display = appModeIsPersonal ? "" : "none";
       }
     }
 
-    function renderChartsSection(){
+    function renderPersonalSection(){
       renderAppModeSection();
-      if (appMode !== "charts") return;
+      if (appMode !== "personal") return;
 
       const canCompare = chartsState.list.length >= 2;
       if (!canCompare && chartsState.mode !== "single") chartsState.mode = "single";
@@ -1205,7 +1205,7 @@
 
     function setChartSummaryVisible(isVisible){
       chartSummaryVisible = !!isVisible;
-      renderChartsSection();
+      renderPersonalSection();
     }
 
     function zodiacSign(deg){
@@ -1229,16 +1229,16 @@
     }
 
     function setAddMode(isAdd){
-      if (appMode !== "charts"){
+      if (appMode !== "personal"){
         chartsState.addMode = false;
         el.addChartPanel.style.display = "none";
-        renderChartsSection();
+        renderPersonalSection();
         return;
       }
       chartsState.addMode = isAdd;
       el.addChartPanel.style.display = isAdd ? "" : "none";
       if (!isAdd) hideSuggest();
-      renderChartsSection();
+      renderPersonalSection();
     }
 
     function setActiveChartA(id){
@@ -1248,7 +1248,7 @@
       chartsState.addMode = false;
       el.addChartPanel.style.display = "none";
       hideSuggest();
-      renderChartsSection();
+      renderPersonalSection();
     }
 
     function setActiveChartB(id){
@@ -1257,7 +1257,7 @@
       el.addChartPanel.style.display = "none";
       hideSuggest();
       if (chartsState.mode === "composing") chartsState.mode = "composite";
-      renderChartsSection();
+      renderPersonalSection();
     }
 
     function setMode(modeKey){
@@ -1265,7 +1265,7 @@
       if (modeKey === "composing" && canCompare) chartsState.mode = "composing";
       else if (modeKey === "composite" && canCompare) chartsState.mode = "composite";
       else chartsState.mode = "single";
-      renderChartsSection();
+      renderPersonalSection();
     }
 
     function toggleCompose(){
@@ -1278,15 +1278,15 @@
     }
 
     function setAppMode(modeKey){
-      appMode = (modeKey === "world") ? "world" : "charts";
-      if (appMode !== "charts"){
+      appMode = (modeKey === "world") ? "world" : "personal";
+      if (appMode !== "personal"){
         chartsState.addMode = false;
         chartSummaryVisible = false;
         if (el.addChartPanel) el.addChartPanel.style.display = "none";
         activePresetKey = "week";
       }
       applyPreset(activePresetKey);
-      renderChartsSection();
+      renderPersonalSection();
     }
 
     function fmtCoord(lat, lon){
@@ -1478,7 +1478,7 @@
 
       chartsState.addMode = false;
       el.addChartPanel.style.display = "none";
-      renderChartsSection();
+      renderPersonalSection();
       setChartSummaryVisible(false);
     }
 
@@ -1508,9 +1508,9 @@
           updateTimeline();
         });
       }
-      if (el.appModeChartsBtn){
-        el.appModeChartsBtn.addEventListener("click", () => {
-          setAppMode("charts");
+      if (el.appModePersonalBtn){
+        el.appModePersonalBtn.addEventListener("click", () => {
+          setAppMode("personal");
           updateTimeline();
         });
       }
@@ -1535,7 +1535,7 @@
       $("cancelAddBtn").addEventListener("click", () => {
         if (chartsState.list.length === 0) return;
         exitAddMode();
-        renderChartsSection();
+        renderPersonalSection();
       });
 
       el.placeSearch.addEventListener("input", () => {
@@ -2872,9 +2872,9 @@
 
         const chartA = getActiveChartA();
         const chartB = getActiveChartB();
-        const isChartsMode = appMode === "charts";
-        const isComposite = isChartsMode && chartsState.mode === "composite";
-        if (isChartsMode && !chartA) throw new Error("Pick a chart first.");
+        const isPersonalMode = appMode === "personal";
+        const isComposite = isPersonalMode && chartsState.mode === "composite";
+        if (isPersonalMode && !chartA) throw new Error("Pick a chart first.");
         if (isComposite && !chartB) throw new Error("Pick two charts for composite.");
         let lon = Number(chartA?.lon || 0);
         let lat = Number(chartA?.lat || 0);
@@ -2890,7 +2890,7 @@
 
         currentMaxRows = 50;
 
-        const birthUTC = (isChartsMode && chartA) ? parseBirthUTCFor(chartA) : null;
+        const birthUTC = (isPersonalMode && chartA) ? parseBirthUTCFor(chartA) : null;
 
         const rangeStartLocal = parseLocalDateOnly(el.rangeStart.value);
         const rangeEndLocal = parseLocalDateOnly(el.rangeEnd.value);
