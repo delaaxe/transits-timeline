@@ -1769,6 +1769,9 @@
       document.addEventListener("pointerdown", (e) => {
         if (tooltip.style.display !== "block") return;
         if (tooltip.contains(e.target)) return;
+        // Let the backdrop receive the complete tap gesture. Hiding it here
+        // would expose a timeline segment before pointerup, reopening a popup.
+        if (e.target === tooltipBackdrop) return;
         hideTooltip();
       }, true);
     }
@@ -2810,11 +2813,16 @@
             exactTime: getRefinedExactDate()
           });
           const bindSegmentTooltipEvents = (target) => {
+            let touchStart = null;
             target.addEventListener("pointerenter", (e) => {
               if (isCoarsePointer()) return;
               showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
             });
             target.addEventListener("pointermove", (e) => {
+              if (touchStart && e.pointerId === touchStart.pointerId){
+                const distance = Math.hypot(e.clientX - touchStart.x, e.clientY - touchStart.y);
+                if (distance > 8) touchStart.moved = true;
+              }
               if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
                 moveTooltip(e.clientX, e.clientY);
               }
@@ -2826,10 +2834,22 @@
             });
             target.addEventListener("pointerdown", (e) => {
               if (isCoarsePointer()){
+                touchStart = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+              }
+            });
+            target.addEventListener("pointerup", (e) => {
+              if (!touchStart || e.pointerId !== touchStart.pointerId) return;
+              const wasTap = !touchStart.moved;
+              touchStart = null;
+              if (wasTap){
                 showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
               }
             });
+            target.addEventListener("pointercancel", () => {
+              touchStart = null;
+            });
             target.addEventListener("click", (e) => {
+              if (isCoarsePointer()) return;
               showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
             });
           };
