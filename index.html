@@ -831,6 +831,33 @@
       updateAxisTransform();
     }
 
+    function wireTimelineResize(){
+      let animationFrame = null;
+      let settleTimer = null;
+      const rerender = () => {
+        animationFrame = null;
+        if (cachedResults) renderFromCache(currentMaxRows);
+      };
+      const scheduleRerender = () => {
+        if (animationFrame === null){
+          animationFrame = window.requestAnimationFrame(rerender);
+        }
+      };
+      const scheduleOrientationRerender = () => {
+        scheduleRerender();
+        // Mobile browsers may report the final viewport width shortly after
+        // orientationchange, so redraw once more after it has settled.
+        window.clearTimeout(settleTimer);
+        settleTimer = window.setTimeout(scheduleRerender, 250);
+      };
+
+      window.addEventListener("resize", scheduleRerender, { passive: true });
+      window.addEventListener("orientationchange", scheduleOrientationRerender, { passive: true });
+      if ("ResizeObserver" in window && el.timelineScroll){
+        new ResizeObserver(scheduleRerender).observe(el.timelineScroll);
+      }
+    }
+
     function rangeSpanDays(){
       const start = parseLocalDateOnly(el.rangeStart.value);
       const end = parseLocalDateOnly(el.rangeEnd.value);
@@ -3090,6 +3117,7 @@
     wireAdvancedUI();
     wireAutoUpdate();
     wireAxisScrollSync();
+    wireTimelineResize();
     wireRangeNav();
     wireTooltipDismiss();
     wireStaleRefreshOnRefocus();
