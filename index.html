@@ -1702,12 +1702,36 @@
       return getPlanetLonFromAll(allPlanets, planetKey);
     }
     let tooltipListenersWired = false;
+    // Lets the popup backdrop hand a tap straight to the segment underneath it.
+    const segmentPopupOpeners = new WeakMap();
     function ensureTooltipListeners(){
       if (tooltipListenersWired) return;
       tooltipListenersWired = true;
       window.addEventListener("scroll", hideTooltip, {passive:true});
       window.addEventListener("blur", hideTooltip);
-      if (tooltipBackdrop) tooltipBackdrop.addEventListener("click", hideTooltip);
+      if (tooltipBackdrop){
+        let backdropStart = null;
+        tooltipBackdrop.addEventListener("pointerdown", (e) => {
+          backdropStart = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+        });
+        tooltipBackdrop.addEventListener("pointermove", (e) => {
+          if (!backdropStart || e.pointerId !== backdropStart.pointerId) return;
+          if (Math.hypot(e.clientX - backdropStart.x, e.clientY - backdropStart.y) > 8) backdropStart.moved = true;
+        });
+        tooltipBackdrop.addEventListener("pointercancel", () => { backdropStart = null; });
+        tooltipBackdrop.addEventListener("click", (e) => {
+          const start = backdropStart;
+          backdropStart = null;
+          hideTooltip();
+          // The backdrop covers the timeline, so a tap meant for another segment
+          // would otherwise only dismiss the popup. Reopen for whatever is beneath.
+          if (start && start.moved) return;
+          if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+          const under = document.elementFromPoint(e.clientX, e.clientY);
+          const openPopup = under && segmentPopupOpeners.get(under);
+          if (openPopup) openPopup(e);
+        });
+      }
       tooltip.addEventListener("click", (e) => {
         const closeBtn = e.target.closest(".tooltipClose");
         if (closeBtn){
@@ -2763,7 +2787,8 @@
 
         svg.appendChild(svgEl("line", {
           x1:x0, y1:y + rowH/2, x2:x0 + timelineW, y2:y + rowH/2,
-          stroke:"var(--muted)", "stroke-width":"1", "stroke-dasharray":"2,6"
+          stroke:"var(--muted)", "stroke-width":"1", "stroke-dasharray":"2,6",
+          "pointer-events": "none"
         }));
 
         const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`;
@@ -2814,8 +2839,11 @@
           });
           const bindSegmentTooltipEvents = (target) => {
             let touchStart = null;
+            const openPopup = (e) => showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
+            segmentPopupOpeners.set(target, openPopup);
             target.addEventListener("pointerenter", (e) => {
               if (isCoarsePointer()) return;
+              if (tooltip.classList.contains("popup")) return;
               showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
             });
             target.addEventListener("pointermove", (e) => {
@@ -2841,16 +2869,14 @@
               if (!touchStart || e.pointerId !== touchStart.pointerId) return;
               const wasTap = !touchStart.moved;
               touchStart = null;
-              if (wasTap){
-                showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
-              }
+              if (wasTap) openPopup(e);
             });
             target.addEventListener("pointercancel", () => {
               touchStart = null;
             });
             target.addEventListener("click", (e) => {
               if (isCoarsePointer()) return;
-              showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
+              openPopup(e);
             });
           };
 
@@ -2895,7 +2921,8 @@
           stroke: "var(--accent)",
           "stroke-width": "1",
           "stroke-dasharray": "4,6",
-          opacity: "0.7"
+          opacity: "0.7",
+          "pointer-events": "none"
         }));
       }
 
