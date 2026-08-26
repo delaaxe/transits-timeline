@@ -1,39 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Builds, then publishes with the active wrangler login. Run `npx wrangler login`
+# once first.
+#
+#   ./scripts/deploy-cloudflare-pages.sh            -> production
+#   ./scripts/deploy-cloudflare-pages.sh preview    -> preview URL, production untouched
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-if [[ -f ".env" ]]; then
-  set -a
-  source ".env"
-  set +a
-fi
+# main is the project's production branch; anything else is a preview.
+branch="${1:-main}"
 
-if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-  echo "Set CLOUDFLARE_API_TOKEN in .env." >&2
-  exit 1
-fi
+[[ -f api-key.js ]] || { echo "api-key.js is missing; the build would ship a placeholder." >&2; exit 1; }
 
-# Only these files are published. Everything else (.env, .git, .wrangler,
-# scripts/, *.example.*, .DS_Store, ...) stays local.
-assets=(
-  index.html
-  api-key.js
-  aspects.json
-  myths.json
-  apple-touch-icon.png
-)
+npm run build
 
-staging="$(mktemp -d)"
-trap 'rm -rf "$staging"' EXIT
-
-for asset in "${assets[@]}"; do
-  if [[ ! -f "$asset" ]]; then
-    echo "Missing required asset: $asset" >&2
-    exit 1
-  fi
-  cp "$asset" "$staging/"
+# dist/ is rebuilt from scratch by the build, so only built output can ship.
+# This is what replaced deploying the working directory, which once published .env.
+expected=(index.html aspects.json myths.json apple-touch-icon.png)
+for f in "${expected[@]}"; do
+  [[ -f "dist/$f" ]] || { echo "Build did not produce dist/$f" >&2; exit 1; }
 done
+bundles="$(find dist -maxdepth 1 -name 'app.*.js' | wc -l | tr -d ' ')"
+[[ "$bundles" == "1" ]] || { echo "Expected exactly one bundle in dist/, found $bundles" >&2; exit 1; }
 
-wrangler pages deploy "$staging" --project-name "transits-timeline" --branch "main"
+stray="$(find dist -type f \! -name 'app.*.js' $(printf '! -name %s ' "${expected[@]}"))"
+if [[ -n "$stray" ]]; then
+  echo "Unexpected files in dist/:" >&2; echo "$stray" >&2; exit 1
+fi
+
+if [[ "$branch" == "main" ]]; then
+  echo "Deploying to PRODUCTION (transits-timeline.pages.dev)." >&2
+else
+  echo "Deploying preview branch '$branch'; production is untouched." >&2
+fi
+
+npx wrangler pages deploy dist --project-name "transits-timeline" --branch "$branch"

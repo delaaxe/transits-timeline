@@ -1,3 +1,5 @@
 api-key.js
 .env
 .wrangler/
+node_modules/
+dist/

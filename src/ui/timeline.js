@@ -1,0 +1,473 @@
+import { state } from "../state.js";
+import { refineExactMinute } from "../core/transits.js";
+import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols } from "../data/bodies.js";
+import { aspectDescription, mythDescription } from "../data/interpretations.js";
+import { locale } from "../storage/charts.js";
+import { el, tooltip } from "./dom.js";
+import { formatExactPretty, formatRangePretty } from "./format.js";
+import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
+import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
+
+export function updateShowMore(shown, total){
+  const wrap = el.moreWrap;
+  const btn = el.showMoreBtn;
+  if (!wrap || !btn) return;
+  if (total >= 100 && total > shown){
+    wrap.style.display = "block";
+    btn.textContent = `Show 50 more (showing ${shown} of ${total})`;
+  } else {
+    wrap.style.display = "none";
+  }
+}
+
+export function renderFromCache(limit){
+  if (!state.cachedResults){
+    updateShowMore(0, 0);
+    return;
+  }
+  const layout = computeTimelineLayout(el.timelineSvg, false);
+  state.currentLayout = layout;
+  const threshold = Math.max(0, layout.labelWMax - layout.labelWMin);
+  state.labelsUseSymbols = !!el.timelineScroll && el.timelineScroll.scrollLeft >= threshold;
+  const total = state.cachedResults.rules.length;
+  const shown = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
+  const rules = state.cachedResults.rules.slice(0, shown);
+  const intervals = state.cachedResults.intervals.slice(0, shown);
+
+  const spanMs = state.cachedResults.endExclusive.getTime() - state.cachedResults.start.getTime();
+  const showYear = (spanMs / (365.25 * 24 * 3600 * 1000)) >= 3;
+
+  renderAxisSVG({
+    svg: el.dateAxisSvg,
+    start: state.cachedResults.start,
+    endExclusive: state.cachedResults.endExclusive,
+    stepMillis: state.cachedResults.stepMillis,
+    layout
+  });
+
+  renderLabelsSVG({
+    svg: el.aspectAxisSvg,
+    rules,
+    chartRuler: state.cachedResults.chartRuler,
+    layout,
+    useSymbols: state.labelsUseSymbols
+  });
+
+  renderTimelineSVG({
+    svg: el.timelineSvg,
+    start: state.cachedResults.start,
+    endExclusive: state.cachedResults.endExclusive,
+    rules,
+    intervalsByRule: intervals,
+    stepMillis: state.cachedResults.stepMillis,
+    presetKey: state.cachedResults.presetKey,
+    chartRuler: state.cachedResults.chartRuler,
+    layout,
+    showYear,
+    observer: state.cachedResults.observer,
+    natalLon: state.cachedResults.natalLon
+  });
+
+  updateShowMore(shown, total);
+  updateAxisTransform();
+}
+
+export function updateAxisTransform(){
+  if (!el.dateAxisSvg || !el.timelineScroll) return;
+  const scrollLeft = el.timelineScroll.scrollLeft;
+  const layout = state.currentLayout;
+  const labelWMax = layout?.labelWMax ?? 150;
+  const labelWMin = layout?.labelWMin ?? 96;
+  const shift = Math.min(Math.max(0, scrollLeft), Math.max(0, labelWMax - labelWMin));
+  el.dateAxisSvg.style.transform = `translate3d(${-Math.round(scrollLeft)}px, 0, 0)`;
+  document.documentElement.style.setProperty("--aspect-axis-visible-w", `${labelWMax - shift}px`);
+  document.documentElement.style.setProperty("--aspect-axis-shift", `${-Math.round(shift)}px`);
+  updateLabelsMode();
+}
+
+export function symbolsThreshold(){
+  const layout = state.currentLayout;
+  if (!layout) return 4;
+  return Math.max(0, layout.labelWMax - layout.labelWMin);
+}
+
+export function updateLabelsMode(){
+  if (!state.cachedResults || !el.timelineScroll) return;
+  const shouldUseSymbols = el.timelineScroll.scrollLeft >= symbolsThreshold();
+  if (shouldUseSymbols === state.labelsUseSymbols) return;
+  state.labelsUseSymbols = shouldUseSymbols;
+  renderFromCache(state.currentMaxRows);
+}
+
+export function wireAxisScrollSync(){
+  if (!el.dateAxisScroll || !el.timelineScroll) return;
+  el.timelineScroll.addEventListener("scroll", () => {
+    window.requestAnimationFrame(updateAxisTransform);
+  }, { passive: true });
+  updateAxisTransform();
+}
+
+export function wireTimelineResize(){
+  let animationFrame = null;
+  let settleTimer = null;
+  const rerender = () => {
+    animationFrame = null;
+    if (state.cachedResults) renderFromCache(state.currentMaxRows);
+  };
+  const scheduleRerender = () => {
+    if (animationFrame === null){
+      animationFrame = window.requestAnimationFrame(rerender);
+    }
+  };
+  const scheduleOrientationRerender = () => {
+    scheduleRerender();
+    // Mobile browsers may report the final viewport width shortly after
+    // orientationchange, so redraw once more after it has settled.
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(scheduleRerender, 250);
+  };
+
+  window.addEventListener("resize", scheduleRerender, { passive: true });
+  window.addEventListener("orientationchange", scheduleOrientationRerender, { passive: true });
+  if ("ResizeObserver" in window && el.timelineScroll){
+    new ResizeObserver(scheduleRerender).observe(el.timelineScroll);
+  }
+}
+
+export function renderAxisSVG({svg, start, endExclusive, stepMillis, layout}){
+  clearSvg(svg);
+
+  const { totalW, timelineW, labelW, marginL, axisY, isCompact } = layout;
+  const x0 = marginL + labelW;
+  const axisHeight = axisY + 40 + (isCompact ? 6 : 8);
+  document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
+  svg.setAttribute("viewBox", `0 0 ${totalW} ${axisHeight}`);
+  svg.setAttribute("width", String(totalW));
+  svg.setAttribute("height", String(axisHeight));
+  svg.style.width = `${totalW}px`;
+  svg.style.height = `${axisHeight}px`;
+  svg.appendChild(svgEl("rect", {x:0, y:0, width: totalW, height: axisHeight, fill:"var(--axis-bg)"}));
+
+  const startMs = start.getTime();
+  const endMs = endExclusive.getTime();
+  const spanMs = Math.max(1, endMs - startMs);
+  const spanDays = spanMs / (24*3600*1000);
+  const dateToX = (d) => x0 + ((d.getTime() - startMs) / spanMs) * timelineW;
+  const topLabelByMs = new Set();
+
+  svg.appendChild(svgEl("rect", {x:x0, y:axisY, width:timelineW, height:40, fill:"var(--axis-bg)"}));
+  svg.appendChild(svgEl("line", {x1:x0, y1:axisY + 40, x2:x0 + timelineW, y2:axisY + 40, stroke:"var(--axis-line)", "stroke-width":"1.5"}));
+
+  const axisLabelSize = isCompact ? 15 : 18;
+  const axisTitleSize = isCompact ? 16 : 20;
+  const minBoxPx = axisLabelSize * 2.7;
+  const minLabelPx = axisLabelSize * 2.2;
+  const monthLabelPx = axisLabelSize * 1.6;
+
+  const useHours = (spanDays <= 2 && stepMillis < 24*3600*1000);
+  const useDays  = (!useHours) && (spanDays <= 45);
+
+  const boundaries = (() => {
+    if (useHours){
+      const totalHours = spanMs / (3600 * 1000);
+      const stepHours = pickStep(totalHours, timelineW, minBoxPx, [1,2,3,4,6,8,12,24]);
+      return [start, ...getHourStartsLocal(start, endExclusive, stepHours), endExclusive];
+    }
+    if (useDays){
+      const totalDays = spanDays;
+      const stepDays = pickStep(totalDays, timelineW, minBoxPx, [1,2,3,4,5,7,10,14,21,30]);
+      return [start, ...getDayStartsLocal(start, endExclusive, stepDays), endExclusive];
+    }
+    const totalMonths = spanDays / 30.44;
+    const stepMonths = pickStep(totalMonths, timelineW, minBoxPx, [1,2,3,4,6,12]);
+    return [start, ...getMonthStartsLocal(start, endExclusive, stepMonths), endExclusive];
+  })();
+
+  if (useHours){
+    const dateLabel = start.toLocaleDateString(locale, {month:"short", day:"numeric", year:"numeric"});
+    const t = svgEl("text", { x: x0 + 6, y: axisY - 6, "font-size": String(axisTitleSize), "font-weight":"700", fill:"var(--text)" });
+    t.textContent = dateLabel;
+    svg.appendChild(t);
+  }
+
+  if (useDays){
+    for (let i=0; i<boundaries.length-1; i++){
+      const a = boundaries[i];
+      const prev = boundaries[i-1];
+      const monthChanged = (!prev) || (prev.getMonth() !== a.getMonth()) || (prev.getFullYear() !== a.getFullYear());
+      if (monthChanged) topLabelByMs.add(a.getTime());
+    }
+  }
+  if (!useHours && !useDays){
+    const months = getMonthStartsLocal(start, endExclusive);
+    for (const m of months){
+      if (m.getMonth() === 0) topLabelByMs.add(m.getTime());
+    }
+  }
+
+  for (let i=0; i<boundaries.length-1; i++){
+    const a = boundaries[i];
+    const xa = dateToX(a);
+    const xb = dateToX(boundaries[i+1]);
+    const w = Math.max(0.5, xb - xa);
+    const isTopLabeled = topLabelByMs.has(a.getTime());
+    const tickY1 = isTopLabeled ? axisY : (axisY + 20);
+    svg.appendChild(svgEl("line", {x1:xa, y1:tickY1, x2:xa, y2:axisY + 40, stroke:"var(--axis-line)", "stroke-width":"1"}));
+
+    let label = "";
+    let shouldLabel = false;
+
+    if (useHours){
+      const hh = a.getHours();
+      label = `${String(hh).padStart(2,"0")}:00`;
+      shouldLabel = (w >= minLabelPx);
+    } else if (useDays){
+      const mon = a.toLocaleString(locale, {month:"short"});
+      const dow = a.toLocaleString(locale, {weekday:"short"});
+
+      // Don't repeat the month on every tick: show month only at changes.
+      const prev = boundaries[i-1];
+      const monthChanged = (!prev) || (prev.getMonth() !== a.getMonth()) || (prev.getFullYear() !== a.getFullYear());
+
+      if (spanDays <= 10){
+        label = `${dow} ${a.getDate()}`;
+      } else {
+        label = `${a.getDate()}`;
+      }
+
+      shouldLabel = (w >= minLabelPx);
+      if (monthChanged){
+        const mtX = Math.max(x0 + 6, xa - 6);
+        const mt = svgEl("text", { x: mtX, y: axisY - 6, "font-size": String(axisTitleSize), "font-weight":"700", fill:"var(--text)" });
+        mt.textContent = mon;
+        svg.appendChild(mt);
+      }
+    } else {
+      label = a.toLocaleString(locale, {month:"short"});
+      shouldLabel = (w >= monthLabelPx);
+    }
+
+    if (shouldLabel){
+      const txt = svgEl("text", {x: xa + 6, y: axisY + 25, "font-size": String(axisLabelSize), fill:"var(--text)"});
+      txt.textContent = label;
+      svg.appendChild(txt);
+    }
+  }
+
+  if (!useHours && !useDays){
+    const months = getMonthStartsLocal(start, endExclusive);
+    for (const m of months){
+      if (m.getMonth() === 0){
+        const yearX = Math.max(x0 + 6, dateToX(m) - 6);
+        const t = svgEl("text", { x: yearX, y: axisY - 6, "font-size": String(axisTitleSize), "font-weight":"700", fill:"var(--text)" });
+        t.textContent = String(m.getFullYear());
+        svg.appendChild(t);
+      }
+    }
+  }
+}
+
+export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=false}){
+  if (!svg) return;
+  clearSvg(svg);
+  const { labelW, rowH, rowGap, bottomPad, isCompact } = layout;
+  const n = rules.length;
+  const rowsY0 = isCompact ? 6 : 8;
+  const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
+
+  document.documentElement.style.setProperty("--aspect-axis-w", `${labelW}px`);
+  svg.setAttribute("viewBox", `0 0 ${labelW} ${totalH}`);
+  svg.setAttribute("width", String(labelW));
+  svg.setAttribute("height", String(totalH));
+  svg.style.width = `${labelW}px`;
+  svg.style.height = `${totalH}px`;
+  svg.appendChild(svgEl("rect", {x:0, y:0, width: labelW, height: totalH, fill:"var(--axis-bg)"}));
+
+  const labelX = labelW - 8;
+
+  const labelFontSize = isCompact ? 17 : 20;
+  for (let idx=0; idx<rules.length; idx++){
+    const r = rules[idx];
+    const y = rowsY0 + idx*(rowH+rowGap);
+    const t = svgEl("text", {
+      x: labelX,
+      y: y + rowH/2 + 4,
+      "font-size": String(labelFontSize),
+      fill:"var(--text)",
+      "text-anchor":"end"
+    });
+
+    const transitLabel = useSymbols ? (planetSymbols[r.transit] || planetLabel(r.transit)) : planetLabel(r.transit);
+    const natalLabel = useSymbols ? (planetSymbols[r.natal] || planetLabel(r.natal)) : planetLabel(r.natal);
+    const parts = [
+      { text: transitLabel + " " },
+      { text: aspectSymbol(r.aspect) + " " },
+      { text: natalLabel, underline: (!useSymbols && chartRuler && r.natal === chartRuler) }
+    ];
+
+    for (const p of parts){
+      const sp = document.createElementNS(svgNs, "tspan");
+      sp.textContent = p.text;
+      if (p.underline) sp.setAttribute("text-decoration", "underline");
+      t.appendChild(sp);
+    }
+
+    svg.appendChild(t);
+  }
+}
+
+export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByRule, stepMillis, presetKey, chartRuler, layout, showYear, observer, natalLon}){
+  clearSvg(svg);
+
+  const { totalW, timelineW, labelW, marginL, rowH, rowGap, bottomPad, isCompact } = layout;
+  const x0 = marginL + labelW;
+
+  const n = rules.length;
+  const rowsY0 = isCompact ? 6 : 8;
+  const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
+
+  svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
+  svg.setAttribute("width", String(totalW));
+  svg.setAttribute("height", String(totalH));
+  svg.style.width = `${totalW}px`;
+  svg.style.height = `${totalH}px`;
+  svg.appendChild(svgEl("rect", {x:0, y:0, width: totalW, height: totalH, fill:"var(--panel-bg)"}));
+
+  const startMs = start.getTime();
+  const endMs = endExclusive.getTime();
+  const spanMs = Math.max(1, endMs - startMs);
+  const dateToX = (d) => x0 + ((d.getTime() - startMs) / spanMs) * timelineW;
+
+  for (let idx=0; idx<rules.length; idx++){
+    const r = rules[idx];
+    const y = rowsY0 + idx*(rowH+rowGap);
+
+    svg.appendChild(svgEl("line", {
+      x1:x0, y1:y + rowH/2, x2:x0 + timelineW, y2:y + rowH/2,
+      stroke:"var(--muted)", "stroke-width":"1", "stroke-dasharray":"2,6",
+      "pointer-events": "none"
+    }));
+
+    const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`;
+
+    const intervals = intervalsByRule[idx] ?? [];
+    for (const [a,b,exact,exactAtBoundary] of intervals){
+      const xa = dateToX(a);
+      const xb = dateToX(b);
+      const w = Math.max(1, xb - xa);
+
+      const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
+      const barColor = isReturn ? "#d4a017" : (aspectColors[r.aspect] || "var(--text)");
+      const rect = svgEl("rect", { x: xa, y: y + 4, width: w, height: rowH - 8, fill: barColor, class: "bar" });
+
+      const showTime = stepMillis < 24*3600*1000;
+      const endApprox = new Date(Math.max(a.getTime(), b.getTime() - stepMillis));
+      const rangeText = formatRangePretty(a, endApprox, showTime, showYear);
+      const descKey = `${r.transit}-${r.aspect}-${r.natal}`;
+      const descText = aspectDescription(descKey);
+      const mythKey = mythKeyFor(r.transit, r.natal);
+      const mythText = mythDescription(mythKey);
+      const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
+      const calendarTitle = (state.appMode === "world") ? `${glyphTitleCore} world` : glyphTitleCore;
+
+      let exactLabelCache = null;
+      let refinedExactDateCache = undefined;
+      const getRefinedExactDate = () => {
+        if (!exact) return null;
+        if (refinedExactDateCache !== undefined) return refinedExactDateCache;
+        const refineWindowMs = 24 * 3600 * 1000;
+        const refineStart = new Date(exact.getTime() - refineWindowMs);
+        const refineEnd = new Date(exact.getTime() + refineWindowMs);
+        refinedExactDateCache = refineExactMinute(exact, refineStart, refineEnd, stepMillis, r, observer, natalLon);
+        return refinedExactDateCache;
+      };
+      const getExactLabel = () => {
+        if (exactLabelCache !== null) return exactLabelCache;
+        if (!exact) return "";
+        const refined = getRefinedExactDate();
+        exactLabelCache = formatExactPretty(refined, a, endApprox, showYear);
+        return exactLabelCache;
+      };
+      const buildCalendarData = () => ({
+        title: calendarTitle,
+        segmentStart: a,
+        segmentEnd: endApprox,
+        exactTime: getRefinedExactDate()
+      });
+      const bindSegmentTooltipEvents = (target) => {
+        const openPopup = (e) => showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
+        target.addEventListener("pointerenter", (e) => {
+          if (isCoarsePointer()) return;
+          if (tooltip.classList.contains("popup")) return;
+          showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
+        });
+        target.addEventListener("pointermove", (e) => {
+          if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
+            moveTooltip(e.clientX, e.clientY);
+          }
+        });
+        target.addEventListener("pointerleave", () => {
+          if (isCoarsePointer()) return;
+          if (tooltip.classList.contains("popup")) return;
+          hideTooltip();
+        });
+        // Bars sit inside a horizontally scrollable container, so a tap that
+        // drifts a little makes the browser claim the gesture and fire
+        // pointercancel. Let it arbitrate: it only synthesises click for a real
+        // tap, using its own slop, and withholds it after a scroll.
+        target.addEventListener("click", openPopup);
+      };
+
+      bindSegmentTooltipEvents(rect);
+
+      svg.appendChild(rect);
+      if (exact && !exactAtBoundary && exact >= a && exact <= b){
+        const xExact = dateToX(exact);
+        if (xExact >= xa && xExact <= xb){
+          const cy = y + rowH / 2;
+          const hitCircle = svgEl("circle", {
+            cx: xExact,
+            cy,
+            r: 10,
+            fill: "transparent",
+            class: "bar"
+          });
+          bindSegmentTooltipEvents(hitCircle);
+          svg.appendChild(hitCircle);
+          svg.appendChild(svgEl("circle", {
+            cx: xExact,
+            cy,
+            r: 3.5,
+            fill: "var(--text)",
+            stroke: barColor,
+            "stroke-width": "1.5",
+            "pointer-events": "none"
+          }));
+        }
+      }
+    }
+  }
+
+  const now = new Date();
+  if (now >= start && now < endExclusive){
+    const xNow = dateToX(now);
+    const yTop = 0;
+    const yBottom = totalH - 10;
+
+    svg.appendChild(svgEl("line", {
+      x1: xNow, y1: yTop, x2: xNow, y2: yBottom,
+      stroke: "var(--accent)",
+      "stroke-width": "1",
+      "stroke-dasharray": "4,6",
+      opacity: "0.7",
+      "pointer-events": "none"
+    }));
+  }
+
+  svg.addEventListener("pointerleave", () => {
+    if (isCoarsePointer()) return;
+    if (tooltip.classList.contains("popup")) return;
+    hideTooltip();
+  });
+  ensureTooltipListeners();
+}
