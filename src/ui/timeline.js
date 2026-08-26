@@ -1,6 +1,5 @@
 import { state } from "../state.js";
 import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols } from "../data/bodies.js";
-import { aspectDescription, mythDescription } from "../data/interpretations.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
 import { formatExactPretty, formatRangePretty } from "./format.js";
@@ -448,10 +447,10 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const rect = svgEl("rect", { x: xa, y: y + 4, width: w, height: rowH - 8, fill: barColor, class: "bar" });
 
       const rangeText = formatRangePretty(a, b, showTime, showYear);
+      // Keys, not prose: the tooltip looks them up when it draws, so bars drawn
+      // before the interpretations arrive still open with text once they have.
       const descKey = `${r.transit}-${r.aspect}-${r.natal}`;
-      const descText = aspectDescription(descKey);
       const mythKey = mythKeyFor(r.transit, r.natal);
-      const mythText = mythDescription(mythKey);
       const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
       const calendarTitle = (state.appMode === "world") ? `${glyphTitleCore} world` : glyphTitleCore;
 
@@ -468,11 +467,11 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         exactTime: exactDates[0] ?? null
       });
       const bindSegmentTooltipEvents = (target) => {
-        const openPopup = (e) => showTooltip(e, rowLabel, descText, rangeText, true, mythText, exactLabel, buildCalendarData());
+        const openPopup = (e) => showTooltip(e, rowLabel, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData());
         target.addEventListener("pointerenter", (e) => {
           if (isCoarsePointer()) return;
           if (tooltip.classList.contains("popup")) return;
-          showTooltip(e, rowLabel, descText, rangeText, false, mythText, exactLabel);
+          showTooltip(e, rowLabel, descKey, rangeText, false, mythKey, exactLabel);
         });
         target.addEventListener("pointermove", (e) => {
           if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){

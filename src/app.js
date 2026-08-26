@@ -6,12 +6,12 @@ import { addDaysLocal, parseBirthUTCFor, parseLocalDateOnly } from "./core/time.
 import { buildCandidateRules, buildSkyRules } from "./core/transits.js";
 import { orderMap } from "./data/bodies.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
-import { loadInterpretations } from "./data/interpretations.js";
+import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
 import { chartsState, getActiveChartA, getActiveChartB } from "./storage/charts.js";
 import { el, setStatus } from "./ui/dom.js";
 import { bootPresets, bootSelects, getCheckedAspects, initCharts, readRuleOptions, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav } from "./ui/panels.js";
 import { renderFromCache, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
-import { wireTooltipDismiss } from "./ui/tooltip.js";
+import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
 
 export function maybeRefreshTimelineOnRefocus(){
   if (document.visibilityState === "hidden") return;
@@ -192,7 +192,6 @@ async function boot(){
   }
 
   // init charts UI
-  await loadInterpretations();
   initCharts();
   wireChartsUI();
   wireAdvancedUI();
@@ -210,7 +209,23 @@ async function boot(){
     setStatus("Cancelling…");
     cancelCompute();
   });
-  updateTimeline();
+
+  // Nothing on screen needs the interpretations, so the first timeline does not
+  // wait for half a megabyte of prose. They are fetched once it is up, rather
+  // than on the first click, so they are almost always there before anyone can
+  // open a bar - and a popup opened inside that window is redrawn when they
+  // land, since the tooltip holds keys rather than text.
+  await updateTimeline();
+  onInterpretationsArrived(refreshTooltipContent);
+  whenIdle(() => loadInterpretations());
+}
+
+// requestIdleCallback where it exists, and a turn of the event loop where it
+// does not; either way the first render has already happened.
+function whenIdle(fn){
+  const idle = /** @type {any} */ (window).requestIdleCallback;
+  if (typeof idle === "function") idle(fn, { timeout: 2000 });
+  else window.setTimeout(fn, 0);
 }
 
 if (typeof document !== "undefined") await boot();

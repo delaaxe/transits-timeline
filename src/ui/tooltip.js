@@ -1,3 +1,4 @@
+import { aspectDescription, mythDescription } from "../data/interpretations.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
 
@@ -152,7 +153,25 @@ export function isMobileCalendarTarget(){
   return /Android/i.test(ua) || isIOSLike();
 }
 
-export function setTooltipContent(title, desc, range, myth, popupMode, exactLabel, calendarData){
+// What is on screen, so it can be drawn again when the prose lands. The
+// interpretations are fetched after the first render, and a popup opened in
+// that window would otherwise keep the empty text it was built with.
+/** @type {any[]|null} */
+let shownArgs = null;
+
+export function refreshTooltipContent(){
+  if (tooltip.style.display !== "block" || !shownArgs) return;
+  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any]} */ (shownArgs)));
+}
+
+/**
+ * `descKey` and `mythKey` are looked up here rather than passed as text, so a
+ * redraw picks up prose that was not loaded when the bar was drawn.
+ */
+export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData){
+  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData];
+  const desc = aspectDescription(descKey);
+  const myth = mythDescription(mythKey);
   const safeMyth = myth ? escapeHtml(myth) : "";
   const useToggle = !!safeMyth;
   const mythHtml = useToggle
@@ -243,8 +262,8 @@ export function isCoarsePointer(){
   return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
-export function showTooltip(e, title, desc, range, popupMode, myth, exactLabel, calendarData=null){
-  setTooltipContent(title, desc, range, myth, popupMode, exactLabel, calendarData);
+export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null){
+  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData);
   tooltip.style.display = "block";
   tooltip.style.visibility = "hidden";
   tooltip.classList.toggle("popup", !!popupMode);
@@ -256,6 +275,7 @@ export function showTooltip(e, title, desc, range, popupMode, myth, exactLabel, 
 }
 
 export function hideTooltip(){
+  shownArgs = null;
   tooltip.style.display = "none";
   tooltip.style.visibility = "hidden";
   tooltip.classList.remove("popup");
