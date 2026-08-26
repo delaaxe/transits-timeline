@@ -17,7 +17,7 @@ export const presets = [
     world:{ transitGroup:"all", includeMoon:false, includeChiron:true, includeNode:true } },
   { key:"basic_longterm", label:"Year",
     transitGroup:"outer", natalGroup:"all", aspects:["conjunction","sextile","square","trine","opposition"],
-    orb:1.0, includeMoon:false, includeChiron:true, includeNode:true, stepDays:1, range:{startOffsetDays:-90, endOffsetDays:364},
+    orb:1.0, includeMoon:false, includeChiron:true, includeNode:true, range:{startOffsetDays:-90, endOffsetDays:364},
     world:{ transitGroup:"outer", includeMoon:false, includeChiron:true, includeNode:true } }
 ];
 

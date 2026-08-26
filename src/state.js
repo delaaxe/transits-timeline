@@ -9,9 +9,6 @@ export const state = {
   // Last computation, so "Show more" can paginate without recomputing.
   cachedResults: null,
   currentMaxRows: 50,
-  transitCache: null,
-  cachedObserver: null,
-  cachedNatalLon: null,
   isComputing: false,
   cancelRequested: false,
   pendingUpdate: false,

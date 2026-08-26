@@ -1,12 +1,16 @@
-// Bundles src/ into one hashed file under dist/, which is what gets deployed.
+// Bundles src/ into hashed files under dist/, which is what gets deployed.
 // Development still runs straight from the repo root with no build: index.html
-// loads src/app.js as native ESM.
+// loads src/app.js as native ESM and the worker is its sibling source file.
+//
+// There are two entry points, the page and the transit worker, and they share
+// the ephemeris. esbuild's code splitting puts it in one chunk both import, so
+// it is downloaded once rather than bundled into each.
 
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { mkdir, rm, readFile, writeFile, copyFile, access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
@@ -39,31 +43,64 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
 const result = await build({
-  entryPoints: [join(root, "src/app.js")],
+  entryPoints: { app: join(root, "src/app.js"), worker: join(root, "src/core/worker.js") },
   bundle: true,
+  splitting: true,
   format: "esm",
   target: "es2022",
   minify: true,
   legalComments: "none",
   write: false,
+  metafile: true,
+  outdir: dist,
+  entryNames: "[name].[hash]",
+  chunkNames: "chunk.[hash]",
   absWorkingDir: root,
   plugins: keyPlugin
 });
 
-const js = result.outputFiles[0].contents;
-const hash = createHash("sha256").update(js).digest("hex").slice(0, 8);
-const bundleName = `app.${hash}.js`;
-await writeFile(join(dist, bundleName), js);
+const entryFor = (source) => {
+  const hits = Object.entries(result.metafile.outputs)
+    .filter(([, out]) => out.entryPoint === source)
+    .map(([path]) => basename(path));
+  if (hits.length !== 1) throw new Error(`Expected one output for ${source}, got ${hits.length}`);
+  return hits[0];
+};
+
+const workerName = entryFor("src/core/worker.js");
+const appBuilt = entryFor("src/app.js");
+
+const decoder = new TextDecoder();
+const encoder = new TextEncoder();
+const outputs = new Map(result.outputFiles.map(f => [basename(f.path), f.contents]));
+
+// core/worker-url.js names the worker as a sibling of whatever is running,
+// which is true in src/ and true again here once the hashed name is written in.
+let appSource = decoder.decode(outputs.get(appBuilt));
+const occurrences = appSource.split('"worker.js"').length - 1;
+if (occurrences !== 1){
+  throw new Error(`Expected exactly one "worker.js" in the bundle to point at ${workerName}, found ${occurrences}`);
+}
+appSource = appSource.replace('"worker.js"', JSON.stringify(workerName));
+const appBytes = encoder.encode(appSource);
+
+// Rehashed because the substitution changed the bytes esbuild hashed. Nothing
+// imports an entry point, so renaming this one breaks no reference.
+const appName = `app.${createHash("sha256").update(appBytes).digest("hex").slice(0, 8)}.js`;
+outputs.delete(appBuilt);
+outputs.set(appName, appBytes);
+
+for (const [name, contents] of outputs) await writeFile(join(dist, name), contents);
 
 const html = await readFile(join(root, "index.html"), "utf8");
 const marker = '<script type="module" src="src/app.js"></script>';
 if (!html.includes(marker)) throw new Error(`index.html no longer contains ${marker}`);
 await writeFile(join(dist, "index.html"),
-  html.replace(marker, `<script type="module" src="${bundleName}"></script>`));
+  html.replace(marker, `<script type="module" src="${appName}"></script>`));
 
 for (const asset of ASSETS) await copyFile(join(root, asset), join(dist, asset));
 
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
-console.log(`dist/${bundleName}  ${kb(js.byteLength)}`);
-console.log(`dist/index.html     ${kb(Buffer.byteLength(html))}`);
+for (const [name, contents] of outputs) console.log(`dist/${name}`.padEnd(28) + kb(contents.byteLength));
+console.log("dist/index.html".padEnd(28) + kb(Buffer.byteLength(html)));
 for (const a of ASSETS) console.log(`dist/${a}`);

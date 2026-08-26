@@ -23,10 +23,13 @@ expected=(index.html aspects.json myths.json apple-touch-icon.png)
 for f in "${expected[@]}"; do
   [[ -f "dist/$f" ]] || { echo "Build did not produce dist/$f" >&2; exit 1; }
 done
-bundles="$(find dist -maxdepth 1 -name 'app.*.js' | wc -l | tr -d ' ')"
-[[ "$bundles" == "1" ]] || { echo "Expected exactly one bundle in dist/, found $bundles" >&2; exit 1; }
+# One page bundle, one worker, and the chunk they share.
+for kind in app worker chunk; do
+  n="$(find dist -maxdepth 1 -name "$kind.*.js" | wc -l | tr -d ' ')"
+  [[ "$n" == "1" ]] || { echo "Expected exactly one $kind.*.js in dist/, found $n" >&2; exit 1; }
+done
 
-stray="$(find dist -type f \! -name 'app.*.js' $(printf '! -name %s ' "${expected[@]}"))"
+stray="$(find dist -type f \! -name 'app.*.js' \! -name 'worker.*.js' \! -name 'chunk.*.js' $(printf '! -name %s ' "${expected[@]}"))"
 if [[ -n "$stray" ]]; then
   echo "Unexpected files in dist/:" >&2; echo "$stray" >&2; exit 1
 fi

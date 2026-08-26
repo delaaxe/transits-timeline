@@ -1,5 +1,4 @@
 import { state } from "../state.js";
-import { refineExactMinute } from "../core/transits.js";
 import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols } from "../data/bodies.js";
 import { aspectDescription, mythDescription } from "../data/interpretations.js";
 import { locale } from "../storage/charts.js";
@@ -32,7 +31,7 @@ export function renderFromCache(limit){
   const total = state.cachedResults.rules.length;
   const shown = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
   const rules = state.cachedResults.rules.slice(0, shown);
-  const intervals = state.cachedResults.intervals.slice(0, shown);
+  const events = state.cachedResults.events.slice(0, shown);
 
   const spanMs = state.cachedResults.endExclusive.getTime() - state.cachedResults.start.getTime();
   const showYear = (spanMs / (365.25 * 24 * 3600 * 1000)) >= 3;
@@ -41,7 +40,7 @@ export function renderFromCache(limit){
     svg: el.dateAxisSvg,
     start: state.cachedResults.start,
     endExclusive: state.cachedResults.endExclusive,
-    stepMillis: state.cachedResults.stepMillis,
+    showTime: state.cachedResults.showTime,
     layout
   });
 
@@ -58,14 +57,12 @@ export function renderFromCache(limit){
     start: state.cachedResults.start,
     endExclusive: state.cachedResults.endExclusive,
     rules,
-    intervalsByRule: intervals,
-    stepMillis: state.cachedResults.stepMillis,
+    eventsByRule: events,
+    showTime: state.cachedResults.showTime,
     presetKey: state.cachedResults.presetKey,
     chartRuler: state.cachedResults.chartRuler,
     layout,
-    showYear,
-    observer: state.cachedResults.observer,
-    natalLon: state.cachedResults.natalLon
+    showYear
   });
 
   updateShowMore(shown, total);
@@ -222,7 +219,7 @@ export function wireTimelineResize(){
   }
 }
 
-export function renderAxisSVG({svg, start, endExclusive, stepMillis, layout}){
+export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   clearSvg(svg);
 
   const { totalW, timelineW, labelW, marginL, axisY, isCompact } = layout;
@@ -252,7 +249,7 @@ export function renderAxisSVG({svg, start, endExclusive, stepMillis, layout}){
   const minLabelPx = axisLabelSize * 2.2;
   const monthLabelPx = axisLabelSize * 1.6;
 
-  const useHours = (spanDays <= 2 && stepMillis < 24*3600*1000);
+  const useHours = (spanDays <= 2 && showTime);
   const useDays  = (!useHours) && (spanDays <= 45);
 
   const boundaries = (() => {
@@ -404,7 +401,7 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
   }
 }
 
-export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByRule, stepMillis, presetKey, chartRuler, layout, showYear, observer, natalLon}){
+export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, showTime, presetKey, chartRuler, layout, showYear}){
   clearSvg(svg);
 
   const { totalW, timelineW, labelW, marginL, rowH, rowGap, bottomPad, isCompact } = layout;
@@ -438,8 +435,10 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByR
 
     const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`;
 
-    const intervals = intervalsByRule[idx] ?? [];
-    for (const [a,b,exact,exactAtBoundary] of intervals){
+    const events = eventsByRule[idx] ?? [];
+    for (const event of events){
+      const a = new Date(event.start);
+      const b = new Date(event.end);
       const xa = dateToX(a);
       const xb = dateToX(b);
       const w = Math.max(1, xb - xa);
@@ -448,9 +447,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByR
       const barColor = isReturn ? "#d4a017" : (aspectColors[r.aspect] || "var(--text)");
       const rect = svgEl("rect", { x: xa, y: y + 4, width: w, height: rowH - 8, fill: barColor, class: "bar" });
 
-      const showTime = stepMillis < 24*3600*1000;
-      const endApprox = new Date(Math.max(a.getTime(), b.getTime() - stepMillis));
-      const rangeText = formatRangePretty(a, endApprox, showTime, showYear);
+      const rangeText = formatRangePretty(a, b, showTime, showYear);
       const descKey = `${r.transit}-${r.aspect}-${r.natal}`;
       const descText = aspectDescription(descKey);
       const mythKey = mythKeyFor(r.transit, r.natal);
@@ -458,36 +455,24 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByR
       const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
       const calendarTitle = (state.appMode === "world") ? `${glyphTitleCore} world` : glyphTitleCore;
 
-      let exactLabelCache = null;
-      let refinedExactDateCache = undefined;
-      const getRefinedExactDate = () => {
-        if (!exact) return null;
-        if (refinedExactDateCache !== undefined) return refinedExactDateCache;
-        const refineWindowMs = 24 * 3600 * 1000;
-        const refineStart = new Date(exact.getTime() - refineWindowMs);
-        const refineEnd = new Date(exact.getTime() + refineWindowMs);
-        refinedExactDateCache = refineExactMinute(exact, refineStart, refineEnd, stepMillis, r, observer, natalLon);
-        return refinedExactDateCache;
-      };
-      const getExactLabel = () => {
-        if (exactLabelCache !== null) return exactLabelCache;
-        if (!exact) return "";
-        const refined = getRefinedExactDate();
-        exactLabelCache = formatExactPretty(refined, a, endApprox, showYear);
-        return exactLabelCache;
-      };
+      // The scan already found these to the second; a retrograde pass that
+      // stays within orb throughout hits more than once.
+      const exactDates = (event.exacts ?? []).map(ms => new Date(ms));
+      // Each formatted hit can carry its own comma, so they are separated by
+      // something a date never contains.
+      const exactLabel = exactDates.map(d => formatExactPretty(d, a, b, showYear)).join(" \u00b7 ");
       const buildCalendarData = () => ({
         title: calendarTitle,
         segmentStart: a,
-        segmentEnd: endApprox,
-        exactTime: getRefinedExactDate()
+        segmentEnd: b,
+        exactTime: exactDates[0] ?? null
       });
       const bindSegmentTooltipEvents = (target) => {
-        const openPopup = (e) => showTooltip(e, rowLabel, descText, rangeText, true, mythText, getExactLabel(), buildCalendarData());
+        const openPopup = (e) => showTooltip(e, rowLabel, descText, rangeText, true, mythText, exactLabel, buildCalendarData());
         target.addEventListener("pointerenter", (e) => {
           if (isCoarsePointer()) return;
           if (tooltip.classList.contains("popup")) return;
-          showTooltip(e, rowLabel, descText, rangeText, false, mythText, getExactLabel());
+          showTooltip(e, rowLabel, descText, rangeText, false, mythText, exactLabel);
         });
         target.addEventListener("pointermove", (e) => {
           if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
@@ -509,29 +494,28 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByR
       bindSegmentTooltipEvents(rect);
 
       svg.appendChild(rect);
-      if (exact && !exactAtBoundary && exact >= a && exact <= b){
+      for (const exact of exactDates){
         const xExact = dateToX(exact);
-        if (xExact >= xa && xExact <= xb){
-          const cy = y + rowH / 2;
-          const hitCircle = svgEl("circle", {
-            cx: xExact,
-            cy,
-            r: 10,
-            fill: "transparent",
-            class: "bar"
-          });
-          bindSegmentTooltipEvents(hitCircle);
-          svg.appendChild(hitCircle);
-          svg.appendChild(svgEl("circle", {
-            cx: xExact,
-            cy,
-            r: 3.5,
-            fill: "var(--text)",
-            stroke: barColor,
-            "stroke-width": "1.5",
-            "pointer-events": "none"
-          }));
-        }
+        if (xExact < xa || xExact > xb) continue;
+        const cy = y + rowH / 2;
+        const hitCircle = svgEl("circle", {
+          cx: xExact,
+          cy,
+          r: 10,
+          fill: "transparent",
+          class: "bar"
+        });
+        bindSegmentTooltipEvents(hitCircle);
+        svg.appendChild(hitCircle);
+        svg.appendChild(svgEl("circle", {
+          cx: xExact,
+          cy,
+          r: 3.5,
+          fill: "var(--text)",
+          stroke: barColor,
+          "stroke-width": "1.5",
+          "pointer-events": "none"
+        }));
       }
     }
   }
@@ -552,10 +536,21 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, intervalsByR
     }));
   }
 
+  wireSvgLeave(svg);
+  ensureTooltipListeners();
+}
+
+// The <svg> outlives every render - clearSvg only removes children - so this
+// has to attach once rather than once per call, or a ResizeObserver-driven
+// session piles up a handler per redraw.
+const svgLeaveWired = new WeakSet();
+
+function wireSvgLeave(svg){
+  if (svgLeaveWired.has(svg)) return;
+  svgLeaveWired.add(svg);
   svg.addEventListener("pointerleave", () => {
     if (isCoarsePointer()) return;
     if (tooltip.classList.contains("popup")) return;
     hideTooltip();
   });
-  ensureTooltipListeners();
 }
