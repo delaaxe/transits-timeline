@@ -27,3 +27,12 @@ export function getBodyLonFromAll(allPlanets, planetKey, dateObj){
   if (planetKey === "node") return calcMeanNodeDeg(dateObj);
   return getPlanetLonFromAll(allPlanets, planetKey);
 }
+
+// One body at one time. getAllPlanets computes every body whether or not the
+// caller wants it; the event scan asks for a single longitude many thousands of
+// times, and this returns the identical number for a fraction of the work.
+export function getBodyLonAt(planetKey, dateObj, observer){
+  if (planetKey === "node") return calcMeanNodeDeg(dateObj);
+  const one = ephemerisAstronomy.getPlanet(planetKey, dateObj, observer.lon, observer.lat, observer.height);
+  return getPlanetLonFromAll(one, planetKey);
+}

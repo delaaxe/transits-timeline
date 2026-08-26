@@ -24,6 +24,29 @@ export const planetSymbols = {
   mc: "Mc"
 };
 
+// Ceilings on apparent geocentric daily motion, in degrees per day. The event
+// scan steps by (distance to the orb boundary) / this figure, so a value set too
+// low would let it step over a transit. Each is the maximum measured against the
+// ephemeris over 1900-2100 with margin added, and test/events.test.mjs
+// re-measures a sample of them so a wrong one fails rather than quietly losing
+// transits. This library's longitudes are geocentric, so none of it depends on
+// where the observer is.
+export const maxSpeedDegPerDay = {
+  sun: 1.05,      // 1.020
+  moon: 15.6,     // 15.389
+  mercury: 2.3,   // 2.203
+  venus: 1.32,    // 1.259
+  mars: 0.85,     // 0.791
+  jupiter: 0.26,  // 0.242
+  saturn: 0.14,   // 0.130
+  uranus: 0.07,   // 0.063
+  neptune: 0.05,  // 0.042
+  pluto: 0.05,    // 0.041
+  chiron: 0.18,   // 0.146
+  node: 0.06,     // 0.0530, and analytic rather than measured
+  mc: 0
+};
+
 export const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc"];
 
 export const orderMap = new Map(order.map((k,i)=>[k,i]));
