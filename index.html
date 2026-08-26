@@ -74,6 +74,50 @@
     .error{ color: var(--danger); }
 
     .dateAxisScroll{ position: sticky; top: 0; z-index: 3; background: var(--panel-bg); overflow: hidden; border-bottom: 0; }
+
+    /* The date axis sits outside the scroller, so it used to be repositioned by
+       JS on every scroll event and lagged behind touch scrolling. Tying it to a
+       scroll timeline lets the compositor drive it. updateAxisTransform still
+       does the work where scroll timelines are unsupported. */
+    #timelineScroll{ scroll-timeline: --timelineX inline; }
+    body{ timeline-scope: --timelineX; }
+
+    @keyframes dateAxisFollow{
+      from{ transform: translateX(0); }
+      to{ transform: translateX(calc(-1 * var(--date-axis-travel, 0px))); }
+    }
+
+    @supports (animation-timeline: --x){
+      /* Longhand on purpose: the animation shorthand resets duration to 0s,
+         which finishes a scroll-driven animation instantly at 100%. */
+      #dateAxisSvg{
+        animation-name: dateAxisFollow;
+        animation-duration: auto;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: --timelineX;
+      }
+
+      /* The label column slides and narrows over the first stretch of scroll,
+         then holds. The hold is a keyframe stop rather than animation-range,
+         and the values are plain lengths rather than a custom property, because
+         Safari runs neither of those on a scroll timeline. syncAxisAnimations
+         writes the keyframes, since the stop depends on the layout. */
+      #aspectAxisWrap{ animation-name: aspectAxisNarrow; }
+      #aspectAxisSvg{ animation-name: aspectAxisSlide; }
+      #axisCornerBlock{ animation-name: aspectAxisCornerNarrow; }
+      .timelineNav{ animation-name: aspectAxisNavIndent; }
+
+      #aspectAxisWrap,
+      #aspectAxisSvg,
+      #axisCornerBlock,
+      .timelineNav{
+        animation-duration: auto;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: --timelineX;
+      }
+    }
     .dateAxisScrollInner{ padding: var(--axis-pad); position: relative; }
     .timelineNav{
       display: flex;
@@ -81,7 +125,7 @@
       align-items: center;
       gap: 16px;
       padding: 2px 0 4px;
-      margin-left: calc(var(--aspect-axis-visible-w, var(--aspect-axis-w, 150px)) + var(--axis-pad));
+      margin-left: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) + var(--axis-pad));
       margin-right: 6px;
       user-select: none;
       min-height: var(--timeline-nav-h);
@@ -102,7 +146,7 @@
       position: absolute;
       left: var(--axis-pad);
       top: var(--axis-pad);
-      width: calc(var(--aspect-axis-visible-w, var(--aspect-axis-w, 150px)) - 1px);
+      width: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) - 1px);
       height: calc(var(--date-axis-h, 80px) + var(--timeline-nav-total, 0px));
       background: var(--panel-bg);
       z-index: 2;
@@ -118,7 +162,7 @@
       top: var(--chart-pad);
       z-index: 2;
       overflow: hidden;
-      width: var(--aspect-axis-visible-w, var(--aspect-axis-w, 150px));
+      width: calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px));
       pointer-events: none;
     }
     #aspectAxisSvg{

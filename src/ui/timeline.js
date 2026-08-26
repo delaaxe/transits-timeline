@@ -69,20 +69,88 @@ export function renderFromCache(limit){
   });
 
   updateShowMore(shown, total);
+  syncAxisTravel();
   updateAxisTransform();
 }
+
+const scrollTimelineSupported = typeof CSS !== "undefined"
+  && typeof CSS.supports === "function"
+  && CSS.supports("animation-timeline", "--x");
+
+// How far each axis has to travel, read once per layout rather than per scroll
+// frame. The CSS keyframes interpolate to these.
+function syncAxisTravel(){
+  if (!el.dateAxisSvg || !el.timelineScroll) return;
+  const travel = Math.max(0, el.timelineScroll.scrollWidth - el.timelineScroll.clientWidth);
+  el.dateAxisSvg.style.setProperty("--date-axis-travel", `${travel}px`);
+  syncAxisAnimations(travel);
+}
+
+let axisStyleEl = null;
+
+// The label column holds its narrow width once it has travelled far enough, so
+// the keyframes need a stop partway through the scroll. Its position depends on
+// the layout, so the rule is written here rather than in the stylesheet. Plain
+// lengths only: Safari does not run custom-property or animation-range variants
+// on a scroll timeline, though it does run these.
+function syncAxisAnimations(maxScroll){
+  if (!scrollTimelineSupported) return;
+  const layout = state.currentLayout;
+  if (!layout) return;
+
+  if (!axisStyleEl){
+    axisStyleEl = document.createElement("style");
+    axisStyleEl.id = "axisAnimations";
+    document.head.appendChild(axisStyleEl);
+  }
+
+  const travel = symbolsThreshold();
+  if (maxScroll <= 0 || travel <= 0){
+    axisStyleEl.textContent = "";
+    return;
+  }
+
+  const wide = layout.labelWMax;
+  const narrow = wide - travel;
+  const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--axis-pad")) || 0;
+  const hold = Math.min(100, (travel / maxScroll) * 100).toFixed(4);
+
+  const holding = (prop, from, to) =>
+    `@keyframes ${prop.name}{0%{${prop.css}:${from}}${hold}%{${prop.css}:${to}}100%{${prop.css}:${to}}}`;
+
+  const rules = [
+    holding({ name: "aspectAxisNarrow", css: "width" }, `${wide}px`, `${narrow}px`),
+    holding({ name: "aspectAxisSlide", css: "transform" }, "translateX(0)", `translateX(${-travel}px)`),
+    holding({ name: "aspectAxisCornerNarrow", css: "width" }, `${wide - 1}px`, `${narrow - 1}px`),
+    holding({ name: "aspectAxisNavIndent", css: "margin-left" }, `${wide + pad}px`, `${narrow + pad}px`)
+  ].join("\n");
+
+  // renderFromCache runs on every resize tick, and replacing the rule costs a
+  // style recalc even when it is identical.
+  if (rules !== axisStyleEl.textContent) axisStyleEl.textContent = rules;
+}
+
+let lastShift = null;
 
 export function updateAxisTransform(){
   if (!el.dateAxisSvg || !el.timelineScroll) return;
   const scrollLeft = el.timelineScroll.scrollLeft;
-  const layout = state.currentLayout;
-  const labelWMax = layout?.labelWMax ?? 150;
-  const labelWMin = layout?.labelWMin ?? 96;
-  const shift = Math.min(Math.max(0, scrollLeft), Math.max(0, labelWMax - labelWMin));
-  el.dateAxisSvg.style.transform = `translate3d(${-Math.round(scrollLeft)}px, 0, 0)`;
-  document.documentElement.style.setProperty("--aspect-axis-visible-w", `${labelWMax - shift}px`);
-  document.documentElement.style.setProperty("--aspect-axis-shift", `${-Math.round(shift)}px`);
-  updateLabelsMode();
+  const shift = Math.round(Math.min(Math.max(0, scrollLeft), symbolsThreshold()));
+
+  // The date axis follows a CSS scroll timeline where those exist.
+  if (!scrollTimelineSupported){
+    el.dateAxisSvg.style.transform = `translate3d(${-Math.round(scrollLeft)}px, 0, 0)`;
+  }
+
+  // Where scroll timelines exist the generated keyframes drive the column.
+  if (scrollTimelineSupported) return;
+
+  // shift is clamped, so it stops changing early in a scroll. The width each
+  // consumer needs is derived from it in CSS, so this is the only value written.
+  if (shift !== lastShift){
+    lastShift = shift;
+    document.documentElement.style.setProperty("--aspect-axis-shift", `${-shift}px`);
+  }
 }
 
 export function symbolsThreshold(){
@@ -91,18 +159,38 @@ export function symbolsThreshold(){
   return Math.max(0, layout.labelWMax - layout.labelWMin);
 }
 
+// Checked every scroll frame so the form changes exactly at the threshold. The
+// comparison is all that runs until the crossing, and the crossing redraws only
+// the label column, not the timeline and date axis with it.
 export function updateLabelsMode(){
-  if (!state.cachedResults || !el.timelineScroll) return;
+  if (!state.cachedResults || !el.timelineScroll || !state.currentLayout) return;
   const shouldUseSymbols = el.timelineScroll.scrollLeft >= symbolsThreshold();
   if (shouldUseSymbols === state.labelsUseSymbols) return;
   state.labelsUseSymbols = shouldUseSymbols;
-  renderFromCache(state.currentMaxRows);
+
+  const total = state.cachedResults.rules.length;
+  const shown = Math.min(total, Math.max(0, Math.floor(Number(state.currentMaxRows || 0))));
+  renderLabelsSVG({
+    svg: el.aspectAxisSvg,
+    rules: state.cachedResults.rules.slice(0, shown),
+    chartRuler: state.cachedResults.chartRuler,
+    layout: state.currentLayout,
+    useSymbols: state.labelsUseSymbols
+  });
 }
 
 export function wireAxisScrollSync(){
   if (!el.dateAxisScroll || !el.timelineScroll) return;
+  let frame = null;
   el.timelineScroll.addEventListener("scroll", () => {
-    window.requestAnimationFrame(updateAxisTransform);
+    // Straight off the scroll event, not a frame, so the form changes at the
+    // threshold rather than whenever the next frame lands.
+    updateLabelsMode();
+    if (frame !== null) return;
+    frame = window.requestAnimationFrame(() => {
+      frame = null;
+      updateAxisTransform();
+    });
   }, { passive: true });
   updateAxisTransform();
 }
