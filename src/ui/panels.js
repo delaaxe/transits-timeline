@@ -3,7 +3,7 @@ import { requestUpdate } from "../refresh.js";
 import { calcNatalAscDeg, calcNatalMCDeg, computeCompositeChart } from "../core/chart.js";
 import { ephemerisAstronomy, getBodyLonFromAll } from "../core/ephemeris.js";
 import { addDaysLocal, fmtLocalYYYYMMDD, parseBirthUTCFor, parseLocalDateOnly } from "../core/time.js";
-import { aspects, natalGroups, planetSymbols, summaryPlanetOrder, summaryPointSymbols, transitGroups, zodiacSignSymbol } from "../data/bodies.js";
+import { aspects, natalGroups, planetSymbols, summaryPlanetOrder, summaryPointSymbols, summaryTailOrder, transitGroups, zodiacSignSymbol } from "../data/bodies.js";
 import { defaultPresetKey, presets } from "../data/presets.js";
 import { awsAutocomplete, awsGetPlace, extractPosition } from "../services/places.js";
 import { chartsState, defaultChartData, getActiveChart, getActiveChartA, getActiveChartB, isDefaultChart, lastChartKey, loadCharts, newId, normalizeChart, saveCharts } from "../storage/charts.js";
@@ -150,19 +150,21 @@ export function renderChartButtonsFor(wrap, activeId, { allowAdd=true, disableId
 export function buildSymbolPlacementsLine(lonByKey){
   const pieces = [];
   for (const k of summaryPlanetOrder){
+    if (summaryTailOrder.includes(k)) continue;
     const lon = lonByKey?.[k];
     if (!Number.isFinite(lon)) continue;
     const planetGlyph = planetSymbols[k];
     if (!planetGlyph) continue;
     pieces.push(`${planetGlyph}\u00A0${zodiacSignSymbol(lon)}`);
   }
-  if (Number.isFinite(lonByKey?.asc)){
-    pieces.push(`${summaryPointSymbols.asc}\u00A0${zodiacSignSymbol(lonByKey.asc)}`);
+  for (const k of summaryTailOrder){
+    const lon = lonByKey?.[k];
+    if (!Number.isFinite(lon)) continue;
+    const glyph = summaryPointSymbols[k] || planetSymbols[k];
+    if (!glyph) continue;
+    pieces.push(`${glyph}\u00A0${zodiacSignSymbol(lon)}`);
   }
-  if (Number.isFinite(lonByKey?.mc)){
-    pieces.push(`${summaryPointSymbols.mc}\u00A0${zodiacSignSymbol(lonByKey.mc)}`);
-  }
-  return pieces.join("\u00A0 ");
+  return pieces.join("\u00A0\u00A0 ");
 }
 
 export function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = {}){
@@ -209,7 +211,7 @@ export function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = 
     const cc = fmtCoord(pA.lat, pA.lon);
     if (cc) parts.push(cc);
   }
-  const firstLine = parts.join("\u00A0 ");
+  const firstLine = parts.join("\u00A0\u00A0 ");
   if (includePlacementsLine && placementsLine){
     return firstLine ? `${firstLine}\n${placementsLine}` : placementsLine;
   }

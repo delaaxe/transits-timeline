@@ -118,9 +118,11 @@ export function mythKeyFor(a, b){
 
 export const signSymbols = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
 
-// The node trails the planets: it is a point rather than a body, and it reads
-// as one alongside Ac and Mc at the end of the line.
+// The node stays in the lookup - the line still needs its longitude - but it
+// is drawn last, after Ac and Mc: it is a point rather than a body, and it
+// reads as one at the end of the line.
 export const summaryPlanetOrder = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node"];
+export const summaryTailOrder = ["asc","mc","node"];
 
 export const summaryPointSymbols = { asc: "Ac", mc: "Mc" };
 
