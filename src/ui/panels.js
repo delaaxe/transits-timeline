@@ -1,7 +1,7 @@
 import { state } from "../state.js";
 import { requestUpdate } from "../refresh.js";
 import { calcNatalAscDeg, calcNatalMCDeg, computeCompositeChart } from "../core/chart.js";
-import { ephemerisAstronomy, getPlanetLonFromAll } from "../core/ephemeris.js";
+import { ephemerisAstronomy, getBodyLonFromAll } from "../core/ephemeris.js";
 import { addDaysLocal, fmtLocalYYYYMMDD, parseBirthUTCFor, parseLocalDateOnly } from "../core/time.js";
 import { aspects, natalGroups, planetSymbols, summaryPlanetOrder, summaryPointSymbols, transitGroups, zodiacSignSymbol } from "../data/bodies.js";
 import { defaultPresetKey, presets } from "../data/presets.js";
@@ -100,7 +100,14 @@ export function setAdvancedVisible(isVisible){
     el.advancedToggle.setAttribute("aria-expanded", advancedVisible ? "true" : "false");
     // Short on purpose: this sits in the view bar beside four preset chips, and
     // "Show options" is wide enough to push the bar to two lines on a phone.
-    el.advancedToggle.textContent = advancedVisible ? "Options \u25b4" : "Options \u25be";
+    // The caret is its own element so it can be spaced and sized against the
+    // label rather than inheriting it.
+    el.advancedToggle.textContent = "Options ";
+    const caret = document.createElement("span");
+    caret.className = "viewBarCaret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.textContent = advancedVisible ? "\u25b4" : "\u25be";
+    el.advancedToggle.appendChild(caret);
   }
 }
 
@@ -183,7 +190,10 @@ export function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = 
         if (includePlacementsLine){
           const lonByKey = {};
           for (const key of summaryPlanetOrder){
-            lonByKey[key] = getPlanetLonFromAll(allPlanets, key);
+            // Not getPlanetLonFromAll: the node is computed analytically rather
+            // than observed, so that one throws for it - into the catch below,
+            // which would have silently dropped the entire line.
+            lonByKey[key] = getBodyLonFromAll(allPlanets, key, birthUTC);
           }
           lonByKey.asc = calcNatalAscDeg(birthUTC, pA.lon, pA.lat);
           lonByKey.mc = calcNatalMCDeg(birthUTC, pA.lon);

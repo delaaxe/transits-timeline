@@ -267,7 +267,25 @@
       border-bottom: 0;
       border-radius: 12px 12px 0 0;
     }
-    .viewBarToggle{ flex: none; white-space: nowrap; }
+    /* Geometrically this was already centred - both ends of the bar carry the
+       same ink, and its text centre matched the chips' to the pixel. What made
+       it read as off was that it had no box: an underline hanging below the
+       label and a caret sitting at its own height, next to four pills. It gets
+       the chips' band and their padding instead, and the caret gets a gap. */
+    .viewBar > .viewBarToggle{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex: none;
+      white-space: nowrap;
+      text-decoration: none;
+      /* The chips' own padding, so the hover pill is their size rather than
+         the whole height of the bar. */
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .viewBar > .viewBarToggle:hover{ color: var(--ink); background: var(--hover); }
+    .viewBarCaret{ font-size: 11px; opacity: .8; }
     .optionsDrawer{
       display: flex;
       flex-direction: column;
@@ -547,6 +565,7 @@
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
+      .viewBar > .viewBarToggle{ min-height: 40px; padding: 6px 8px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
     }
@@ -559,6 +578,7 @@
       body.scrolled{ --viewbar-min: 28px; }
       body.scrolled .viewBar{ padding-block: 2px; }
       body.scrolled .presetBtn{ padding-block: 4px; }
+      body.scrolled .viewBar > .viewBarToggle{ padding-block: 4px; }
     }
 
     /* A phone in landscape is under 400px tall: every row of chrome above the
@@ -575,6 +595,7 @@
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 36px; }
+      .viewBar > .viewBarToggle{ min-height: 36px; padding: 6px 8px; }
       .linkBtn{ padding: 4px 0; }
       .optionsDrawer{ padding: var(--sp-2) var(--sp-3); gap: var(--sp-1); }
       .installHint{ display: none; }

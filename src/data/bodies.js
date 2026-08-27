@@ -118,7 +118,9 @@ export function mythKeyFor(a, b){
 
 export const signSymbols = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
 
-export const summaryPlanetOrder = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"];
+// The node trails the planets: it is a point rather than a body, and it reads
+// as one alongside Ac and Mc at the end of the line.
+export const summaryPlanetOrder = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node"];
 
 export const summaryPointSymbols = { asc: "Ac", mc: "Mc" };
 
