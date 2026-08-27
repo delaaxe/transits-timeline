@@ -236,11 +236,7 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
 
   const { totalW, timelineW, labelW, marginL, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
   const x0 = marginL + labelW;
-  // The now chip straddles the axis line, so the SVG has to be tall enough for
-  // its lower half whatever the tier's padding is - on the phone tier that
-  // padding is 6px and the chip would be clipped by the scroller.
-  const nowChipH = 16;
-  const axisHeight = axisY + 40 + Math.max(axisBottomPad, nowChipH / 2 + 1);
+  const axisHeight = axisY + 40 + axisBottomPad;
   document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
   svg.setAttribute("viewBox", `0 0 ${totalW} ${axisHeight}`);
   svg.setAttribute("width", String(totalW));
@@ -365,9 +361,9 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
     }
   }
 
-  // The marker for now was a dashed line and nothing else, which reads as one
-  // more gridline. The chip names it. It belongs on this SVG rather than the
-  // timeline because this one is anchored to the dates and travels with them.
+  // Now gets a tick in the axis band to match the line down the chart. It had
+  // a labelled pill for a while, which cost a lane of vertical space and was
+  // the loudest thing on a screen whose subject is the bars.
   const now = new Date();
   if (now >= start && now < endExclusive){
     const xNow = dateToX(now);
@@ -375,27 +371,6 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
       x1: xNow, y1: axisY + 20, x2: xNow, y2: axisY + 40,
       stroke: "var(--accent)", "stroke-width": "1", opacity: "0.55", "pointer-events": "none"
     }));
-
-    const chipW = 36;
-    const chipH = nowChipH;
-    // Kept inside the axis at both ends, so it stays readable when now sits on
-    // the very edge of the range.
-    const cx = Math.min(Math.max(xNow, x0 + chipW/2), x0 + timelineW - chipW/2);
-    // Sits on the axis line rather than in the label lane above it: the tick
-    // labels have their baseline at axisY + 25, and a chip at the top of the
-    // band lands right on top of them.
-    const chipY = axisY + 40 - chipH / 2;
-    svg.appendChild(svgEl("rect", {
-      x: cx - chipW/2, y: chipY, width: chipW, height: chipH, rx: chipH/2,
-      fill: "var(--accent)", "pointer-events": "none"
-    }));
-    const chipText = svgEl("text", {
-      x: cx, y: chipY + chipH - 4.5,
-      "text-anchor": "middle", "font-size": "11", "font-weight": "700",
-      fill: "var(--accent-contrast)", "pointer-events": "none"
-    });
-    chipText.textContent = "Now";
-    svg.appendChild(chipText);
   }
 }
 
@@ -590,23 +565,16 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         });
         bindSegmentTooltipEvents(hitCircle);
         svg.appendChild(hitCircle);
-        // A ring reads as a moment on the bar; the old filled dot read as a
-        // blemish in it, which is half of why a window with no exact hit was
-        // being reported as a bug.
+        // A hard point. The ring this replaced was a 1.6px stroke and a 1.9px
+        // core over a gradient, and at the size it is actually drawn those
+        // three edges antialias into each other and read as a smudge.
         svg.appendChild(svgEl("circle", {
           cx: xExact,
           cy,
-          r: 4.6,
-          fill: "none",
-          stroke: isHexColor(barColor) ? lighten(barColor, 0.45) : "var(--text)",
-          "stroke-width": "1.6",
-          "pointer-events": "none"
-        }));
-        svg.appendChild(svgEl("circle", {
-          cx: xExact,
-          cy,
-          r: 1.9,
+          r: 3,
           fill: "var(--ink)",
+          stroke: isHexColor(barColor) ? darken(barColor, 0.45) : "none",
+          "stroke-width": "1",
           "pointer-events": "none"
         }));
       }

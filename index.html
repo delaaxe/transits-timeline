@@ -419,7 +419,12 @@
     .chartLinks{ display: flex; align-items: center; gap: 6px; margin-top: 8px; }
     .chartPrivacy{ margin-top: 8px; font-size: 12px; color: var(--muted); }
     .inlineDot{ color: var(--muted); margin: 0; }
-    [data-advanced][hidden]{ display: none; }
+    /* Any author rule that sets display beats the user agent's
+       [hidden]{display:none}, and this file has sprung that trap three times -
+       the options rows, the state plate, and the compose picker, each of which
+       ignored its hidden attribute the moment something gave it a display. The
+       JS toggles .hidden throughout; this makes that mean what it says, once. */
+    [hidden]{ display: none !important; }
 
     
     .orbField input{ width: 70px !important; }
@@ -517,6 +522,33 @@
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
+    }
+
+    /* A phone in landscape is under 400px tall: every row of chrome above the
+       chart is a row of transits that is not on screen. Targets come down to
+       36px here, below the 44 this file uses everywhere else - a deliberate
+       trade in the one orientation where height is the scarce thing. */
+    @media (max-height: 520px){
+      :root{ --viewbar-min: 46px; }
+      .appBar{ padding: max(4px, env(safe-area-inset-top)) 0 4px; }
+      .wordmark{ font-size: 13px; }
+      .wordmark svg{ width: 17px; height: 17px; }
+      .panel{ padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); }
+      .viewBar{ min-height: 46px; padding-block: 2px; }
+      .presetBtn,
+      .chartBtn,
+      .aspectDropdown > summary{ min-height: 36px; }
+      .linkBtn{ padding: 4px 0; }
+      .optionsDrawer{ padding: var(--sp-2) var(--sp-3); gap: var(--sp-1); }
+      .installHint{ display: none; }
+
+      /* The chart picker is three stacked rows for something that is chosen
+         once and then left alone. Landscape gets it as one line. */
+      .chartField{ flex-direction: row; align-items: center; gap: var(--sp-2); }
+      .chartField > label{ margin-bottom: 0; white-space: nowrap; }
+      .chartPickers{ flex-direction: row; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
+      .chartPicker{ display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
+      .chartLinks{ margin-top: 0; }
     }
 
     @media (max-width: 520px){
@@ -743,10 +775,8 @@
       /* Nothing in a plate is interactive, and it covers the whole chart. */
       pointer-events: none;
     }
-    /* Setting display here beats the UA rule for the hidden attribute, so
-       without this the plate is laid out over the bars at all times: no hover,
-       no taps, and a touch that lands on it never reaches the scroller. */
-    .timelineState[hidden]{ display: none; }
+    /* Hiding is handled by the global [hidden] rule; before that existed this
+       plate laid itself over the bars and took every hover, tap and swipe. */
     .timelineStatePlate{
       border: 1px solid var(--hairline);
       border-radius: 12px;
@@ -822,7 +852,7 @@
   <div class="panel" id="personalPanel">
     <div id="personalSection">
     <div class="row rowTop">
-      <div class="field med" style="min-width: 260px; flex: 1;">
+      <div class="field med chartField" style="min-width: 260px; flex: 1;">
         <label>Chart</label>
         <div class="chartPickers">
           <div class="chartPicker">

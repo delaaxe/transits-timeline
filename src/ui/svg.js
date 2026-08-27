@@ -25,6 +25,13 @@ const tiers = {
 
 // The same test the stylesheet uses for tap targets, written the same way on
 // purpose: if these two disagree, a device gets 44px arrows above 20px rows.
+// A phone in landscape is short, not narrow: it gets the tier its width earns,
+// with the phone tier's vertical spacing, so the axis and the gaps between
+// rows stop eating the little height there is.
+function isShortViewport(){
+  return typeof window !== "undefined" && window.innerHeight <= 520;
+}
+
 function isCoarsePointer(){
   return typeof window !== "undefined"
     && typeof window.matchMedia === "function"
@@ -49,7 +56,11 @@ export function computeTimelineLayout(svg){
   const containerW = parent ? Math.max(320, parent.clientWidth - pad) : 1200;
 
   const tier = tierFor(containerW);
-  const t = tiers[tier];
+  const t = { ...tiers[tier] };
+  if (isShortViewport()){
+    const { rowGap, bottomPad, marginT, axisGap, axisBottomPad } = tiers.phone;
+    Object.assign(t, { rowGap, bottomPad, marginT, axisGap, axisBottomPad });
+  }
   // A wide touch screen keeps the roomy rows; it only gains the wide layout.
   const rowH = (tier === "desktop" && isCoarsePointer()) ? tiers.tablet.rowH : t.rowH;
 
