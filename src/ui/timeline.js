@@ -1,5 +1,6 @@
 import { state } from "../state.js";
-import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols } from "../data/bodies.js";
+import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor } from "../data/bodies.js";
+import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
 import { formatExactPretty, formatRangePretty } from "./format.js";
@@ -223,7 +224,11 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
 
   const { totalW, timelineW, labelW, marginL, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
   const x0 = marginL + labelW;
-  const axisHeight = axisY + 40 + axisBottomPad;
+  // The now chip straddles the axis line, so the SVG has to be tall enough for
+  // its lower half whatever the tier's padding is - on the phone tier that
+  // padding is 6px and the chip would be clipped by the scroller.
+  const nowChipH = 16;
+  const axisHeight = axisY + 40 + Math.max(axisBottomPad, nowChipH / 2 + 1);
   document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
   svg.setAttribute("viewBox", `0 0 ${totalW} ${axisHeight}`);
   svg.setAttribute("width", String(totalW));
@@ -347,6 +352,39 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
       }
     }
   }
+
+  // The marker for now was a dashed line and nothing else, which reads as one
+  // more gridline. The chip names it. It belongs on this SVG rather than the
+  // timeline because this one is anchored to the dates and travels with them.
+  const now = new Date();
+  if (now >= start && now < endExclusive){
+    const xNow = dateToX(now);
+    svg.appendChild(svgEl("line", {
+      x1: xNow, y1: axisY + 20, x2: xNow, y2: axisY + 40,
+      stroke: "var(--accent)", "stroke-width": "1", opacity: "0.55", "pointer-events": "none"
+    }));
+
+    const chipW = 36;
+    const chipH = nowChipH;
+    // Kept inside the axis at both ends, so it stays readable when now sits on
+    // the very edge of the range.
+    const cx = Math.min(Math.max(xNow, x0 + chipW/2), x0 + timelineW - chipW/2);
+    // Sits on the axis line rather than in the label lane above it: the tick
+    // labels have their baseline at axisY + 25, and a chip at the top of the
+    // band lands right on top of them.
+    const chipY = axisY + 40 - chipH / 2;
+    svg.appendChild(svgEl("rect", {
+      x: cx - chipW/2, y: chipY, width: chipW, height: chipH, rx: chipH/2,
+      fill: "var(--accent)", "pointer-events": "none"
+    }));
+    const chipText = svgEl("text", {
+      x: cx, y: chipY + chipH - 4.5,
+      "text-anchor": "middle", "font-size": "11", "font-weight": "700",
+      fill: "var(--accent-contrast)", "pointer-events": "none"
+    });
+    chipText.textContent = "Now";
+    svg.appendChild(chipText);
+  }
 }
 
 export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=false}){
@@ -412,6 +450,26 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
   svg.style.height = `${totalH}px`;
   svg.appendChild(svgEl("rect", {x:0, y:0, width: totalW, height: totalH, fill:"var(--panel-bg)"}));
 
+  // A bar with a top edge reads as an object rather than a smear, and the
+  // cheapest way to give several hundred of them one is a gradient per colour
+  // referenced by fill, rather than an overlay element on each.
+  const defs = svgEl("defs");
+  svg.appendChild(defs);
+  const gradients = new Map();
+  const fillFor = (color) => {
+    if (!isHexColor(color)) return color;
+    let id = gradients.get(color);
+    if (!id){
+      id = `barGrad${gradients.size}`;
+      const grad = svgEl("linearGradient", { id, x1:"0", y1:"0", x2:"0", y2:"1" });
+      grad.appendChild(svgEl("stop", { offset:"0", "stop-color": lighten(color, 0.20) }));
+      grad.appendChild(svgEl("stop", { offset:"1", "stop-color": darken(color, 0.12) }));
+      defs.appendChild(grad);
+      gradients.set(color, id);
+    }
+    return `url(#${id})`;
+  };
+
   const startMs = start.getTime();
   const endMs = endExclusive.getTime();
   const spanMs = Math.max(1, endMs - startMs);
@@ -421,9 +479,17 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     const r = rules[idx];
     const y = rowsY0 + idx*(rowH+rowGap);
 
+    // Dashes are noise at twelve rows and a moiré at sixty. A band plus a
+    // hairline gives the eye the same row to follow for less ink.
+    if (idx % 2 === 1){
+      svg.appendChild(svgEl("rect", {
+        x:x0, y, width: timelineW, height: rowH,
+        fill:"var(--row-band)", "pointer-events": "none"
+      }));
+    }
     svg.appendChild(svgEl("line", {
       x1:x0, y1:y + rowH/2, x2:x0 + timelineW, y2:y + rowH/2,
-      stroke:"var(--muted)", "stroke-width":"1", "stroke-dasharray":"2,6",
+      stroke:"var(--row-guide)", "stroke-width":"1",
       "pointer-events": "none"
     }));
 
@@ -438,8 +504,19 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const w = Math.max(1, xb - xa);
 
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
-      const barColor = isReturn ? "#d4a017" : (aspectColors[r.aspect] || "var(--text)");
-      const rect = svgEl("rect", { x: xa, y: y + 4, width: w, height: rowH - 8, fill: barColor, class: "bar" });
+      const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
+      const barH = rowH - 8;
+      const rect = svgEl("rect", {
+        x: xa, y: y + 4, width: w, height: barH,
+        // SVG clamps rx to half the width, so a one-day bar becomes a dot
+        // rather than a rectangle with impossible corners.
+        rx: barH / 2,
+        fill: fillFor(barColor),
+        // Two windows that meet in a row would otherwise read as one long bar.
+        stroke: isHexColor(barColor) ? darken(barColor, 0.4) : "none",
+        "stroke-width": "0.75",
+        class: "bar"
+      });
 
       const rangeText = formatRangePretty(a, b, showTime, showYear);
       // Keys, not prose: the tooltip looks them up when it draws, so bars drawn
@@ -501,13 +578,23 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         });
         bindSegmentTooltipEvents(hitCircle);
         svg.appendChild(hitCircle);
+        // A ring reads as a moment on the bar; the old filled dot read as a
+        // blemish in it, which is half of why a window with no exact hit was
+        // being reported as a bug.
         svg.appendChild(svgEl("circle", {
           cx: xExact,
           cy,
-          r: 3.5,
-          fill: "var(--text)",
-          stroke: barColor,
-          "stroke-width": "1.5",
+          r: 4.6,
+          fill: "none",
+          stroke: isHexColor(barColor) ? lighten(barColor, 0.45) : "var(--text)",
+          "stroke-width": "1.6",
+          "pointer-events": "none"
+        }));
+        svg.appendChild(svgEl("circle", {
+          cx: xExact,
+          cy,
+          r: 1.9,
+          fill: "var(--ink)",
           "pointer-events": "none"
         }));
       }
@@ -524,8 +611,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       x1: xNow, y1: yTop, x2: xNow, y2: yBottom,
       stroke: "var(--accent)",
       "stroke-width": "1",
-      "stroke-dasharray": "4,6",
-      opacity: "0.7",
+      opacity: "0.5",
       "pointer-events": "none"
     }));
   }

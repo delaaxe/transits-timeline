@@ -61,14 +61,23 @@ export const aspects = [
   ["quincunx",    "⚻ 150°", 150],
 ];
 
+// Lifted off a light-page palette onto a dark one, and every aspect given its
+// own hue: sextile #15803d against trine #166534 was one green twice, which a
+// 12px bar cannot tell apart. Soft aspects stay cool, hard aspects warm, and
+// the glyph in the row label is what carries the distinction where colour
+// cannot - a red-green colourblind reader reads the chart from that.
 export const aspectColors = {
-  conjunction: "#1d4ed8",
-  sextile: "#15803d",
-  square: "#b91c1c",
-  trine: "#166534",
-  opposition: "#c2410c",
-  quincunx: "#0f766e"
+  conjunction: "#4f8cff",
+  sextile: "#43c8c0",
+  square: "#ff6b5e",
+  trine: "#3fbf7f",
+  opposition: "#ff9f43",
+  quincunx: "#b08ce8"
 };
+
+// A return - the transiting body meeting its own natal place - is the one
+// event that is not really an aspect, and it has always been drawn in gold.
+export const returnColor = "#ffc94d";
 
 // Dropdown groups exclude Node/Chiron/MC; checkboxes add them.
 export const baseGroups = [

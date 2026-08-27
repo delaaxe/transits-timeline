@@ -39,6 +39,12 @@
 
       --star: #f2e4be;
 
+      /* Row rhythm, read by the renderer: a band under every other row and a
+         hairline through each. Both are white at very low alpha rather than
+         opaque greys, so they hold whatever the plate is doing behind them. */
+      --row-band: rgba(255,255,255,.022);
+      --row-guide: rgba(255,255,255,.06);
+
       /* Spacing: 6 / 10 / 16 / 24, replacing a mix of six ad-hoc values. */
       --sp-1: 6px;
       --sp-2: 10px;
@@ -358,6 +364,8 @@
     }
     #aspectAxisSvg text,
     #dateAxisSvg text{ font-family: var(--font-glyph); }
+    /* Dates sit in a row and are read by position as much as by value. */
+    #dateAxisSvg text{ font-variant-numeric: tabular-nums; }
     .checks{ display:flex; gap: 14px; align-items:center; flex-wrap: wrap; padding: 6px 0 2px 0; }
     .checks label{ margin: 0; font-size: 13px; color: var(--text); display:flex; gap: 8px; align-items:center; }
     .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--star); }
