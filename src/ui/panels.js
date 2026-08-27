@@ -646,8 +646,22 @@ export function wireViewBar(){
     const h = Math.round(bar.getBoundingClientRect().height);
     if (h > 0) document.documentElement.style.setProperty("--viewbar-h", `${h}px`);
   };
+  // Scrolled, the bar sheds a few pixels. The class flips once at the
+  // threshold rather than on every frame, and the ResizeObserver above turns
+  // the new height into the date axis's sticky offset by itself.
+  let compact = false;
+  const syncCompact = () => {
+    const shouldCompact = window.scrollY > 24;
+    if (shouldCompact === compact) return;
+    compact = shouldCompact;
+    document.body.classList.toggle("scrolled", compact);
+    sync();
+  };
+
   sync();
+  syncCompact();
   window.addEventListener("resize", sync, { passive: true });
+  window.addEventListener("scroll", syncCompact, { passive: true });
   if ("ResizeObserver" in window) new ResizeObserver(sync).observe(bar);
 }
 

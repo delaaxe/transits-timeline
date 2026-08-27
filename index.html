@@ -82,11 +82,15 @@
          both from one value makes the ResizeObserver feed its own input, and a
          browser that coalesces that loop leaves the offset a few pixels short -
          which shows as a strip of rows sliding under the bar. */
-      --viewbar-min: 52px;
+      --viewbar-min: 38px;
       --viewbar-h: 52px;
 
       --chart-pad: 8px;
+      /* Sides only: this has to equal --chart-pad or the axis ticks stop
+         lining up with the bars. The top is its own value because it is pure
+         sticky-header cost. */
       --axis-pad: 8px;
+      --axis-pad-top: 4px;
       --timeline-nav-h: 32px;
       --timeline-nav-total: calc(var(--timeline-nav-h) + 10px);
     }
@@ -255,6 +259,8 @@
       flex-wrap: wrap;
       gap: var(--sp-1) var(--sp-2);
       min-height: var(--viewbar-min);
+      /* No box-sizing reset in this file, so this padding and the border are
+         added to --viewbar-min rather than contained by it. */
       padding: var(--sp-1) var(--sp-2);
       background: var(--surface-solid);
       border: 1px solid var(--hairline);
@@ -326,7 +332,7 @@
     /* No padding between the axis and the chart: they are separate SVGs in
        separate scroll containers, and the now line has to cross from one into
        the other without a seam. */
-    .dateAxisScrollInner{ padding: var(--axis-pad) var(--axis-pad) 0; position: relative; }
+    .dateAxisScrollInner{ padding: var(--axis-pad-top) var(--axis-pad) 0; position: relative; }
     .timelineNav{
       display: flex;
       justify-content: space-between;
@@ -353,7 +359,7 @@
     #axisCornerBlock{
       position: absolute;
       left: var(--axis-pad);
-      top: var(--axis-pad);
+      top: var(--axis-pad-top);
       width: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) - 1px);
       height: calc(var(--date-axis-h, 80px) + var(--timeline-nav-total, 0px));
       background: var(--panel-bg);
@@ -525,6 +531,16 @@
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
+    }
+
+    /* Scrolled, the view bar and the date axis are the entire header, and on a
+       long list they are the only thing between the reader and more rows. The
+       bar gives back what it can. Fine pointers only: 44px targets are not
+       negotiable on touch, and this is the case the desktop asked about. */
+    @media (hover: hover) and (pointer: fine){
+      body.scrolled{ --viewbar-min: 28px; }
+      body.scrolled .viewBar{ padding-block: 2px; }
+      body.scrolled .presetBtn{ padding-block: 4px; }
     }
 
     /* A phone in landscape is under 400px tall: every row of chrome above the

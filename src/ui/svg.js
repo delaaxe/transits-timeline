@@ -18,13 +18,16 @@ export function clearSvg(svg){
 // mouse-sized rows. Sizes live here rather than in the renderers so a tier is
 // one table to read, not a dozen ternaries spread over three functions.
 const tiers = {
-  phone:   { labelWMax: 130, labelWMin: 78, rowH: 24, rowGap:  8, bottomPad: 14, marginT:  8, axisGap:  8, axisBottomPad: 6, axisLabelSize: 15, axisTitleSize: 16, labelFontSize: 17, rowsY0: 6 },
-  tablet:  { labelWMax: 140, labelWMin: 90, rowH: 24, rowGap:  9, bottomPad: 16, marginT: 12, axisGap: 10, axisBottomPad: 7, axisLabelSize: 16, axisTitleSize: 18, labelFontSize: 18, rowsY0: 8 },
-  desktop: { labelWMax: 150, labelWMin: 96, rowH: 20, rowGap: 10, bottomPad: 18, marginT: 14, axisGap: 12, axisBottomPad: 8, axisLabelSize: 18, axisTitleSize: 20, labelFontSize: 20, rowsY0: 8 }
+  phone:   { labelWMax: 130, labelWMin: 78, rowH: 24, rowGap:  8, bottomPad: 14, marginT: 10, axisGap:  8, axisBottomPad: 6, axisLabelSize: 15, axisTitleSize: 16, labelFontSize: 17, rowsY0: 6 },
+  tablet:  { labelWMax: 140, labelWMin: 90, rowH: 24, rowGap:  9, bottomPad: 16, marginT: 10, axisGap: 10, axisBottomPad: 6, axisLabelSize: 16, axisTitleSize: 18, labelFontSize: 18, rowsY0: 8 },
+  desktop: { labelWMax: 150, labelWMin: 96, rowH: 20, rowGap: 10, bottomPad: 18, marginT: 12, axisGap: 10, axisBottomPad: 6, axisLabelSize: 18, axisTitleSize: 20, labelFontSize: 20, rowsY0: 8 }
 };
 
 // The same test the stylesheet uses for tap targets, written the same way on
 // purpose: if these two disagree, a device gets 44px arrows above 20px rows.
+// marginT is what keeps the month and year titles inside the SVG: they are
+// drawn at axisY - 6, so this has to clear the title's ascender at that tier's
+// font size. Trimming it too far clips the top of "2027" by half a pixel.
 // A phone in landscape is short, not narrow: it gets the tier its width earns,
 // with the phone tier's vertical spacing, so the axis and the gaps between
 // rows stop eating the little height there is.
