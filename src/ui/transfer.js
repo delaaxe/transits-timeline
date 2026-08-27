@@ -1,11 +1,12 @@
-// Import/export of charts as a JSON file. One dialog serves both directions,
-// because both are the same question: which of these charts?
+// Charts move between devices as a link. One dialog serves both ends, because
+// both ask the same question: which of these charts? Sending is a link you
+// copy; receiving is that link being opened.
 import { chartsState, saveCharts } from "../storage/charts.js";
-import { buildExport, exportFilename, mergeCharts, parseImport } from "../storage/transfer.js";
+import { buildShareURL, decodeCharts, mergeCharts, readShareHash } from "../storage/transfer.js";
 import { el, setStatus } from "./dom.js";
 
-// Either the stored charts (export) or the ones just read off a file (import).
-const view = { mode: "export", charts: [], chosen: new Set() };
+// Either the stored charts (send) or the ones just read off a link (receive).
+const view = { mode: "send", charts: [], chosen: new Set() };
 
 function subtitleFor(p){
   const place = p.placeLabel || `${(+p.lat).toFixed(2)}, ${(+p.lon).toFixed(2)}`;
@@ -42,18 +43,16 @@ function renderList(){
 
 function renderActions(){
   const n = view.chosen.size;
-  const isExport = view.mode === "export";
-  el.transferTitle.textContent = isExport ? "Export charts" : "Import charts";
-  el.transferHint.textContent = isExport
-    ? "Downloads a JSON file you can open on another device."
-    : `${view.charts.length} chart${view.charts.length === 1 ? "" : "s"} in that file. Charts you already have are skipped.`;
-  el.transferConfirmBtn.textContent = isExport
-    ? (n === 1 ? "Export 1 chart" : `Export ${n} charts`)
-    : (n === 1 ? "Import 1 chart" : `Import ${n} charts`);
+  const isSend = view.mode === "send";
+  const plural = n === 1 ? "" : "s";
+  el.transferTitle.textContent = isSend ? "Send charts to another device" : "Charts from a link";
+  el.transferHint.textContent = isSend
+    ? "The link carries the charts themselves. Nothing is uploaded: everything after the # stays in the browser."
+    : `${view.charts.length} chart${view.charts.length === 1 ? "" : "s"} in that link. Charts you already have are skipped.`;
+  el.transferConfirmBtn.textContent = isSend ? `Copy link to ${n} chart${plural}` : `Add ${n} chart${plural}`;
   el.transferConfirmBtn.disabled = n === 0;
   el.transferAllBtn.textContent = (n === view.charts.length) ? "Select none" : "Select all";
-  el.transferFileBtn.hidden = !isExport;
-  el.transferFileDot.hidden = !isExport;
+  el.transferLink.hidden = true;
 }
 
 function show(mode, charts){
@@ -65,47 +64,66 @@ function show(mode, charts){
 }
 
 export function openTransferDialog(){
-  show("export", chartsState.list.slice());
+  show("send", chartsState.list.slice());
 }
 
-function download(text, filename){
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  // Revoked on a turn of its own: Safari drops the download if the URL dies
-  // before it has started reading it.
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+// Where a shared link should land: this page, without whatever fragment
+// brought us here.
+function shareBase(){
+  return location.origin + location.pathname + location.search;
 }
 
-function doExport(){
+async function doSend(){
   const chosen = view.charts.filter((p) => view.chosen.has(p.id));
-  download(JSON.stringify(buildExport(chosen), null, 2), exportFilename());
-  el.transferDialog.close();
-  setStatus(`Exported ${chosen.length} chart${chosen.length === 1 ? "" : "s"}.`);
+  const url = await buildShareURL(chosen, shareBase());
+  // Shown either way: clipboard permission is not a thing to depend on, and a
+  // link you can select is a link you can send.
+  el.transferLink.value = url;
+  el.transferLink.hidden = false;
+  el.transferLink.select();
+  try {
+    await navigator.clipboard.writeText(url);
+    el.transferHint.textContent = "Link copied. Open it on the other device.";
+  } catch {
+    el.transferHint.textContent = "Copy this link and open it on the other device.";
+  }
 }
 
-function doImport(onChanged){
+function doReceive(onChanged){
   const chosen = view.charts.filter((p) => view.chosen.has(p.id));
   const { list, added, duplicates } = mergeCharts(chartsState.list, chosen);
   chartsState.list = list;
   saveCharts(list);
   el.transferDialog.close();
   const skipped = duplicates.length ? `, ${duplicates.length} already here` : "";
-  setStatus(`Imported ${added.length} chart${added.length === 1 ? "" : "s"}${skipped}.`);
+  setStatus(`Added ${added.length} chart${added.length === 1 ? "" : "s"}${skipped}.`);
   onChanged(added[0]?.id || "");
 }
 
-async function readFile(file){
-  const text = await file.text();
-  return parseImport(text);
+// A link that has been opened has been spent: dropping the fragment keeps a
+// refresh from asking the same question again.
+function clearShareHash(){
+  history.replaceState(null, "", shareBase());
+}
+
+export async function checkShareLink(){
+  const encoded = readShareHash(location.hash);
+  if (!encoded) return;
+  clearShareHash();
+  try {
+    show("receive", await decodeCharts(encoded));
+  } catch (err){
+    setStatus(err?.message || "That link couldn't be read.", true);
+  }
 }
 
 export function wireTransferUI(onChanged){
   if (!el.transferDialog || !el.transferBtn) return;
 
   el.transferBtn.addEventListener("click", openTransferDialog);
+  // A link opened while the app is already up changes the fragment and nothing
+  // else - no reload, so the boot-time check never sees it.
+  window.addEventListener("hashchange", checkShareLink);
   el.transferCancelBtn.addEventListener("click", () => el.transferDialog.close());
 
   el.transferAllBtn.addEventListener("click", () => {
@@ -114,23 +132,8 @@ export function wireTransferUI(onChanged){
     renderList();
   });
 
-  el.transferFileBtn.addEventListener("click", () => {
-    el.transferFileInput.value = "";
-    el.transferFileInput.click();
-  });
-
-  el.transferFileInput.addEventListener("change", async () => {
-    const file = el.transferFileInput.files?.[0];
-    if (!file) return;
-    try {
-      show("import", await readFile(file));
-    } catch (err){
-      el.transferHint.textContent = err?.message || "That file couldn't be read.";
-    }
-  });
-
   el.transferConfirmBtn.addEventListener("click", () => {
-    if (view.mode === "export") doExport();
-    else doImport(onChanged);
+    if (view.mode === "send") doSend();
+    else doReceive(onChanged);
   });
 }

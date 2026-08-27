@@ -162,7 +162,7 @@ export function buildSymbolPlacementsLine(lonByKey){
   if (Number.isFinite(lonByKey?.mc)){
     pieces.push(`${summaryPointSymbols.mc}\u00A0${zodiacSignSymbol(lonByKey.mc)}`);
   }
-  return pieces.join(" • ");
+  return pieces.join("\u00A0 ");
 }
 
 export function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = {}){
@@ -209,7 +209,7 @@ export function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = 
     const cc = fmtCoord(pA.lat, pA.lon);
     if (cc) parts.push(cc);
   }
-  const firstLine = parts.join(" • ");
+  const firstLine = parts.join("\u00A0 ");
   if (includePlacementsLine && placementsLine){
     return firstLine ? `${firstLine}\n${placementsLine}` : placementsLine;
   }

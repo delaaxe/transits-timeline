@@ -461,6 +461,11 @@
     }
 
     .inlineHint{ font-size: 12px; color: var(--muted); margin-left: 2px; margin-right: 2px; }
+    /* The chips and the one action that is about all of them, rather than
+       about the selected chart the way the links below the row are. */
+    .chartCollection{ display: flex; align-items: flex-start; gap: var(--sp-3); }
+    .chartCollection .chartButtons{ flex: 1; }
+    .chartCollectionLink{ flex: none; padding-top: 6px; white-space: nowrap; }
     .chartLinks{ display: flex; align-items: center; gap: 6px; margin-top: 8px; }
     .chartPrivacy{ margin-top: 8px; font-size: 12px; color: var(--muted); }
     .inlineDot{ color: var(--muted); margin: 0; }
@@ -567,6 +572,15 @@
     .transferItemText{ min-width: 0; }
     .transferItemName{ font-size: 14px; }
     .transferItemSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .transferLink{
+      width: 100%;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--control-border);
+      background: var(--control-bg);
+      color: var(--ink-soft);
+    }
     .transferActions{ display: flex; align-items: center; gap: var(--sp-2); }
     .transferActions .spacer{ flex: 1; }
 
@@ -946,15 +960,16 @@
         <label>Chart</label>
         <div class="chartPickers">
           <div class="chartPicker">
-            <div id="chartButtons" class="chartButtons" role="listbox" aria-label="Chart A"></div>
+            <div class="chartCollection">
+              <div id="chartButtons" class="chartButtons" role="listbox" aria-label="Chart A"></div>
+              <button id="transferBtn" type="button" class="linkBtn chartCollectionLink" title="Send your charts to another device">Send charts</button>
+            </div>
             <div class="chartLinks" id="chartLinks">
               <button id="chartSummaryToggle" type="button" class="linkBtn" aria-expanded="false">Show data</button>
               <span class="inlineDot" id="composeDot">·</span>
               <button id="composeToggle" type="button" class="linkBtn" aria-expanded="false">Compose</button>
               <span class="inlineDot" id="deleteDot">·</span>
               <button id="deleteChartBtn" type="button" class="linkBtn" title="Delete chart" aria-label="Delete chart">Delete</button>
-              <span class="inlineDot" id="transferDot">·</span>
-              <button id="transferBtn" type="button" class="linkBtn" title="Import or export charts">Transfer</button>
             </div>
             <div id="chartPrivacy" class="chartPrivacy" hidden>Your data is private (stored locally).</div>
           </div>
@@ -1074,19 +1089,14 @@
       <div class="transferTitle" id="transferTitle">Export charts</div>
       <div class="transferHint" id="transferHint"></div>
       <div class="transferList" id="transferList"></div>
+      <input id="transferLink" class="transferLink" type="text" readonly hidden aria-label="Share link" />
       <div class="transferActions">
         <button id="transferAllBtn" type="button" class="linkBtn">Select all</button>
-        <span class="inlineDot" id="transferFileDot">·</span>
-        <button id="transferFileBtn" type="button" class="linkBtn">Import a file…</button>
-        <span class="spacer"></span>
-      </div>
-      <div class="transferActions">
         <span class="spacer"></span>
         <button id="transferCancelBtn" type="button" class="btnGhost">Close</button>
-        <button id="transferConfirmBtn" type="button" class="btnSmallPrimary">Export</button>
+        <button id="transferConfirmBtn" type="button" class="btnSmallPrimary">Copy link</button>
       </div>
     </div>
-    <input id="transferFileInput" type="file" accept="application/json,.json" hidden />
   </dialog>
 
   <script type="module" src="src/app.js"></script>
