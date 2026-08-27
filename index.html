@@ -66,6 +66,18 @@
       --shadow: 0 16px 40px rgba(0,0,0,.55);
       --danger: #ff6b5e;
 
+      /* Shell. The page is a column now, not the whole screen: the sky needs
+         somewhere to be seen. */
+      --shell-max: 1280px;
+      --gutter: clamp(14px, 2.4vw, 28px);
+      /* Two tokens, not one, and deliberately so: --viewbar-min sizes the bar,
+         --viewbar-h is the measured result the date axis sticks below. Driving
+         both from one value makes the ResizeObserver feed its own input, and a
+         browser that coalesces that loop leaves the offset a few pixels short -
+         which shows as a strip of rows sliding under the bar. */
+      --viewbar-min: 52px;
+      --viewbar-h: 52px;
+
       --chart-pad: 8px;
       --axis-pad: 8px;
       --timeline-nav-h: 32px;
@@ -77,12 +89,38 @@
     }
     body{
       font-family: var(--font-ui);
-      margin: 0 18px;
-      padding: 0 0 18px;
+      max-width: var(--shell-max);
+      margin: 0 auto;
+      padding: 0 var(--gutter) max(18px, env(safe-area-inset-bottom));
+      padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
       color: var(--text);
       font-size: 16px;
       background: transparent;
       overscroll-behavior-y: none;
+    }
+
+    .appBar{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--sp-3);
+      padding: max(var(--sp-2), env(safe-area-inset-top)) 0 var(--sp-2);
+    }
+    .wordmark{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wordmark svg{
+      width: 20px;
+      height: 20px;
+      flex: none;
+      color: var(--star);
     }
 
     /* The sky. Three radial washes for the nebula, a vignette, a grain tile to
@@ -148,7 +186,6 @@
       outline-offset: 2px;
     }
 
-    .title{ text-align:center; font-weight: 800; font-size: 34px; line-height: 1.1; letter-spacing: .2px; margin: 10px 0 18px; }
     .panel{
       border: 1px solid var(--hairline);
       border-radius: 12px;
@@ -180,7 +217,44 @@
     .status{ margin-top: 10px; color: var(--muted); font-size: 13px; white-space: normal; }
     .error{ color: var(--danger); }
 
-    .dateAxisScroll{ position: sticky; top: 0; z-index: 3; background: var(--panel-bg); overflow: hidden; border-bottom: 0; }
+    /* The view bar, the options drawer, the date axis and the chart are four
+       elements that have to read as one plate: same surface, one border drawn
+       around the outside of the set. The bar is sticky above the axis, which
+       is why --viewbar-h exists - the axis sticks to the bottom edge of it. */
+    .viewBar{
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--sp-1) var(--sp-2);
+      min-height: var(--viewbar-min);
+      padding: var(--sp-1) var(--sp-2);
+      background: var(--surface-solid);
+      border: 1px solid var(--hairline);
+      border-bottom: 0;
+      border-radius: 12px 12px 0 0;
+    }
+    .viewBarToggle{ flex: none; white-space: nowrap; }
+    .optionsDrawer{
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-2);
+      padding: var(--sp-3);
+      background: var(--surface-solid);
+      border-inline: 1px solid var(--hairline);
+      border-bottom: 1px solid var(--hairline-soft);
+    }
+    .dateAxisScroll{
+      position: sticky;
+      top: var(--viewbar-h);
+      z-index: 3;
+      background: var(--panel-bg);
+      overflow: hidden;
+      border-inline: 1px solid var(--hairline);
+    }
 
     /* The date axis sits outside the scroller, so it used to be repositioned by
        JS on every scroll event and lagged behind touch scrolling. Tying it to a
@@ -260,7 +334,13 @@
       pointer-events: none;
       display: none;
     }
-    .chartFrame{ position: relative; }
+    .chartFrame{
+      position: relative;
+      border: 1px solid var(--hairline);
+      border-top: 0;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+    }
     .timelineScroll{ border: 0; border-radius: 0; padding: var(--chart-pad); background: var(--panel-bg); overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
     svg{ display:block; width: 100%; }
     #aspectAxisWrap{
@@ -281,9 +361,7 @@
     .checks{ display:flex; gap: 14px; align-items:center; flex-wrap: wrap; padding: 6px 0 2px 0; }
     .checks label{ margin: 0; font-size: 13px; color: var(--text); display:flex; gap: 8px; align-items:center; }
     .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--star); }
-    .optionsRow{ margin-top: 10px; }
-    .rowPlanets{ margin-top: 10px; }
-    #topChecks{ margin-top: 10px; }
+    .optionsDrawer > *{ margin-top: 0; }
     .aspectDropdown{ position: relative; }
     .aspectDropdown > summary{
       list-style: none;
@@ -384,7 +462,7 @@
       border-radius: 8px;
     }
 
-    .statusRow{ display:flex; align-items:center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    .statusRow{ display:flex; align-items:center; gap: var(--sp-2); flex-wrap: wrap; }
     .statusRow .status{ margin-top: 0; }
     .linkBtn{
       background: none;
@@ -397,11 +475,50 @@
     }
     .linkBtn:hover{ opacity: .75; }
 
+    /* Size for the hand, not for the viewport. An iPad mini in landscape is
+       1133px wide and still held in two hands, so this keys off the pointer
+       rather than a breakpoint. --timeline-nav-total follows automatically,
+       which is what keeps the corner block covering the nav. */
+    @media (hover: none) and (pointer: coarse){
+      :root{
+        --timeline-nav-h: 44px;
+        --viewbar-min: 60px;
+        --viewbar-h: 60px;
+      }
+      .timelineNavBtn{ min-width: 44px; min-height: 44px; }
+      .presetBtn,
+      .chartBtn,
+      .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
+      .linkBtn{ padding: 8px 0; }
+      .checks label{ min-height: 32px; }
+    }
+
     @media (max-width: 520px){
       :root{ --chart-pad: 0px; --axis-pad: 0px; }
-      .dateAxisScroll{ border-bottom: 0; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
+
+      /* The plate goes edge to edge by taking the page's gutters away, not by
+         being 100vw wide. 100vw counts the scrollbar where the scrollbar takes
+         layout space, which put the right-hand end of the view bar - the
+         options toggle - just off screen on a narrow desktop window. */
+      body{ padding-inline: 0; }
+      .appBar,
+      .panel,
+      .installHint{
+        margin-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+      }
+      .viewBar,
+      .optionsDrawer,
+      .dateAxisScroll,
+      .chartFrame{
+        border-inline: 0;
+        border-radius: 0;
+      }
+      .viewBar,
+      .optionsDrawer{
+        padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+      }
+      .presetBtn{ padding-inline: 10px; }
       .dateAxisScrollInner{ padding: 0; }
-      .chartFrame{ width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
       .timelineScroll{ padding: 0; border-radius: 0; width: 100%; margin: 0; }
       #axisCornerBlock{ display: block; }
       .timelineNavGroup:last-child .timelineNavBtn:last-child{ margin-right: 10px; }
@@ -431,15 +548,11 @@
     .chartPickers{ display: flex; flex-direction: column; gap: 10px; }
     .chartPickerLabel{ font-size: 12px; color: var(--muted); margin: 0 0 6px; }
     .appModeLinks{
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-      column-gap: 10px;
+      display: flex;
       align-items: center;
-      margin: 10px 0 10px;
+      gap: var(--sp-2);
     }
     .appModeLink{ text-decoration: underline; font-size: 15px; }
-    .appModeLink:first-child{ justify-self: end; }
-    .appModeLink:last-child{ justify-self: start; }
     .appModeLink.active{ text-decoration: none; font-weight: 700; color: var(--star); }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
@@ -573,11 +686,21 @@
 
   <div class="sky" aria-hidden="true"></div>
 
-  <div class="appModeLinks" role="listbox" aria-label="Mode">
-    <button id="appModePersonalBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Personal</button>
-    <span class="inlineDot" aria-hidden="true">•</span>
-    <button id="appModeWorldBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
-  </div>
+  <header class="appBar">
+    <span class="wordmark">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <circle cx="16" cy="16" r="8" fill="none" stroke="currentColor" stroke-width="2" />
+        <path d="M6 16h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        <path d="M20 8l2 4 4 2-4 2-2 4-2-4-4-2 4-2z" fill="currentColor" />
+      </svg>
+      Transits
+    </span>
+    <div class="appModeLinks" role="listbox" aria-label="Mode">
+      <button id="appModePersonalBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Personal</button>
+      <span class="inlineDot" aria-hidden="true">•</span>
+      <button id="appModeWorldBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
+    </div>
+  </header>
 
   <div class="panel" id="personalPanel">
     <div id="personalSection">
@@ -627,24 +750,18 @@
   </div>
 
 <div id="mainContent">
-  <div class="panel">
-    <div class="row">
-      <div class="field med">
-        <label>Preset</label>
-        <div id="presetButtons" class="presetButtons" role="listbox" aria-label="Preset"></div>
-      </div>
-    </div>
+  <div class="viewBar" id="viewBar">
+    <div id="presetButtons" class="presetButtons" role="listbox" aria-label="Preset"></div>
+    <button id="advancedToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false">Show options</button>
+  </div>
 
-    <div style="margin-top: 10px;">
-      <button id="advancedToggle" type="button" class="linkBtn" aria-expanded="false">Show options</button>
-    </div>
-
-    <div class="row optionsRow" data-advanced>
+  <div class="optionsDrawer" data-advanced>
+    <div class="row optionsRow">
       <div class="field"><label>Start</label><input id="rangeStart" type="date" value="2025-10-01" /></div>
       <div class="field"><label>End</label><input id="rangeEnd" type="date" value="2026-12-31" /></div>
     </div>
 
-    <div class="row rowPlanets" data-advanced>
+    <div class="row rowPlanets">
       <div class="field med"><label>Planets</label><select id="transitGroup"></select></div>
       <div class="field med" id="natalGroupField"><label>Natal targets</label><select id="natalGroup"></select></div>
       <div class="field">
@@ -657,10 +774,10 @@
       </div>
     </div>
 
-    <div class="checks" id="topChecks" data-advanced>
-      <details class="aspectDropdown" data-advanced>
+    <div class="checks" id="topChecks">
+      <details class="aspectDropdown">
         <summary>Aspects</summary>
-        <div class="aspectPanel" data-advanced>
+        <div class="aspectPanel">
           <div class="checks" id="aspectChecks" style="padding:0; gap:12px;"></div>
           <div class="orbInline orbField" style="margin-top: 8px;">
             <label for="orb">Orb (°)</label>
@@ -670,7 +787,7 @@
       </details>
     </div>
 
-    <div class="statusRow" data-advanced>
+    <div class="statusRow">
       <button id="updateBtn" type="button" class="linkBtn" style="display:none;">Cancel</button>
       <div class="status" id="status"></div>
     </div>

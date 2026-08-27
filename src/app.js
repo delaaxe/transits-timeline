@@ -9,7 +9,7 @@ import { cancelCompute, computeEvents } from "./services/compute.js";
 import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
 import { chartsState, getActiveChartA, getActiveChartB } from "./storage/charts.js";
 import { el, setStatus } from "./ui/dom.js";
-import { bootPresets, bootSelects, getCheckedAspects, initCharts, readRuleOptions, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav } from "./ui/panels.js";
+import { bootPresets, bootSelects, getCheckedAspects, initCharts, readRuleOptions, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
 import { renderFromCache, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
 
@@ -195,6 +195,7 @@ async function boot(){
   initCharts();
   wireChartsUI();
   wireAdvancedUI();
+  wireViewBar();
   wireAutoUpdate();
   wireAxisScrollSync();
   wireTimelineResize();

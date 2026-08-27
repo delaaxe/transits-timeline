@@ -98,7 +98,9 @@ export function setAdvancedVisible(isVisible){
   for (const n of nodes) n.hidden = !advancedVisible;
   if (el.advancedToggle){
     el.advancedToggle.setAttribute("aria-expanded", advancedVisible ? "true" : "false");
-    el.advancedToggle.textContent = advancedVisible ? "Hide options" : "Show options";
+    // Short on purpose: this sits in the view bar beside four preset chips, and
+    // "Show options" is wide enough to push the bar to two lines on a phone.
+    el.advancedToggle.textContent = advancedVisible ? "Options \u25b4" : "Options \u25be";
   }
 }
 
@@ -631,6 +633,22 @@ export function wireChartsUI(){
     const wrap = el.placeSearch.parentElement;
     if (box && wrap && !wrap.contains(e.target)) hideSuggest();
   });
+}
+
+// The date axis sticks to the bottom edge of the view bar, so that offset has
+// to be the bar's real height rather than a guess: the preset chips wrap on a
+// narrow phone, and the bar grows when they do. The stylesheet's value is what
+// applies until this has measured, and if it never runs.
+export function wireViewBar(){
+  const bar = el.viewBar;
+  if (!bar) return;
+  const sync = () => {
+    const h = Math.round(bar.getBoundingClientRect().height);
+    if (h > 0) document.documentElement.style.setProperty("--viewbar-h", `${h}px`);
+  };
+  sync();
+  window.addEventListener("resize", sync, { passive: true });
+  if ("ResizeObserver" in window) new ResizeObserver(sync).observe(bar);
 }
 
 export function wireAdvancedUI(){

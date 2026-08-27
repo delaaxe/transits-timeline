@@ -31,6 +31,7 @@ export const el = {
   placeSearch: $("placeSearch"),
   placeSuggest: $("placeSuggest"),
   presetButtons: $("presetButtons"),
+  viewBar: $("viewBar"),
   transitGroup: $("transitGroup"),
   natalGroup: $("natalGroup"),
   rangeStart: $("rangeStart"),
