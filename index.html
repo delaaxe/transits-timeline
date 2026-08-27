@@ -285,7 +285,9 @@
       border-radius: 8px;
     }
     .viewBar > .viewBarToggle:hover{ color: var(--ink); background: var(--hover); }
-    .viewBarCaret{ font-size: 11px; opacity: .8; }
+    /* Open reads as pressed: the chips' own active band, so the bar has one
+       vocabulary rather than two. */
+    .viewBar > .viewBarToggle.active{ color: var(--ink); background: var(--hover); }
     .optionsDrawer{
       display: flex;
       flex-direction: column;
@@ -465,7 +467,25 @@
        about the selected chart the way the links below the row are. */
     .chartCollection{ display: flex; align-items: flex-start; gap: var(--sp-3); }
     .chartCollection .chartButtons{ flex: 1; }
-    .chartCollectionLink{ flex: none; padding-top: 6px; white-space: nowrap; }
+    .chartCollectionLink{ flex: none; }
+    /* An icon that has to be hit with a thumb: the glyph stays 18px, the box
+       around it grows on touch the way the chips do. */
+    .iconBtn{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: 0;
+      border-radius: 8px;
+      padding: 6px;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .iconBtn:hover{ color: var(--ink); background: var(--hover); }
+    .iconGlyph{ width: 18px; height: 18px; flex: none; display: block; }
+    .appModeLink{ display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .appModeLabel{ text-decoration: underline; }
+    .appModeLink.active .appModeLabel{ text-decoration: none; }
     .chartLinks{ display: flex; align-items: center; gap: 6px; margin-top: 8px; }
     .chartPrivacy{ margin-top: 8px; font-size: 12px; color: var(--muted); }
     .inlineDot{ color: var(--muted); margin: 0; }
@@ -555,6 +575,7 @@
       width: min(420px, calc(100vw - 32px));
     }
     .transferDialog::backdrop{ background: rgba(6,7,15,.62); }
+    .transferBody:focus{ outline: none; }
     .transferBody{ padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
     .transferTitle{ font-size: 15px; }
     .transferHint{ font-size: 12px; color: var(--muted); }
@@ -582,6 +603,7 @@
       color: var(--ink-soft);
     }
     .transferActions{ display: flex; align-items: center; gap: var(--sp-2); }
+    .transferActions button{ white-space: nowrap; }
     .transferActions .spacer{ flex: 1; }
 
     .statusRow{ display:flex; align-items:center; gap: var(--sp-2); flex-wrap: wrap; }
@@ -714,8 +736,8 @@
       align-items: center;
       gap: var(--sp-2);
     }
-    .appModeLink{ text-decoration: underline; font-size: 15px; }
-    .appModeLink.active{ text-decoration: none; font-weight: 700; color: var(--star); }
+    .appModeLink{ font-size: 15px; }
+    .appModeLink.active{ font-weight: 700; color: var(--star); }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
     .presetBtn{
@@ -947,9 +969,21 @@
       Transits
     </span>
     <div class="appModeLinks" role="listbox" aria-label="Mode">
-      <button id="appModePersonalBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Personal</button>
+      <button id="appModePersonalBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">
+        <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+        <span class="appModeLabel">Personal</span>
+      </button>
       <span class="inlineDot" aria-hidden="true">•</span>
-      <button id="appModeWorldBtn" type="button" class="linkBtn appModeLink" aria-selected="false">World</button>
+      <button id="appModeWorldBtn" type="button" class="linkBtn appModeLink" aria-selected="false">
+        <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <path d="M4 12h16M12 4c2.4 2.2 3.6 5 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-5-3.6-8s1.2-5.8 3.6-8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+        <span class="appModeLabel">World</span>
+      </button>
     </div>
   </header>
 
@@ -962,7 +996,12 @@
           <div class="chartPicker">
             <div class="chartCollection">
               <div id="chartButtons" class="chartButtons" role="listbox" aria-label="Chart A"></div>
-              <button id="transferBtn" type="button" class="linkBtn chartCollectionLink" title="Send your charts to another device">Send charts</button>
+              <button id="transferBtn" type="button" class="iconBtn chartCollectionLink" title="Send or add charts" aria-label="Send or add charts">
+                <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 15V4m0 0L8.5 7.5M12 4l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </button>
             </div>
             <div class="chartLinks" id="chartLinks">
               <button id="chartSummaryToggle" type="button" class="linkBtn" aria-expanded="false">Show data</button>
@@ -1006,7 +1045,13 @@
 <div id="mainContent">
   <div class="viewBar" id="viewBar">
     <div id="presetButtons" class="presetButtons" role="listbox" aria-label="Preset"></div>
-    <button id="advancedToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false">Show options</button>
+    <button id="advancedToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Options" aria-label="Options">
+      <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 8h10M18 8h2M4 16h4M12 16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        <circle cx="16" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <circle cx="10" cy="16" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+      </svg>
+    </button>
   </div>
 
   <div class="optionsDrawer" data-advanced>
@@ -1085,13 +1130,19 @@
 
   
   <dialog id="transferDialog" class="transferDialog" aria-labelledby="transferTitle">
-    <div class="transferBody">
+    <div class="transferBody" tabindex="-1" autofocus>
       <div class="transferTitle" id="transferTitle">Export charts</div>
       <div class="transferHint" id="transferHint"></div>
       <div class="transferList" id="transferList"></div>
       <input id="transferLink" class="transferLink" type="text" readonly hidden aria-label="Share link" />
+      <input id="transferPaste" class="transferLink" type="url" hidden inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://transits.me/#charts=…" aria-label="Link to add charts from" />
       <div class="transferActions">
         <button id="transferAllBtn" type="button" class="linkBtn">Select all</button>
+        <span class="inlineDot" id="transferPasteDot">·</span>
+        <button id="transferPasteBtn" type="button" class="linkBtn">Paste a link</button>
+        <span class="spacer"></span>
+      </div>
+      <div class="transferActions">
         <span class="spacer"></span>
         <button id="transferCancelBtn" type="button" class="btnGhost">Close</button>
         <button id="transferConfirmBtn" type="button" class="btnSmallPrimary">Copy link</button>

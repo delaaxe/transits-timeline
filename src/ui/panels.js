@@ -99,16 +99,11 @@ export function setAdvancedVisible(isVisible){
   for (const n of nodes) n.hidden = !advancedVisible;
   if (el.advancedToggle){
     el.advancedToggle.setAttribute("aria-expanded", advancedVisible ? "true" : "false");
-    // Short on purpose: this sits in the view bar beside four preset chips, and
-    // "Show options" is wide enough to push the bar to two lines on a phone.
-    // The caret is its own element so it can be spaced and sized against the
-    // label rather than inheriting it.
-    el.advancedToggle.textContent = "Options ";
-    const caret = document.createElement("span");
-    caret.className = "viewBarCaret";
-    caret.setAttribute("aria-hidden", "true");
-    caret.textContent = advancedVisible ? "\u25b4" : "\u25be";
-    el.advancedToggle.appendChild(caret);
+    // Sliders rather than a word: this sits in the view bar beside four preset
+    // chips, and any label wide enough to read pushes the bar to two lines on a
+    // phone. The state is carried by the drawer being open, and by the button
+    // taking the chips' active band while it is.
+    el.advancedToggle.classList.toggle("active", advancedVisible);
   }
 }
 

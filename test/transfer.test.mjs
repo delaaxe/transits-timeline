@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildShareURL, decodeCharts, encodeCharts, mergeCharts, parseCharts, readShareHash } from "../src/storage/transfer.js";
+import { buildShareURL, decodeCharts, encodeCharts, mergeCharts, parseCharts, readShareHash, readShareText } from "../src/storage/transfer.js";
 
 const ada = {
   id: "c_ada", name: "Ada", birthDate: "1815-12-10", birthTime: "12:00",
@@ -46,6 +46,17 @@ test("only our own fragment is treated as a share link", () => {
   assert.equal(readShareHash("#charts=abc"), "abc");
   assert.equal(readShareHash("#section=charts"), "");
   assert.equal(readShareHash(""), "");
+});
+
+test("a pasted link is read whole, or as just its fragment", async () => {
+  const url = await buildShareURL([ada], "https://transits.me/");
+  const encoded = readShareHash(new URL(url).hash);
+
+  assert.equal(readShareText(`  ${url}  `), encoded, "a whole URL, with the whitespace a paste brings");
+  assert.equal(readShareText(`#charts=${encoded}`), encoded);
+  assert.equal(readShareText(`charts=${encoded}`), encoded);
+  assert.equal(readShareText("https://transits.me/"), "");
+  assert.equal(readShareText(""), "");
 });
 
 test("legacy field names still read", () => {

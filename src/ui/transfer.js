@@ -2,10 +2,12 @@
 // both ask the same question: which of these charts? Sending is a link you
 // copy; receiving is that link being opened.
 import { chartsState, saveCharts } from "../storage/charts.js";
-import { buildShareURL, decodeCharts, mergeCharts, readShareHash } from "../storage/transfer.js";
+import { buildShareURL, decodeCharts, mergeCharts, readShareHash, readShareText } from "../storage/transfer.js";
 import { el, setStatus } from "./dom.js";
 
-// Either the stored charts (send) or the ones just read off a link (receive).
+// Three modes, one dialog: the charts here (send), a link typed in by hand
+// (paste), and the charts a link turned out to hold (receive). Pasting exists
+// because an installed web app on iOS cannot be the thing a link opens.
 const view = { mode: "send", charts: [], chosen: new Set() };
 
 function subtitleFor(p){
@@ -41,17 +43,32 @@ function renderList(){
   renderActions();
 }
 
+const titles = {
+  send: "Send charts to another device",
+  paste: "Add charts from a link",
+  receive: "Charts from a link"
+};
+
 function renderActions(){
   const n = view.chosen.size;
-  const isSend = view.mode === "send";
+  const mode = view.mode;
   const plural = n === 1 ? "" : "s";
-  el.transferTitle.textContent = isSend ? "Send charts to another device" : "Charts from a link";
-  el.transferHint.textContent = isSend
+  el.transferTitle.textContent = titles[mode];
+  el.transferHint.textContent = mode === "send"
     ? "The link carries the charts themselves. Nothing is uploaded: everything after the # stays in the browser."
-    : `${view.charts.length} chart${view.charts.length === 1 ? "" : "s"} in that link. Charts you already have are skipped.`;
-  el.transferConfirmBtn.textContent = isSend ? `Copy link to ${n} chart${plural}` : `Add ${n} chart${plural}`;
-  el.transferConfirmBtn.disabled = n === 0;
+    : mode === "paste"
+      ? "Paste a link you sent yourself. Opening it works too, unless this is an app on the home screen."
+      : `${view.charts.length} chart${view.charts.length === 1 ? "" : "s"} in that link. Charts you already have are skipped.`;
+  el.transferConfirmBtn.textContent = mode === "send"
+    ? `Copy link to ${n} chart${plural}`
+    : mode === "paste" ? "Read the link" : `Add ${n} chart${plural}`;
+  el.transferConfirmBtn.disabled = (mode === "paste") ? !el.transferPaste.value.trim() : n === 0;
   el.transferAllBtn.textContent = (n === view.charts.length) ? "Select none" : "Select all";
+  el.transferAllBtn.hidden = mode === "paste";
+  el.transferPasteBtn.hidden = mode !== "send";
+  el.transferPasteDot.hidden = mode !== "send";
+  el.transferList.hidden = mode === "paste";
+  el.transferPaste.hidden = mode !== "paste";
   el.transferLink.hidden = true;
 }
 
@@ -67,6 +84,26 @@ export function openTransferDialog(){
   show("send", chartsState.list.slice());
 }
 
+function showPaste(){
+  view.mode = "paste";
+  el.transferPaste.value = "";
+  renderActions();
+  el.transferPaste.focus();
+}
+
+async function doPaste(){
+  const encoded = readShareText(el.transferPaste.value);
+  if (!encoded){
+    el.transferHint.textContent = "That doesn't look like a charts link.";
+    return;
+  }
+  try {
+    show("receive", await decodeCharts(encoded));
+  } catch (err){
+    el.transferHint.textContent = err?.message || "That link couldn't be read.";
+  }
+}
+
 // Where a shared link should land: this page, without whatever fragment
 // brought us here.
 function shareBase(){
@@ -80,7 +117,6 @@ async function doSend(){
   // link you can select is a link you can send.
   el.transferLink.value = url;
   el.transferLink.hidden = false;
-  el.transferLink.select();
   try {
     await navigator.clipboard.writeText(url);
     el.transferHint.textContent = "Link copied. Open it on the other device.";
@@ -132,8 +168,12 @@ export function wireTransferUI(onChanged){
     renderList();
   });
 
+  el.transferPasteBtn.addEventListener("click", showPaste);
+  el.transferPaste.addEventListener("input", renderActions);
+
   el.transferConfirmBtn.addEventListener("click", () => {
     if (view.mode === "send") doSend();
+    else if (view.mode === "paste") doPaste();
     else doReceive(onChanged);
   });
 }

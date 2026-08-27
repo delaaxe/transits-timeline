@@ -114,6 +114,16 @@ export function readShareHash(hash){
   return raw.slice(transferParam.length + 1);
 }
 
+// Pasted by hand on a phone: a whole URL, or just the fragment, with whatever
+// whitespace came along for the ride.
+/** @param {string} text */
+export function readShareText(text){
+  const trimmed = (text || "").trim();
+  if (!trimmed) return "";
+  const hash = trimmed.slice(trimmed.lastIndexOf("#") + 1);
+  return readShareHash(`#${hash}`);
+}
+
 // What makes two records the same chart to a human: same person, same moment,
 // same place. Ids don't survive a round trip through two devices.
 function identityOf(p){
