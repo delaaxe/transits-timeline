@@ -740,7 +740,13 @@
       place-items: center;
       padding: var(--sp-4);
       text-align: center;
+      /* Nothing in a plate is interactive, and it covers the whole chart. */
+      pointer-events: none;
     }
+    /* Setting display here beats the UA rule for the hidden attribute, so
+       without this the plate is laid out over the bars at all times: no hover,
+       no taps, and a touch that lands on it never reaches the scroller. */
+    .timelineState[hidden]{ display: none; }
     .timelineStatePlate{
       border: 1px solid var(--hairline);
       border-radius: 12px;
