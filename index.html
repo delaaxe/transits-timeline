@@ -398,7 +398,21 @@
     .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--star); }
     .optionsDrawer > *{ margin-top: 0; }
     .aspectDropdown{ position: relative; }
+    /* A summary is display: list-item by default, which is two problems at
+       once on iOS. Safari keeps drawing its disclosure triangle unless the
+       display is changed - list-style: none alone does not remove it there -
+       and a list-item box does not centre its own text, so the 40px minimum
+       this control gets on touch stretched the pill downward and left "Aspects"
+       sitting against the top of it. inline-flex settles both, and makes this
+       chip line up with the button-based chips beside it. */
     .aspectDropdown > summary{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      /* The chips beside this are buttons, which the UA gives border-box, so
+         their 40px minimum is 40px. A summary is content-box, and the same
+         minimum came out 54 - the odd one out in the row. */
+      box-sizing: border-box;
       list-style: none;
       cursor: pointer;
       padding: 6px 10px;
@@ -406,10 +420,14 @@
       border-radius: 8px;
       background: var(--control-bg);
       font-size: 13px;
+      line-height: 1.2;
       color: var(--text);
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .aspectDropdown > summary::-webkit-details-marker{ display: none; }
+    .aspectDropdown > summary::-webkit-details-marker,
+    .aspectDropdown > summary::marker{ display: none; content: ""; }
     .aspectDropdown[open] > summary{ background: var(--star); border-color: var(--star); color: var(--accent-contrast); }
     .aspectDropdown .aspectPanel{
       position: absolute;
