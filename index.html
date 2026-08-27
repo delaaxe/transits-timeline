@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#06070f" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Transits Timeline</title>
   <script>
@@ -11,25 +11,61 @@
       location.replace(`https://transits.me${location.pathname}${location.search}${location.hash}`);
     }
   </script>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d1117'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23f0f6fc' stroke-width='2'/%3E%3Cpath d='M6 16h8' stroke='%23f0f6fc' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M20 8l2 4 4 2-4 2-2 4-2-4-4-2 4-2z' fill='%23f0f6fc'/%3E%3C/svg%3E" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2306070f'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23f0f6fc' stroke-width='2'/%3E%3Cpath d='M6 16h8' stroke='%23f0f6fc' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M20 8l2 4 4 2-4 2-2 4-2-4-4-2 4-2z' fill='%23f0f6fc'/%3E%3C/svg%3E" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <style>
     :root{
       color-scheme: dark;
-      --bg: #0d1117;
-      --panel-bg: #121823;
-      --panel-border: #273142;
-      --control-bg: #0f1520;
-      --control-border: #2f3a4d;
-      --text: #e6edf3;
-      --muted: #9aa7b5;
-      --accent: #f0f6fc;
-      --accent-contrast: #0d1117;
-      --axis-bg: #121823;
-      --axis-line: #c2c9d2;
-      --hover: rgba(255,255,255,0.08);
-      --shadow: 0 10px 24px rgba(0,0,0,.45);
-      --danger: #f87171;
+
+      /* The sky is drawn by .sky; --void is what shows during overscroll and
+         before it paints. */
+      --void: #06070f;
+
+      /* Two surface tokens on purpose. Anything a bar can pass behind stays
+         opaque - the sticky date axis and the corner block are the reason -
+         while controls may go glass. The renderer fills its own background
+         rects with --panel-bg and --axis-bg, so both alias the solid one. */
+      --surface-solid: #0e1122;
+      --surface-glass: rgba(14,17,34,.62);
+      --surface-2: #151a30;
+
+      --hairline: #232842;
+      --hairline-soft: #191e33;
+
+      --ink: #e9ecf7;
+      --ink-soft: #a6aeca;
+      --ink-dim: #949cbb;
+      --ink-faint: #737b99;
+
+      --star: #f2e4be;
+
+      /* Spacing: 6 / 10 / 16 / 24, replacing a mix of six ad-hoc values. */
+      --sp-1: 6px;
+      --sp-2: 10px;
+      --sp-3: 16px;
+      --sp-4: 24px;
+
+      --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      --font-glyph: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", "Symbola", system-ui, sans-serif;
+
+      /* Names the renderer writes straight into SVG attributes. Kept as
+         aliases so no drawing code changes in this phase. */
+      --bg: var(--void);
+      --panel-bg: var(--surface-solid);
+      --axis-bg: var(--surface-solid);
+      --text: var(--ink);
+      --muted: var(--ink-dim);
+      --accent: var(--star);
+      --accent-contrast: #06070f;
+      --axis-line: #7e86a6;
+
+      --panel-border: var(--hairline);
+      --control-bg: #131731;
+      --control-border: #2a3050;
+      --hover: rgba(242,228,190,.10);
+      --shadow: 0 16px 40px rgba(0,0,0,.55);
+      --danger: #ff6b5e;
+
       --chart-pad: 8px;
       --axis-pad: 8px;
       --timeline-nav-h: 32px;
@@ -37,37 +73,108 @@
     }
     html{
       min-height: 100%;
-      background: var(--bg);
+      background: var(--void);
     }
     body{
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-family: var(--font-ui);
       margin: 0 18px;
       padding: 0 0 18px;
-      color:var(--text);
+      color: var(--text);
       font-size: 16px;
-      background: var(--bg);
+      background: transparent;
       overscroll-behavior-y: none;
     }
-    body::before{
-      content: "";
+
+    /* The sky. Three radial washes for the nebula, a vignette, a grain tile to
+       stop the gradients banding on OLED, and two star fields as children.
+       All CSS: no canvas and no per-frame JS, so a drag still has the main
+       thread to itself. A fixed element rather than background-attachment:
+       fixed, which repaints every scroll frame on iOS. */
+    .sky{
       position: fixed;
       inset: 0;
-      background: var(--bg);
       z-index: -1;
       pointer-events: none;
+      background:
+        url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAQAAABKfvVzAAAEGUlEQVR42g3Ti08QVBQG8Ktu59xz77nnXucj0RRtMlMSXzRXiSYyHySZUOpSTERQsTJcivNBQpipG762fBCROS0tRWUjxWmU+UINp1OGj7U5RMPUwgwfofEXfN9+3z61XVeFTtjfdpUP4CW+hIuxFoZRpD8N2ZBgLukhvlim4DQ7QLr7bn62U5ftXX/LbqYp1NtvlmZ7w0ThJV2qH3P70Eu+tmX+qf8D+5nG0AO+CnVGHQv74E87wb/mutEGncsnXW99gwv1VSnkH8MvlITv6gUhBx76VLMWElkd9tt0F3eSz/DL7iykYZZLwT2+MyqfJIOswyxfqfNshRuKj9wDV4JqDJaaB9rSQe1kU4gxh3Q5fRfm+XQ6S5nynxVY4wpor9tve1Ms/UXqB2ryyu0N0SGOM91k3oVV7iyO18Mhyd8Nib4xlOkRgCFWRnE6iVHvm8V+R4tGpG0INRIvSUIu1bfWk3Sjj5NI24RdKc10wJsieN1mGnVT/pFcKZCZbiQP5es2KizmKCrCceGQztP3qD8/0vNaCH6zNVRu+1lFtsER75SN0h3nY7RZDVNMPBfw2BbivqarrsWV0Nf08dm4Am/BblEXTTwswmQToWeaL2W2qZPJZh8sA4Q0uU91eC00yykppvk2I4zifaDioWfI5xSIDkdlrV9innNT9UrXylTY7dTWzLWp8D33cYWSSa1bMsaw6sDWFIWcls4nbLNe5xPhiowSHeajh4RwACtdRKCw1K2Alr1DD6fycAXNptvuKD4IGyAD37D5ocgnwL/w0Aykx2a9u+uGSKaJdto0YL1Rx2kOxujP7Ai/BivoqTsF4+FJqOct+qKttHFW2d0cR2DybA8+4XtZdcV0MrGwPoylz3kr/cQSzsgsjOB6PzKsdxEyXP/NpWaTWc6LTJOcQvVOSMYseSofuV3usp5OMbpUYuwiW+BnwgW+IHN4lY10hf6A/hBX0a+s6rgEhkOtewxRfM99gvN0kgwODdgeXqd2oUgvk99xIG6W6bycFGxxqtAucQslF86HYrD0LNTgp1RrP3ZtbY2tojbmBWqmElrgss1GbPbvkXrIz/tE7kLsR3NnmMr19hV826bpe1ASfrY73QRshWuwjIdJFpeba6gi3AxbR9ttI5ynaqiEOxhp0nG3XW07mm/MJugBOXjfHTNX3QiXCkVaLbTb3EH/omTweDqHbd0OfRl7mmgawM/cJErg236hDDVfmJU232S4XK2W0ptmWovxMloQBoU7EAv36YZtb3IwgtLxiEx2y0MbLKN2do/uSPmgZsG3fESX4CxoliY8h1VhXIgJKbyK14Vi7mzK+SJUhBlcTW34LX4VVbWvcCkaYXQ4jYdlot5vkmUiDuYntEV3dFvhOCaHbF/tZ7Tcai6ckf8BKzw3p4kZuu0AAAAASUVORK5CYII=") repeat 0 0 / 24px 24px,
+        radial-gradient(122% 90% at 50% 32%, transparent 58%, rgba(0,0,0,.42) 100%),
+        radial-gradient(1100px 720px at 12% -8%, rgba(123,92,214,.32), transparent 62%),
+        radial-gradient(900px 640px at 88% 4%, rgba(46,127,140,.24), transparent 60%),
+        radial-gradient(820px 620px at 62% 106%, rgba(180,86,110,.18), transparent 62%),
+        var(--void);
     }
+    .sky::before,
+    .sky::after{
+      content: "";
+      position: absolute;
+      inset: -8%;
+    }
+    /* Near field: fewer, brighter, one of them warm. */
+    .sky::before{
+      background-image:
+        radial-gradient(1.6px 1.6px at 40px 62px, rgba(255,255,255,.95), transparent 60%),
+        radial-gradient(1.4px 1.4px at 168px 22px, rgba(242,228,190,.85), transparent 60%),
+        radial-gradient(1.2px 1.2px at 96px 190px, rgba(255,255,255,.75), transparent 60%),
+        radial-gradient(1.8px 1.8px at 232px 132px, rgba(255,255,255,.70), transparent 60%);
+      background-size: 260px 260px;
+      animation: starDrift 260s linear infinite;
+    }
+    /* Far field: more of them, dimmer, on a tile whose size shares no factor
+       with the near one, so the two repeats never line up. */
+    .sky::after{
+      background-image:
+        radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,.55), transparent 60%),
+        radial-gradient(1px 1px at 110px 96px, rgba(255,255,255,.45), transparent 60%),
+        radial-gradient(1px 1px at 60px 148px, rgba(198,210,255,.45), transparent 60%),
+        radial-gradient(1px 1px at 172px 58px, rgba(255,255,255,.35), transparent 60%),
+        radial-gradient(1px 1px at 140px 178px, rgba(255,255,255,.40), transparent 60%);
+      background-size: 190px 190px;
+      opacity: .9;
+      animation: starDrift 420s linear infinite reverse;
+    }
+    @keyframes starDrift{
+      from{ transform: translate3d(0,0,0); }
+      to{ transform: translate3d(-190px, -140px, 0); }
+    }
+    /* Still on touch: nothing compositing behind a chart while a finger is on
+       the glass, and no battery spent on motion nobody asked for. */
+    @media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse){
+      .sky::before,
+      .sky::after{ animation: none; }
+    }
+
+    :focus-visible{
+      outline: 2px solid var(--star);
+      outline-offset: 2px;
+    }
+
     .title{ text-align:center; font-weight: 800; font-size: 34px; line-height: 1.1; letter-spacing: .2px; margin: 10px 0 18px; }
-    .panel{ border:1px solid var(--panel-border); border-radius: 10px; padding: 14px; margin-bottom: 14px; background: var(--panel-bg); }
+    .panel{
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      padding: var(--sp-3);
+      margin-bottom: var(--sp-3);
+      background: var(--surface-glass);
+      backdrop-filter: blur(10px) saturate(115%);
+      -webkit-backdrop-filter: blur(10px) saturate(115%);
+    }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+      .panel,
+      .installHint{ background: var(--surface-solid); }
+    }
     .row{ display:flex; gap:12px; flex-wrap: wrap; align-items:flex-end; }
     label{ display:block; font-size: 12px; color:var(--muted); margin-bottom: 6px; }
     input, select, button{ font: inherit; padding: 8px 10px; border:1px solid var(--control-border); border-radius: 8px; background: var(--control-bg); color: var(--text); }
+    input[type="number"],
+    input[type="date"],
+    input[type="time"]{ font-variant-numeric: tabular-nums; }
     input[type="number"]{ width: 110px; }
     input[type="date"]{ width: 132px; } /* narrower */
     input[type="time"]{ width: 130px; }
     .field{ display:flex; flex-direction: column; }
     .field.small input, .field.small select { width: 160px; }
     .field.med input, .field.med select { width: 210px; }
-    button{ cursor:pointer; border-color: var(--axis-line); }
+    button{ cursor:pointer; border-color: var(--control-border); }
     button:disabled{ opacity:.6; cursor: not-allowed; }
 
     .status{ margin-top: 10px; color: var(--muted); font-size: 13px; white-space: normal; }
@@ -135,7 +242,7 @@
       background: none;
       border: none;
       padding: 0;
-      color: var(--axis-line);
+      color: var(--ink-soft);
       font-size: 28px;
       line-height: 1;
       cursor: pointer;
@@ -170,10 +277,10 @@
       transform: translateX(var(--aspect-axis-shift, 0px));
     }
     #aspectAxisSvg text,
-    #dateAxisSvg text{ font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", "Symbola", system-ui, sans-serif; }
+    #dateAxisSvg text{ font-family: var(--font-glyph); }
     .checks{ display:flex; gap: 14px; align-items:center; flex-wrap: wrap; padding: 6px 0 2px 0; }
     .checks label{ margin: 0; font-size: 13px; color: var(--text); display:flex; gap: 8px; align-items:center; }
-    .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--axis-line); }
+    .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--star); }
     .optionsRow{ margin-top: 10px; }
     .rowPlanets{ margin-top: 10px; }
     #topChecks{ margin-top: 10px; }
@@ -182,7 +289,7 @@
       list-style: none;
       cursor: pointer;
       padding: 6px 10px;
-      border: 1px solid var(--axis-line);
+      border: 1px solid var(--control-border);
       border-radius: 8px;
       background: var(--control-bg);
       font-size: 13px;
@@ -190,15 +297,15 @@
       user-select: none;
     }
     .aspectDropdown > summary::-webkit-details-marker{ display: none; }
-    .aspectDropdown[open] > summary{ background: var(--axis-line); color: var(--accent-contrast); }
+    .aspectDropdown[open] > summary{ background: var(--star); border-color: var(--star); color: var(--accent-contrast); }
     .aspectDropdown .aspectPanel{
       position: absolute;
       top: calc(100% + 6px);
       left: 0;
-      padding: 10px;
-      border: 1px solid var(--control-border);
+      padding: var(--sp-2);
+      border: 1px solid var(--hairline);
       border-radius: 10px;
-      background: var(--panel-bg);
+      background: var(--surface-solid);
       box-shadow: var(--shadow);
       min-width: 220px;
       z-index: 20;
@@ -223,8 +330,8 @@
       top: calc(100% + 6px);
       left: 0;
       right: 0;
-      background: var(--panel-bg);
-      border: 1px solid var(--control-border);
+      background: var(--surface-solid);
+      border: 1px solid var(--hairline);
       border-radius: 10px;
       box-shadow: var(--shadow);
       max-height: 260px;
@@ -246,7 +353,7 @@
       white-space: pre-line;
     }
     .symbolGlyphText{
-      font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", "Symbola", system-ui, sans-serif;
+      font-family: var(--font-glyph);
       font-size: 14px;
     }
     .composeHint{
@@ -260,9 +367,9 @@
       justify-content: flex-start;
     }
     .btnSmallPrimary{
-      background: var(--axis-line);
+      background: var(--star);
       color: var(--accent-contrast);
-      border: 1px solid var(--axis-line);
+      border: 1px solid var(--star);
       padding: 7px 10px;
       font-size: 13px;
       border-radius: 8px;
@@ -271,7 +378,7 @@
 
     .btnGhost{
       background: var(--control-bg);
-      border: 1px solid var(--axis-line);
+      border: 1px solid var(--control-border);
       padding: 6px 10px;
       font-size: 13px;
       border-radius: 8px;
@@ -283,7 +390,7 @@
       background: none;
       border: none;
       padding: 0;
-      color: var(--axis-line);
+      color: var(--ink-soft);
       cursor: pointer;
       text-decoration: underline;
       font-size: 13px;
@@ -308,13 +415,14 @@
     .chartBtn{
       padding: 6px 10px;
       border-radius: 999px;
-      border: 1px solid var(--axis-line);
+      border: 1px solid var(--control-border);
       background: var(--control-bg);
       font-size: 13px;
       cursor: pointer;
     }
     .chartBtn.active{
-      background: var(--axis-line);
+      background: var(--star);
+      border-color: var(--star);
       color: var(--accent-contrast);
     }
     .chartBtn.add{
@@ -332,26 +440,27 @@
     .appModeLink{ text-decoration: underline; font-size: 15px; }
     .appModeLink:first-child{ justify-self: end; }
     .appModeLink:last-child{ justify-self: start; }
-    .appModeLink.active{ text-decoration: none; font-weight: 700; }
+    .appModeLink.active{ text-decoration: none; font-weight: 700; color: var(--star); }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
     .presetBtn{
       padding: 6px 10px;
       border-radius: 999px;
-      border: 1px solid var(--axis-line);
+      border: 1px solid var(--control-border);
       background: var(--control-bg);
       font-size: 13px;
       cursor: pointer;
     }
     .presetBtn.active{
-      background: var(--axis-line);
+      background: var(--star);
+      border-color: var(--star);
       color: var(--accent-contrast);
     }
 
     #tooltip{
       position: fixed; z-index: 9999; left: 0; top: 0; display: none; pointer-events: none;
-      padding: 8px 10px; border-radius: 10px; background: var(--panel-bg); color: var(--text);
-      border: 1px solid var(--panel-border);
+      padding: 8px 10px; border-radius: 12px; background: var(--surface-solid); color: var(--text);
+      border: 1px solid var(--hairline);
       font-size: 14px; line-height: 1.25; width: 90vw; max-width: 560px; box-shadow: 0 14px 30px rgba(0,0,0,0.55);
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       white-space: normal; visibility: hidden;
@@ -442,11 +551,13 @@
     #tooltip .tooltipAction:active{ background: var(--hover); }
     .bar{ cursor: pointer; }
     .installHint{
-      margin: 18px 0 0;
-      padding: 10px 12px;
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      background: var(--panel-bg);
+      margin: var(--sp-3) 0 0;
+      padding: var(--sp-2) 12px;
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      background: var(--surface-glass);
+      backdrop-filter: blur(10px) saturate(115%);
+      -webkit-backdrop-filter: blur(10px) saturate(115%);
       color: var(--muted);
       font-size: 13px;
       line-height: 1.4;
@@ -459,6 +570,8 @@
   </style>
 </head>
 <body>
+
+  <div class="sky" aria-hidden="true"></div>
 
   <div class="appModeLinks" role="listbox" aria-label="Mode">
     <button id="appModePersonalBtn" type="button" class="linkBtn appModeLink active" aria-selected="true">Personal</button>
