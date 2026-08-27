@@ -361,14 +361,15 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
     }
   }
 
-  // Now gets a tick in the axis band to match the line down the chart. It had
-  // a labelled pill for a while, which cost a lane of vertical space and was
-  // the loudest thing on a screen whose subject is the bars.
+  // Now, continued into the chart: this runs from just under the tick labels
+  // to the bottom edge of this SVG, and the timeline picks it up at its own
+  // y = 0. It starts below the labels rather than at the top of the band,
+  // where it used to strike through the dates it was drawn over.
   const now = new Date();
   if (now >= start && now < endExclusive){
     const xNow = dateToX(now);
     svg.appendChild(svgEl("line", {
-      x1: xNow, y1: axisY + 20, x2: xNow, y2: axisY + 40,
+      x1: xNow, y1: axisY + 29, x2: xNow, y2: axisHeight,
       stroke: "var(--accent)", "stroke-width": "1", opacity: "0.55", "pointer-events": "none"
     }));
   }
@@ -585,13 +586,14 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
   if (now >= start && now < endExclusive){
     const xNow = dateToX(now);
     const yTop = 0;
-    const yBottom = totalH - 10;
+    const yBottom = totalH - 6;
 
     svg.appendChild(svgEl("line", {
       x1: xNow, y1: yTop, x2: xNow, y2: yBottom,
       stroke: "var(--accent)",
       "stroke-width": "1",
-      opacity: "0.5",
+      // Same opacity as the segment in the axis above it, or the join shows.
+      opacity: "0.55",
       "pointer-events": "none"
     }));
   }

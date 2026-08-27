@@ -323,7 +323,10 @@
         animation-timeline: --timelineX;
       }
     }
-    .dateAxisScrollInner{ padding: var(--axis-pad); position: relative; }
+    /* No padding between the axis and the chart: they are separate SVGs in
+       separate scroll containers, and the now line has to cross from one into
+       the other without a seam. */
+    .dateAxisScrollInner{ padding: var(--axis-pad) var(--axis-pad) 0; position: relative; }
     .timelineNav{
       display: flex;
       justify-content: space-between;
@@ -365,12 +368,12 @@
       border-radius: 0 0 12px 12px;
       overflow: hidden;
     }
-    .timelineScroll{ border: 0; border-radius: 0; padding: var(--chart-pad); background: var(--panel-bg); overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
+    .timelineScroll{ border: 0; border-radius: 0; padding: 0 var(--chart-pad) var(--chart-pad); background: var(--panel-bg); overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
     svg{ display:block; width: 100%; }
     #aspectAxisWrap{
       position: absolute;
       left: var(--chart-pad);
-      top: var(--chart-pad);
+      top: 0;
       z-index: 2;
       overflow: hidden;
       width: calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px));
