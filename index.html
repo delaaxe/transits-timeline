@@ -538,6 +538,38 @@
       border-radius: 8px;
     }
 
+    /* Charts move between devices as a file, so both ends need the same
+       thing: a list of charts with a checkbox each. One dialog does both. */
+    .transferDialog{
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      background: var(--surface-solid);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      padding: 0;
+      width: min(420px, calc(100vw - 32px));
+    }
+    .transferDialog::backdrop{ background: rgba(6,7,15,.62); }
+    .transferBody{ padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+    .transferTitle{ font-size: 15px; }
+    .transferHint{ font-size: 12px; color: var(--muted); }
+    .transferList{ max-height: 46vh; overflow: auto; display: flex; flex-direction: column; }
+    .transferItem{
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: 8px 2px;
+      border-bottom: 1px solid var(--hairline-soft);
+      cursor: pointer;
+    }
+    .transferItem:last-child{ border-bottom: 0; }
+    .transferItem input{ margin: 0; }
+    .transferItemText{ min-width: 0; }
+    .transferItemName{ font-size: 14px; }
+    .transferItemSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .transferActions{ display: flex; align-items: center; gap: var(--sp-2); }
+    .transferActions .spacer{ flex: 1; }
+
     .statusRow{ display:flex; align-items:center; gap: var(--sp-2); flex-wrap: wrap; }
     .statusRow .status{ margin-top: 0; }
     .linkBtn{
@@ -921,6 +953,8 @@
               <button id="composeToggle" type="button" class="linkBtn" aria-expanded="false">Compose</button>
               <span class="inlineDot" id="deleteDot">·</span>
               <button id="deleteChartBtn" type="button" class="linkBtn" title="Delete chart" aria-label="Delete chart">Delete</button>
+              <span class="inlineDot" id="transferDot">·</span>
+              <button id="transferBtn" type="button" class="linkBtn" title="Import or export charts">Transfer</button>
             </div>
             <div id="chartPrivacy" class="chartPrivacy" hidden>Your data is private (stored locally).</div>
           </div>
@@ -1033,6 +1067,27 @@
   </div>
   <div id="tooltipBackdrop" aria-hidden="true"></div>
   <div id="tooltip" aria-hidden="true"></div>
+
+  
+  <dialog id="transferDialog" class="transferDialog" aria-labelledby="transferTitle">
+    <div class="transferBody">
+      <div class="transferTitle" id="transferTitle">Export charts</div>
+      <div class="transferHint" id="transferHint"></div>
+      <div class="transferList" id="transferList"></div>
+      <div class="transferActions">
+        <button id="transferAllBtn" type="button" class="linkBtn">Select all</button>
+        <span class="inlineDot" id="transferFileDot">·</span>
+        <button id="transferFileBtn" type="button" class="linkBtn">Import a file…</button>
+        <span class="spacer"></span>
+      </div>
+      <div class="transferActions">
+        <span class="spacer"></span>
+        <button id="transferCancelBtn" type="button" class="btnGhost">Close</button>
+        <button id="transferConfirmBtn" type="button" class="btnSmallPrimary">Export</button>
+      </div>
+    </div>
+    <input id="transferFileInput" type="file" accept="application/json,.json" hidden />
+  </dialog>
 
   <script type="module" src="src/app.js"></script>
 </body>

@@ -9,6 +9,7 @@ import { awsAutocomplete, awsGetPlace, extractPosition } from "../services/place
 import { chartsState, defaultChartData, getActiveChart, getActiveChartA, getActiveChartB, isDefaultChart, lastChartKey, loadCharts, newId, normalizeChart, saveCharts } from "../storage/charts.js";
 import { $, debounce, el, escapeHTML, fillSelect, installHint, installHintText, setStatus } from "./dom.js";
 import { fmtCoord } from "./format.js";
+import { wireTransferUI } from "./transfer.js";
 import { isIOSLike } from "./tooltip.js";
 
 export function rangeSpanDays(){
@@ -575,6 +576,11 @@ export function initCharts(){
 }
 
 export function wireChartsUI(){
+  wireTransferUI((newChartId) => {
+    if (newChartId) setActiveChartA(newChartId);
+    else renderPersonalSection();
+    requestUpdate();
+  });
   el.chartButtons.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-chart-id]");
     if (!btn) return;
