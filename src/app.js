@@ -8,9 +8,9 @@ import { orderMap } from "./data/bodies.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
 import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
 import { chartsState, getActiveChartA, getActiveChartB } from "./storage/charts.js";
-import { el, setStatus } from "./ui/dom.js";
+import { el, setStatus, setTimelineState } from "./ui/dom.js";
 import { bootPresets, bootSelects, getCheckedAspects, initCharts, readRuleOptions, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
-import { renderFromCache, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
+import { clearTimeline, renderFromCache, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
 
 export function maybeRefreshTimelineOnRefocus(){
@@ -52,6 +52,10 @@ export async function updateTimeline(){
     el.updateBtn.style.display = "inline-block";
     el.updateBtn.disabled = false;
     setStatus("Computing…");
+    // A recompute over an existing chart leaves it up: the old answer is still
+    // roughly the right shape, and replacing it with a plate is a worse wait.
+    const hadResults = !!state.cachedResults;
+    if (!hadResults) setTimelineState("Computing…", "busy");
 
     const chartA = getActiveChartA();
     const chartB = getActiveChartB();
@@ -121,7 +125,10 @@ export async function updateTimeline(){
       observer: { lon, lat, height },
       natalLon,
       rules: candidateRules
-    }, (done, total) => setStatus(`Computing\u2026 ${done}/${total}`));
+    }, (done, total) => {
+      setStatus(`Computing\u2026 ${done}/${total}`);
+      if (!hadResults) setTimelineState(`Computing\u2026 ${done}/${total}`, "busy");
+    });
 
     const firstHitByRule = eventsByRule.map(events => events[0].start);
 
@@ -151,6 +158,10 @@ export async function updateTimeline(){
     renderFromCache(state.currentMaxRows);
     state.lastTimelineRefreshAt = Date.now();
 
+    const nothingFound = rulesSorted.length === 0;
+    setTimelineState(nothingFound ? "No transits match these settings in this range." : null,
+      nothingFound ? "empty" : null);
+
     const totalMatches = rulesSorted.length;
     const orbLabel = `${Number(el.orb.value || 0).toFixed(1)}°`;
     setStatus(`Done • ${orbLabel} orb • ${totalMatches} matches`);
@@ -159,12 +170,16 @@ export async function updateTimeline(){
     if (state.cancelRequested && String(err?.message || err) === "Cancelled"){
       setStatus("Cancelled.");
       state.cachedResults = null;
+      clearTimeline();
+      setTimelineState("Cancelled.", "empty");
       updateShowMore(0, 0);
       return;
     }
     console.error(err);
     setStatus(String(err?.message || err), true);
     state.cachedResults = null;
+    clearTimeline();
+    setTimelineState(String(err?.message || err), "error");
     updateShowMore(0, 0);
   } finally {
     state.isComputing = false;

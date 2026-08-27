@@ -19,6 +19,18 @@ export function updateShowMore(shown, total){
   }
 }
 
+// An error plate over the previous chart reads as though the chart is the
+// answer. Blanking the three SVGs - and their heights, which are attributes
+// rather than layout - is what makes the plate the only thing on screen.
+export function clearTimeline(){
+  for (const svg of [el.timelineSvg, el.aspectAxisSvg, el.dateAxisSvg]){
+    if (!svg) continue;
+    clearSvg(svg);
+    svg.setAttribute("height", "0");
+    svg.style.height = "0px";
+  }
+}
+
 export function renderFromCache(limit){
   if (!state.cachedResults){
     updateShowMore(0, 0);

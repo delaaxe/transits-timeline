@@ -54,6 +54,7 @@ export const el = {
   timelineScroll: $("timelineScroll"),
   aspectAxisSvg: $("aspectAxisSvg"),
   timelineSvg: $("timelineSvg"),
+  timelineState: $("timelineState"),
   moreWrap: $("moreWrap"),
   showMoreBtn: $("showMoreBtn")
 };
@@ -79,6 +80,33 @@ export function fillSelect(sel, items){
 export function setStatus(msg, isError=false){
   el.status.textContent = msg;
   el.status.className = "status" + (isError ? " error" : "");
+}
+
+/**
+ * The plate drawn where the chart would be. The status line says the same
+ * things, but it lives in the options drawer, which is closed by default - so
+ * computing, empty and failed all looked identical to an empty chart.
+ * @param {string|null} text @param {"busy"|"empty"|"error"|null} kind
+ */
+export function setTimelineState(text, kind=null){
+  const wrap = el.timelineState;
+  if (!wrap) return;
+  const frame = wrap.parentElement;
+  if (!text || !kind){
+    wrap.hidden = true;
+    wrap.className = "timelineState";
+    wrap.textContent = "";
+    if (frame) frame.classList.remove("hasState");
+    return;
+  }
+  wrap.className = `timelineState ${kind}`;
+  wrap.textContent = "";
+  const plate = document.createElement("div");
+  plate.className = "timelineStatePlate";
+  plate.textContent = text;
+  wrap.appendChild(plate);
+  wrap.hidden = false;
+  if (frame) frame.classList.add("hasState");
 }
 
 export function escapeHTML(s){

@@ -580,11 +580,17 @@
 
     #tooltip{
       position: fixed; z-index: 9999; left: 0; top: 0; display: none; pointer-events: none;
-      padding: 8px 10px; border-radius: 12px; background: var(--surface-solid); color: var(--text);
+      padding: 14px 16px; border-radius: 14px; background: var(--surface-solid); color: var(--text);
       border: 1px solid var(--hairline);
-      font-size: 14px; line-height: 1.25; width: 90vw; max-width: 560px; box-shadow: 0 14px 30px rgba(0,0,0,0.55);
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      font-size: 14px; line-height: 1.45; width: min(92vw, 560px); box-shadow: var(--shadow);
       white-space: normal; visibility: hidden;
+    }
+    /* Following a cursor, it is a label: narrow, and read in a glance. Opened
+       by a tap it is a card, and gets the full measure. */
+    #tooltip:not(.popup){
+      width: max-content;
+      max-width: min(92vw, 420px);
+      padding: 10px 12px;
     }
     #tooltipBackdrop{
       position: fixed;
@@ -605,19 +611,35 @@
       transform: translate(-50%, -50%);
       pointer-events: auto;
     }
+    /* 44px of target for a 12px glyph: this is the control people reach for
+       first on a phone, and it used to be a 20px square in a corner. */
     #tooltip .tooltipClose{
       position: absolute;
-      right: 10px;
-      top: 8px;
+      right: 4px;
+      top: 4px;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: none;
       border: none;
-      color: var(--text);
-      font-size: 16px;
+      color: var(--ink-soft);
+      font-size: 15px;
       line-height: 1;
       cursor: pointer;
-      padding: 2px 4px;
+      padding: 0;
+      border-radius: 10px;
     }
-    #tooltip .tooltipTitle{ font-size: 16px; }
+    #tooltip .tooltipClose:hover{ background: var(--hover); color: var(--ink); }
+    #tooltip .tooltipTitle{
+      font-family: var(--font-glyph);
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: .01em;
+      padding-right: 44px;
+    }
+    #tooltip:not(.popup) .tooltipTitle{ padding-right: 0; font-size: 15px; }
     #tooltip.popup .tooltipTitle{ cursor: pointer; }
     #tooltip .copiedHint{
       margin-left: 6px;
@@ -634,11 +656,25 @@
       opacity: 0;
       transition: opacity 700ms ease;
     }
-    #tooltip .desc{ opacity: 0.95; margin-top: 6px; }
-    #tooltip .sub{ opacity: 0.85; margin-top: 4px; white-space: normal; }
-    #tooltip .myth{ opacity: 0.9; margin-top: 6px; font-style: italic; }
+    #tooltip .desc{ color: var(--ink); margin-top: 10px; }
+    /* The range and the exact time are data, not prose: they get the label
+       treatment - smaller, dimmer, tabular - so the eye skips them or lands on
+       them deliberately. */
+    #tooltip .sub{
+      color: var(--ink-dim);
+      margin-top: 2px;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      white-space: normal;
+    }
+    #tooltip .desc + .mythToggle,
+    #tooltip .tooltipCalendarBlock{
+      border-top: 1px solid var(--hairline-soft);
+      padding-top: 10px;
+    }
+    #tooltip .myth{ color: var(--ink-soft); margin-top: 6px; font-style: italic; }
     #tooltip .mythToggle{
-      margin-top: 6px;
+      margin-top: 10px;
       background: none;
       border: none;
       padding: 0;
@@ -649,6 +685,7 @@
     }
     #tooltip .tooltipCalendarBlock{
       margin-top: 12px;
+      color: var(--ink-dim);
     }
     #tooltip .tooltipActions{
       font-size: 13px;
@@ -661,7 +698,7 @@
       margin: 0;
     }
     #tooltip .tooltipAction{
-      color: var(--text);
+      color: var(--star);
       text-decoration: underline;
       font-size: 13px;
       display: inline-block;
@@ -671,6 +708,54 @@
     }
     #tooltip .tooltipAction:active{ background: var(--hover); }
     .bar{ cursor: pointer; }
+
+    /* Computing, empty and error were three strings in a status line that only
+       exists while the options drawer is open. They are plates on the chart
+       now, where whatever they are about would have been. */
+    /* With the SVGs blanked the frame has nothing to paint, so the sky would
+       show through the middle of the plate. */
+    .chartFrame.hasState{ min-height: 190px; background: var(--surface-solid); }
+    .timelineState{
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: var(--sp-4);
+      text-align: center;
+    }
+    .timelineStatePlate{
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      background: var(--surface-2);
+      padding: 14px 18px;
+      color: var(--ink-soft);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 36ch;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .timelineState.error .timelineStatePlate{
+      color: var(--danger);
+      border-color: rgba(255,107,94,.35);
+    }
+    .timelineState.busy .timelineStatePlate::before{
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--star);
+      flex: none;
+      animation: statePulse 1.1s ease-in-out infinite;
+    }
+    @keyframes statePulse{
+      0%, 100%{ opacity: .25; transform: scale(.85); }
+      50%{ opacity: 1; transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce){
+      .timelineState.busy .timelineStatePlate::before{ animation: none; opacity: .8; }
+    }
     .installHint{
       margin: var(--sp-3) 0 0;
       padding: var(--sp-2) 12px;
@@ -824,6 +909,7 @@
     <div class="timelineScroll" id="timelineScroll">
       <svg id="timelineSvg" width="1200" height="280" viewBox="0 0 1200 280" role="img" aria-label="Transit timeline"></svg>
     </div>
+    <div id="timelineState" class="timelineState" role="status" aria-live="polite" hidden></div>
     <div id="moreWrap" style="margin-top: 8px; display: none; padding-left: 245px;">
       <button id="showMoreBtn" class="linkBtn" type="button">Show 50 more</button>
     </div>
