@@ -12,37 +12,72 @@ export function clearSvg(svg){
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 }
 
-export function computeTimelineLayout(svg, useSymbols=false){
-  const containerW = svg.parentElement
-    ? Math.max(320, svg.parentElement.clientWidth - 16)
-    : 1200;
-  const isCompact = containerW < 520;
-  const labelWMax = isCompact ? 130 : 150;
-  const labelWMin = isCompact ? 78 : 96;
-  const labelW = labelWMax;
+// Three tiers by how much room there is, and touch sizing by what is pointing
+// at the screen. Those are separate questions: an iPad mini in landscape is
+// 1133px wide and still held in two hands, so width alone would hand it
+// mouse-sized rows. Sizes live here rather than in the renderers so a tier is
+// one table to read, not a dozen ternaries spread over three functions.
+const tiers = {
+  phone:   { labelWMax: 130, labelWMin: 78, rowH: 24, rowGap:  8, bottomPad: 14, marginT:  8, axisGap:  8, axisBottomPad: 6, axisLabelSize: 15, axisTitleSize: 16, labelFontSize: 17, rowsY0: 6 },
+  tablet:  { labelWMax: 140, labelWMin: 90, rowH: 24, rowGap:  9, bottomPad: 16, marginT: 12, axisGap: 10, axisBottomPad: 7, axisLabelSize: 16, axisTitleSize: 18, labelFontSize: 18, rowsY0: 8 },
+  desktop: { labelWMax: 150, labelWMin: 96, rowH: 20, rowGap: 10, bottomPad: 18, marginT: 14, axisGap: 12, axisBottomPad: 8, axisLabelSize: 18, axisTitleSize: 20, labelFontSize: 20, rowsY0: 8 }
+};
+
+// The same test the stylesheet uses for tap targets, written the same way on
+// purpose: if these two disagree, a device gets 44px arrows above 20px rows.
+function isCoarsePointer(){
+  return typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
+export function tierFor(containerW){
+  if (containerW < 520) return "phone";
+  if (containerW < 1024) return "tablet";
+  return "desktop";
+}
+
+export function computeTimelineLayout(svg){
+  const parent = svg ? svg.parentElement : null;
+  // The scroller's padding is 8px at desktop and 0 on a phone, so measuring it
+  // beats assuming: the old fixed 16 threw away 16px of a 390px screen.
+  const pad = (() => {
+    if (!parent || typeof getComputedStyle !== "function") return 16;
+    const cs = getComputedStyle(parent);
+    return (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  })();
+  const containerW = parent ? Math.max(320, parent.clientWidth - pad) : 1200;
+
+  const tier = tierFor(containerW);
+  const t = tiers[tier];
+  // A wide touch screen keeps the roomy rows; it only gains the wide layout.
+  const rowH = (tier === "desktop" && isCoarsePointer()) ? tiers.tablet.rowH : t.rowH;
+
+  const labelW = t.labelWMax;
   const marginL = 0;
   const marginR = 12;
-  const marginT = isCompact ? 8 : 14;
-  const rowH = isCompact ? 22 : 20;
-  const rowGap = isCompact ? 8 : 10;
-  const bottomPad = isCompact ? 14 : 18;
-  const axisY = marginT + (isCompact ? 8 : 12);
+  const axisY = t.marginT + t.axisGap;
   const totalW = Math.max(600, Math.floor(containerW));
   const timelineW = Math.max(360, totalW - marginL - labelW - marginR);
 
   return {
     containerW,
-    isCompact,
+    tier,
     labelW,
-    labelWMax,
-    labelWMin,
+    labelWMax: t.labelWMax,
+    labelWMin: t.labelWMin,
     marginL,
     marginR,
-    marginT,
+    marginT: t.marginT,
     rowH,
-    rowGap,
-    bottomPad,
+    rowGap: t.rowGap,
+    bottomPad: t.bottomPad,
+    rowsY0: t.rowsY0,
     axisY,
+    axisBottomPad: t.axisBottomPad,
+    axisLabelSize: t.axisLabelSize,
+    axisTitleSize: t.axisTitleSize,
+    labelFontSize: t.labelFontSize,
     totalW,
     timelineW
   };

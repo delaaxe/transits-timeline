@@ -23,7 +23,7 @@ export function renderFromCache(limit){
     updateShowMore(0, 0);
     return;
   }
-  const layout = computeTimelineLayout(el.timelineSvg, false);
+  const layout = computeTimelineLayout(el.timelineSvg);
   state.currentLayout = layout;
   const threshold = Math.max(0, layout.labelWMax - layout.labelWMin);
   state.labelsUseSymbols = !!el.timelineScroll && el.timelineScroll.scrollLeft >= threshold;
@@ -221,9 +221,9 @@ export function wireTimelineResize(){
 export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   clearSvg(svg);
 
-  const { totalW, timelineW, labelW, marginL, axisY, isCompact } = layout;
+  const { totalW, timelineW, labelW, marginL, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
   const x0 = marginL + labelW;
-  const axisHeight = axisY + 40 + (isCompact ? 6 : 8);
+  const axisHeight = axisY + 40 + axisBottomPad;
   document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
   svg.setAttribute("viewBox", `0 0 ${totalW} ${axisHeight}`);
   svg.setAttribute("width", String(totalW));
@@ -242,8 +242,6 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   svg.appendChild(svgEl("rect", {x:x0, y:axisY, width:timelineW, height:40, fill:"var(--axis-bg)"}));
   svg.appendChild(svgEl("line", {x1:x0, y1:axisY + 40, x2:x0 + timelineW, y2:axisY + 40, stroke:"var(--axis-line)", "stroke-width":"1.5"}));
 
-  const axisLabelSize = isCompact ? 15 : 18;
-  const axisTitleSize = isCompact ? 16 : 20;
   const minBoxPx = axisLabelSize * 2.7;
   const minLabelPx = axisLabelSize * 2.2;
   const monthLabelPx = axisLabelSize * 1.6;
@@ -354,9 +352,8 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
 export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=false}){
   if (!svg) return;
   clearSvg(svg);
-  const { labelW, rowH, rowGap, bottomPad, isCompact } = layout;
+  const { labelW, rowH, rowGap, bottomPad, rowsY0, labelFontSize } = layout;
   const n = rules.length;
-  const rowsY0 = isCompact ? 6 : 8;
   const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
 
   document.documentElement.style.setProperty("--aspect-axis-w", `${labelW}px`);
@@ -369,7 +366,6 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 
   const labelX = labelW - 8;
 
-  const labelFontSize = isCompact ? 17 : 20;
   for (let idx=0; idx<rules.length; idx++){
     const r = rules[idx];
     const y = rowsY0 + idx*(rowH+rowGap);
@@ -403,11 +399,10 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, showTime, presetKey, chartRuler, layout, showYear}){
   clearSvg(svg);
 
-  const { totalW, timelineW, labelW, marginL, rowH, rowGap, bottomPad, isCompact } = layout;
+  const { totalW, timelineW, labelW, marginL, rowH, rowGap, bottomPad, rowsY0 } = layout;
   const x0 = marginL + labelW;
 
   const n = rules.length;
-  const rowsY0 = isCompact ? 6 : 8;
   const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
 
   svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
