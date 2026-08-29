@@ -6,6 +6,7 @@
   "description": "Astrological transit timeline. The app itself is index.html; these scripts only test and check it.",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "dev": "python3 -m http.server 8931",
     "test": "node --test \"test/*.test.mjs\"",
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm test && npm run typecheck && npm run build",

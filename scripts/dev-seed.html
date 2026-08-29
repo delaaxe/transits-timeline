@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Seed charts</title>
+<!--
+  A development shortcut, never built into dist/: scripts/ is not copied there.
+  `npm run dev` serves the repo, so opening /scripts/dev-seed.html writes a few
+  charts into the same origin's storage and drops you back on the app with a
+  collection to work with - importing, exporting and composing all need more
+  than the one seeded sample to say anything.
+-->
+<style>
+  body{ font: 14px/1.5 system-ui, sans-serif; margin: 40px auto; max-width: 30em; }
+  button{ font: inherit; padding: 8px 12px; margin-right: 8px; }
+</style>
+<h1>Seed charts</h1>
+<p id="state">Loading…</p>
+<p>
+  <button id="seed" type="button">Seed and open the app</button>
+  <button id="clear" type="button">Clear and open the app</button>
+</p>
+<script type="module">
+  import { chartsKey, lastChartKey } from "../src/storage/charts.js";
+
+  // Public birth data, chosen to span time zones and hemispheres so the chart
+  // list, the place labels and the transfer dialog all have something to show.
+  const charts = [
+    { id: "dev_ada", name: "Ada Lovelace", birthDate: "1815-12-10", birthTime: "12:00",
+      placeLabel: "Marylebone, London, England, United Kingdom",
+      lon: -0.1536, lat: 51.5215, tzName: "Europe/London" },
+    { id: "dev_alan", name: "Alan Turing", birthDate: "1912-06-23", birthTime: "02:15",
+      placeLabel: "Maida Vale, London, England, United Kingdom",
+      lon: -0.1870, lat: 51.5250, tzName: "Europe/London" },
+    { id: "dev_frida", name: "Frida Kahlo", birthDate: "1907-07-06", birthTime: "08:30",
+      placeLabel: "Coyoacán, Mexico City, Mexico",
+      lon: -99.1618, lat: 19.3467, tzName: "America/Mexico_City" },
+    { id: "dev_yayoi", name: "Yayoi Kusama", birthDate: "1929-03-22", birthTime: "09:00",
+      placeLabel: "Matsumoto, Nagano, Japan",
+      lon: 137.9720, lat: 36.2380, tzName: "Asia/Tokyo" },
+    { id: "dev_nelson", name: "Nelson Mandela", birthDate: "1918-07-18", birthTime: "14:00",
+      placeLabel: "Mvezo, Eastern Cape, South Africa",
+      lon: 28.4833, lat: -31.9500, tzName: "Africa/Johannesburg" }
+  ];
+
+  const app = new URL("../index.html", location.href).toString();
+  const state = document.getElementById("state");
+  const stored = JSON.parse(localStorage.getItem(chartsKey) || "[]");
+  state.textContent = stored.length
+    ? `${stored.length} chart${stored.length === 1 ? "" : "s"} stored: ${stored.map((p) => p.name).join(", ")}.`
+    : "No charts stored yet.";
+
+  document.getElementById("seed").addEventListener("click", () => {
+    localStorage.setItem(chartsKey, JSON.stringify(charts));
+    localStorage.setItem(lastChartKey, charts[0].id);
+    location.href = app;
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    localStorage.removeItem(chartsKey);
+    localStorage.removeItem(lastChartKey);
+    location.href = app;
+  });
+</script>

@@ -12,7 +12,6 @@ import { el, setStatus, setTimelineState } from "./ui/dom.js";
 import { bootPresets, bootSelects, getCheckedAspects, initCharts, readRuleOptions, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
 import { clearTimeline, renderFromCache, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
-import { checkShareLink } from "./ui/transfer.js";
 
 export function maybeRefreshTimelineOnRefocus(){
   if (document.visibilityState === "hidden") return;
@@ -233,9 +232,6 @@ async function boot(){
   // open a bar - and a popup opened inside that window is redrawn when they
   // land, since the tooltip holds keys rather than text.
   await updateTimeline();
-  // After the first render: a shared link is a question to answer, not a
-  // reason to hold the page back.
-  checkShareLink();
   onInterpretationsArrived(refreshTooltipContent);
   whenIdle(() => loadInterpretations());
 }
