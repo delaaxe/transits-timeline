@@ -883,11 +883,29 @@
       #axisCornerBlock{ display: block; }
       .timelineNavGroup:last-child .timelineNavBtn:last-child{ margin-right: 10px; }
       /* Stacked, so the groups get a hairline between them to stand in for the
-         space they had beside each other. */
+         space they had beside each other. Everything else here is about height:
+         the drawer covers a phone screen, and every line it saves is a line of
+         transits the reader keeps. */
       .optionsGroup + .optionsGroup{
-        padding-top: var(--sp-2);
+        padding-top: var(--sp-1);
         border-top: 1px solid var(--hairline-soft);
       }
+      .optionsGrid{ gap: var(--sp-1); }
+      .optionsDrawer{ padding-block: var(--sp-1); gap: var(--sp-1); }
+      .optionsGroup{ gap: 2px; }
+      .optionsGroupTitle{ font-size: 10px; line-height: 1.2; }
+      .optionsGroup label,
+      .optionsGroup .fieldLabel{ margin-bottom: 2px; }
+      .statusRow{ margin-top: 0; }
+      .optionsDrawer .status{ margin-top: 2px; }
+      .optionsGroupBody{ gap: var(--sp-1) var(--sp-2); }
+      .toggleChips{ gap: var(--sp-1); }
+      /* Four toggles on one line rather than two: the pill keeps its height,
+         it gives up the padding it does not need. */
+      .toggleChip{ padding-inline: 10px !important; gap: 6px; }
+      /* The group is titled Aspects and the chip says how many are on, so the
+         word between them was a line spent on nothing. */
+      .aspectFieldLabel{ display: none; }
       .rowPlanets{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
       .rowPlanets .fieldToggles{ grid-column: 1 / -1; }
       .rowPlanets .field select{ width: 100%; }
@@ -1301,7 +1319,7 @@
         <h3 class="optionsGroupTitle" id="optAspectsTitle">Aspects</h3>
         <div class="optionsGroupBody">
           <div class="field">
-            <span class="fieldLabel">Selected</span>
+            <span class="fieldLabel aspectFieldLabel">Selected</span>
             <details class="aspectDropdown" id="aspectDropdown">
               <summary>
                 <span id="aspectSummaryText">Aspects</span>
