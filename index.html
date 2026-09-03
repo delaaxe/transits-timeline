@@ -418,6 +418,108 @@
     .checks label{ margin: 0; font-size: 13px; color: var(--text); display:flex; gap: 8px; align-items:center; }
     .checks input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--star); }
     .optionsDrawer > *{ margin-top: 0; }
+
+    /* The drawer used to be three loose rows: two dates, two selects with an
+       unlabelled checkbox row floating beside them, and a lone Aspects chip on
+       a line of its own. Nothing said which control belonged with which, and on
+       a phone the checkbox row ran off the right edge. It is three named groups
+       now - Range, Bodies, Aspects - laid out side by side while there is room
+       and stacked once there is not, each separated by the same hairline the
+       rest of the plate is drawn with. */
+    .optionsGrid{
+      display: grid;
+      grid-template-columns: 1fr;
+      align-items: start;
+      gap: var(--sp-2) var(--sp-4);
+      justify-content: start;
+    }
+    /* Two columns as soon as two fit, three once the drawer is wide enough for
+       Bodies to keep its two selects on one line. Columns rather than a wrap:
+       a wrapped flex row left the third group's title hanging under the first
+       group's fields, which read as an accident rather than a heading. */
+    @media (min-width: 760px){
+      /* max-content rather than auto: auto tracks absorb the free space in a
+         wide drawer, which pushed the last group out to the far edge. */
+      .optionsGrid{ grid-template-columns: repeat(2, minmax(0, max-content)); }
+    }
+    /* Two columns: Bodies is the tall one, so it takes the second column for
+       both rows and Aspects sits under Range rather than after a gap. */
+    @media (min-width: 760px) and (max-width: 1179px){
+      .optionsGroup:nth-child(1){ grid-column: 1; grid-row: 1; }
+      .optionsGroup:nth-child(2){ grid-column: 2; grid-row: 1 / span 2; }
+      .optionsGroup:nth-child(3){ grid-column: 1; grid-row: 2; }
+    }
+    @media (min-width: 1180px){
+      .optionsGrid{ grid-template-columns: repeat(3, minmax(0, max-content)); }
+      /* Aspects is the last column here, so its panel hangs from the chip's
+         right edge rather than running off the plate. */
+      .aspectDropdown .aspectPanel{ left: auto; right: 0; }
+    }
+    .optionsGroup{
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-1);
+      /* A grid item defaults to min-width:auto, which is what let the toggles
+         push past the edge of the drawer instead of wrapping inside it. */
+      min-width: 0;
+    }
+    .optionsGroupTitle{
+      margin: 0;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    /* This file has no box-sizing reset, so a 100% width input in a stacked
+       column overflowed it by its own padding and border. */
+    .optionsGroup input,
+    .optionsGroup select{ box-sizing: border-box; max-width: 100%; }
+    /* border-box makes the widths above include the padding these controls had
+       added to them, so the two that were sized to their content get it back. */
+    .optionsGroup input[type="date"]{ width: 158px; }
+    .optionsGroup.optionsGroup .orbField input{ width: 86px !important; }
+    .optionsGroupBody{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: var(--sp-2) var(--sp-3);
+      min-width: 0;
+    }
+    /* Same type and spacing as the <label> above a field, for the two groups
+       whose control is not a single labellable input. */
+    .fieldLabel{ display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .fieldToggles{ min-width: 0; }
+    .toggleChips{ display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+    /* The four body toggles were bare checkboxes in a row of pill-shaped
+       controls. They keep the native checkbox - it carries the state to a
+       screen reader and to a keyboard - inside the same pill the chart chips
+       and the preset buttons use, so the row reads as one vocabulary. */
+    .toggleChip{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      padding: 6px 10px;
+      border: 1px solid var(--control-border);
+      border-radius: 999px;
+      background: var(--control-bg);
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .toggleChip:hover{ background: var(--hover); }
+    .toggleChip input[type="checkbox"]{
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--star);
+      flex: none;
+    }
+    .toggleChip:has(input:checked){ border-color: var(--star); color: var(--ink); }
+    .toggleChip:focus-within{ outline: 2px solid var(--star); outline-offset: 2px; }
     .aspectDropdown{ position: relative; }
     /* A summary is display: list-item by default, which is two problems at
        once on iOS. Safari keeps drawing its disclosure triangle unless the
@@ -449,7 +551,18 @@
     }
     .aspectDropdown > summary::-webkit-details-marker,
     .aspectDropdown > summary::marker{ display: none; content: ""; }
+    .aspectDropdown > summary{ gap: 6px; }
     .aspectDropdown[open] > summary{ background: var(--star); border-color: var(--star); color: var(--accent-contrast); }
+    .aspectDropdown > summary .chevron{ width: 14px; height: 14px; flex: none; transition: transform .15s ease; }
+    .aspectDropdown[open] > summary .chevron{ transform: rotate(180deg); }
+    @media (prefers-reduced-motion: reduce){
+      .aspectDropdown > summary .chevron{ transition: none; }
+    }
+    /* One aspect per line inside the panel: a wrapped two-column grid of
+       thirteen short labels was harder to scan than a list. */
+    .aspectPanel .aspectChecks{ display: grid; grid-template-columns: 1fr; gap: 2px; padding: 0; }
+    .aspectPanel .aspectChecks label{ padding: 4px 2px; border-radius: 6px; }
+    .aspectPanel .aspectChecks label:hover{ background: var(--hover); }
     .aspectDropdown .aspectPanel{
       position: absolute;
       top: calc(100% + 6px);
@@ -678,7 +791,11 @@
       .timelineNavBtn{ min-width: 44px; min-height: 44px; }
       .presetBtn,
       .chartBtn,
+      .toggleChip,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
+      /* The drawer's own controls are tapped, not clicked. */
+      .optionsGroup input,
+      .optionsGroup select{ min-height: 40px; }
       .viewBar > .viewBarToggle{ min-height: 40px; padding: 6px 8px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
@@ -713,10 +830,18 @@
       .viewBar{ min-height: 46px; padding-block: 2px; }
       .presetBtn,
       .chartBtn,
+      .toggleChip,
       .aspectDropdown > summary{ min-height: 36px; }
       .viewBar > .viewBarToggle{ min-height: 36px; padding: 6px 8px; }
       .linkBtn{ padding: 4px 0; }
       .optionsDrawer{ padding: var(--sp-2) var(--sp-3); gap: var(--sp-1); }
+      /* Height is the scarce thing here, so the drawer trades width for lines:
+         the two selects share their column rather than stacking, and the rows
+         inside a group tighten up. */
+      .optionsGrid{ gap: var(--sp-1) var(--sp-3); }
+      .optionsGroupBody{ gap: var(--sp-1) var(--sp-2); }
+      .optionsGroup .field.med{ flex: 1 1 130px; min-width: 0; }
+      .optionsGroup .field.med select{ width: 100%; }
       .installHint{ display: none; }
 
       /* The chart picker is three stacked rows for something that is chosen
@@ -757,10 +882,19 @@
       .timelineScroll{ padding: 0; border-radius: 0; width: 100%; margin: 0; }
       #axisCornerBlock{ display: block; }
       .timelineNavGroup:last-child .timelineNavBtn:last-child{ margin-right: 10px; }
-      .rowPlanets{ margin-top: 0 !important; }
+      /* Stacked, so the groups get a hairline between them to stand in for the
+         space they had beside each other. */
+      .optionsGroup + .optionsGroup{
+        padding-top: var(--sp-2);
+        border-top: 1px solid var(--hairline-soft);
+      }
       .rowPlanets{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
-      .rowPlanets .field:nth-child(3){ grid-column: 1 / -1; }
+      .rowPlanets .fieldToggles{ grid-column: 1 / -1; }
       .rowPlanets .field select{ width: 100%; }
+      /* Two dates, two selects: one line each rather than 132px islands. */
+      .optionsGroup .field input[type="date"]{ width: 100%; }
+      .optionsGroup .field{ min-width: 0; }
+      #optRangeTitle + .optionsGroupBody{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     }
 
     .chartButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
@@ -1137,35 +1271,52 @@
   </div>
 
   <div class="optionsDrawer" data-advanced>
-    <div class="row optionsRow">
-      <div class="field"><label>Start</label><input id="rangeStart" type="date" value="2025-10-01" /></div>
-      <div class="field"><label>End</label><input id="rangeEnd" type="date" value="2026-12-31" /></div>
-    </div>
-
-    <div class="row rowPlanets">
-      <div class="field med"><label>Planets</label><select id="transitGroup"></select></div>
-      <div class="field med" id="natalGroupField"><label>Natal targets</label><select id="natalGroup"></select></div>
-      <div class="field">
-        <div class="checks" style="padding:0;">
-          <label><input id="includeMoon" type="checkbox" checked /> Transiting Moon</label>
-          <label><input id="includeChiron" type="checkbox" checked /> Chiron</label>
-          <label><input id="includeNode" type="checkbox" /> Node</label>
-          <label id="includeMCWrap"><input id="includeMC" type="checkbox" checked /> Mc</label>
+    <div class="optionsGrid">
+      <section class="optionsGroup" aria-labelledby="optRangeTitle">
+        <h3 class="optionsGroupTitle" id="optRangeTitle">Range</h3>
+        <div class="optionsGroupBody">
+          <div class="field"><label for="rangeStart">Start</label><input id="rangeStart" type="date" value="2025-10-01" /></div>
+          <div class="field"><label for="rangeEnd">End</label><input id="rangeEnd" type="date" value="2026-12-31" /></div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <div class="checks" id="topChecks">
-      <details class="aspectDropdown">
-        <summary>Aspects</summary>
-        <div class="aspectPanel">
-          <div class="checks" id="aspectChecks" style="padding:0; gap:12px;"></div>
-          <div class="orbInline orbField" style="margin-top: 8px;">
-            <label for="orb">Orb (°)</label>
-            <input id="orb" type="number" value="1.0" step="0.1" />
+      <section class="optionsGroup optionsGroupWide" aria-labelledby="optBodiesTitle">
+        <h3 class="optionsGroupTitle" id="optBodiesTitle">Bodies</h3>
+        <div class="optionsGroupBody rowPlanets">
+          <div class="field med"><label for="transitGroup">Transiting</label><select id="transitGroup"></select></div>
+          <div class="field med" id="natalGroupField"><label for="natalGroup">Natal targets</label><select id="natalGroup"></select></div>
+          <div class="field fieldToggles">
+            <span class="fieldLabel">Also include</span>
+            <div class="toggleChips" id="bodyToggles">
+              <label class="toggleChip"><input id="includeMoon" type="checkbox" checked /><span>Moon</span></label>
+              <label class="toggleChip"><input id="includeChiron" type="checkbox" checked /><span>Chiron</span></label>
+              <label class="toggleChip"><input id="includeNode" type="checkbox" /><span>Node</span></label>
+              <label class="toggleChip" id="includeMCWrap"><input id="includeMC" type="checkbox" checked /><span>Mc</span></label>
+            </div>
           </div>
         </div>
-      </details>
+      </section>
+
+      <section class="optionsGroup" aria-labelledby="optAspectsTitle">
+        <h3 class="optionsGroupTitle" id="optAspectsTitle">Aspects</h3>
+        <div class="optionsGroupBody">
+          <div class="field">
+            <span class="fieldLabel">Selected</span>
+            <details class="aspectDropdown" id="aspectDropdown">
+              <summary>
+                <span id="aspectSummaryText">Aspects</span>
+                <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </summary>
+              <div class="aspectPanel">
+                <div class="checks aspectChecks" id="aspectChecks"></div>
+              </div>
+            </details>
+          </div>
+          <div class="field orbField"><label for="orb">Orb (°)</label><input id="orb" type="number" value="1.0" step="0.1" /></div>
+        </div>
+      </section>
     </div>
 
     <div class="statusRow">

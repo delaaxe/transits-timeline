@@ -71,6 +71,17 @@ export function renderAspectChecks(selectedKeys){
     lab.appendChild(span);
     wrap.appendChild(lab);
   }
+  updateAspectSummary();
+}
+
+/* The panel is closed most of the time, so the chip that opens it says what is
+   inside rather than repeating the group's own title. */
+export function updateAspectSummary(){
+  if (!el.aspectSummaryText) return;
+  const total = aspects.length;
+  const n = getCheckedAspects().length;
+  el.aspectSummaryText.textContent =
+    n === 0 ? "None" : n === total ? `All ${total}` : `${n} of ${total}`;
 }
 
 export function readRuleOptions(){
@@ -687,6 +698,20 @@ export function wireAdvancedUI(){
   el.advancedToggle.addEventListener("click", () => {
     setAdvancedVisible(!advancedVisible);
   });
+  // A <details> stays open until it is clicked again, which left the aspect
+  // panel covering the chart after a choice had been made. Anything outside it
+  // closes it, the way a menu does.
+  document.addEventListener("pointerdown", (e) => {
+    const dd = el.aspectDropdown;
+    if (!dd || !dd.open) return;
+    if (!(e.target instanceof Node) || dd.contains(e.target)) return;
+    dd.open = false;
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const dd = el.aspectDropdown;
+    if (dd && dd.open) dd.open = false;
+  });
 }
 
 export function wireAutoUpdate(){
@@ -701,7 +726,7 @@ export function wireAutoUpdate(){
   el.includeMC.addEventListener("change", requestUpdate);
   el.includeChiron.addEventListener("change", requestUpdate);
   el.includeNode.addEventListener("change", requestUpdate);
-  el.aspectChecks.addEventListener("change", requestUpdate);
+  el.aspectChecks.addEventListener("change", () => { updateAspectSummary(); requestUpdate(); });
 }
 
 export function applyPreset(key){

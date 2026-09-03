@@ -52,6 +52,8 @@ export const el = {
   rangeEnd: $("rangeEnd"),
   orb: $("orb"),
   aspectChecks: $("aspectChecks"),
+  aspectDropdown: $("aspectDropdown"),
+  aspectSummaryText: $("aspectSummaryText"),
   advancedToggle: $("advancedToggle"),
   includeMoon: $("includeMoon"),
   includeMC: $("includeMC"),
