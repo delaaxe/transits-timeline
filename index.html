@@ -771,9 +771,12 @@
       background: var(--control-bg);
       font-size: 13px;
       cursor: pointer;
-      /* A chip is dragged sideways to reorder; pan-y keeps a vertical swipe
-         that starts on one scrolling the page as it always did. */
-      touch-action: pan-y;
+      /* The chips own every gesture that starts on them. pan-y was the obvious
+         choice - keep vertical page scroll working - but iOS latches
+         touch-action at touchstart and claims the gesture the moment the
+         finger moves, cancelling the drag before it starts. Scrolling still
+         works everywhere around them, the row being two lines at most. */
+      touch-action: none;
       /* WebKit needs the prefix, and the callout is the other half of it: on
          iOS a press held on a chip pops the magnifier and selects its label
          before a drag has travelled far enough to be a drag. */
