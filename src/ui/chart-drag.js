@@ -51,10 +51,34 @@ export function wireChartReorder(wrap, onReordered){
   let startY = 0;
   let moved = false;
   let suppressClick = false;
+  // Where inside the chip the pointer grabbed it, so the chip follows the
+  // pointer from that same spot rather than jumping its centre under it.
+  let grabX = 0;
+  let grabY = 0;
+
+  // The chip itself is the drag preview: it is lifted out of the row and moved
+  // to follow the pointer, while the gap it leaves behind is the drop it will
+  // make. Recomputed from its live position each move, because the row keeps
+  // relaying out underneath it as it passes its neighbours.
+  function followPointer(x, y){
+    if (!dragged) return;
+    dragged.style.transform = "";
+    const r = dragged.getBoundingClientRect();
+    dragged.style.transform = `translate(${x - (r.left + grabX)}px, ${y - (r.top + grabY)}px)`;
+  }
+
+  // A drag that starts on a chip must not also start a text selection: the
+  // chips themselves are unselectable, but a gesture crossing them would still
+  // sweep up the labels around them.
+  const blockSelect = (e) => e.preventDefault();
 
   function reset(){
-    if (dragged) dragged.classList.remove("dragging");
+    if (dragged){
+      dragged.classList.remove("dragging");
+      dragged.style.transform = "";
+    }
     wrap.classList.remove("reordering");
+    document.removeEventListener("selectstart", blockSelect);
     if (pointerId >= 0 && wrap.hasPointerCapture?.(pointerId)) wrap.releasePointerCapture(pointerId);
     dragged = null;
     pointerId = -1;
@@ -74,6 +98,9 @@ export function wireChartReorder(wrap, onReordered){
     pointerId = e.pointerId;
     startX = e.clientX;
     startY = e.clientY;
+    const r = chip.getBoundingClientRect();
+    grabX = e.clientX - r.left;
+    grabY = e.clientY - r.top;
     moved = false;
   });
 
@@ -85,12 +112,17 @@ export function wireChartReorder(wrap, onReordered){
       wrap.setPointerCapture?.(pointerId);
       dragged.classList.add("dragging");
       wrap.classList.add("reordering");
+      document.addEventListener("selectstart", blockSelect);
+      // Whatever the press already selected before it became a drag.
+      document.getSelection()?.removeAllRanges();
     }
     e.preventDefault();
     const target = dropTargetFor(wrap, dragged, e.clientX, e.clientY);
-    if (!target) return;
-    if (target.after) target.chip.after(dragged);
-    else target.chip.before(dragged);
+    if (target){
+      if (target.after) target.chip.after(dragged);
+      else target.chip.before(dragged);
+    }
+    followPointer(e.clientX, e.clientY);
   });
 
   function finish(e){

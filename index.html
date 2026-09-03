@@ -776,11 +776,17 @@
       touch-action: pan-y;
       user-select: none;
     }
+    /* The dragged chip is the preview: it is translated by script to follow the
+       pointer, so the lift is everything except a transform. */
     .chartBtn.dragging{
-      opacity: 0.6;
+      position: relative;
+      z-index: 5;
       cursor: grabbing;
-      transform: scale(1.04);
+      opacity: 0.9;
+      pointer-events: none;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.35);
     }
+    .chartButtons.reordering{ user-select: none; }
     .chartButtons.reordering .chartBtn{ cursor: grabbing; }
     .chartBtn.active{
       background: var(--star);
