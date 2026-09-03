@@ -6,10 +6,12 @@
 name: Deploy
 
 on:
-  # master is this repository's default branch; main is the Pages project's
-  # production branch. A push to the first publishes to the second.
+  # This repository's default branch is master; the Pages project's production
+  # branch is a separate setting that has been main. Both names are listed so a
+  # rename of either one cannot quietly stop the trigger firing, and which of
+  # them means production is asked of Cloudflare below rather than assumed.
   push:
-    branches: [master]
+    branches: [master, main]
   workflow_dispatch:
     inputs:
       target:
@@ -76,23 +78,50 @@ jobs:
             echo "Unexpected files in dist/:" >&2; echo "$stray" >&2; exit 1
           fi
 
-      # Anything that is not the Pages production branch publishes to a preview
-      # URL and leaves production alone, which is what the script's optional
-      # argument used to do.
-      - name: Choose the Pages branch
+      # A Pages deploy is production only when --branch matches the name the
+      # project has set as its production branch, and a preview otherwise. That
+      # name lives in Cloudflare, not here, so it is read from Cloudflare: a
+      # hardcoded guess that drifted would publish production deploys to a
+      # preview URL and nothing would say so.
+      - name: Ask Cloudflare which branch is production
         id: pages
         env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           EVENT: ${{ github.event_name }}
           TARGET: ${{ inputs.target }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "$EVENT" == "push" || "$TARGET" == "production" ]]; then
-            echo "Deploying to PRODUCTION (transits-timeline.pages.dev)." >&2
-            echo "branch=main" >> "$GITHUB_OUTPUT"
-          else
-            echo "Deploying preview branch '$REF_NAME'; production is untouched." >&2
-            echo "branch=$REF_NAME" >> "$GITHUB_OUTPUT"
+          set -o pipefail
+          project=transits-timeline
+          response="$(curl -sS \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$project")"
+
+          # Read the name before deploying anything. A bad token, a renamed
+          # project or an answer shaped differently than expected stops the run
+          # here, with nothing yet sent to Cloudflare.
+          production="$(jq -r 'if .success != true then empty else .result.production_branch // empty end' <<< "$response" 2>/dev/null || true)"
+          if [[ -z "$production" ]]; then
+            echo "Could not read the production branch of Pages project '$project'." >&2
+            echo "$response" >&2
+            exit 1
           fi
+          echo "Pages project '$project' calls '$production' production." >&2
+
+          if [[ "$EVENT" == "push" || "$TARGET" == "production" ]]; then
+            branch="$production"
+            echo "Deploying to PRODUCTION as '$branch'." >&2
+          elif [[ "$REF_NAME" == "$production" ]]; then
+            # Publishing this ref under its own name would land on production,
+            # which is the one thing a preview must not do.
+            branch="preview-$REF_NAME"
+            echo "Deploying preview as '$branch': '$REF_NAME' is the production branch." >&2
+          else
+            branch="$REF_NAME"
+            echo "Deploying preview branch '$branch'; production is untouched." >&2
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
