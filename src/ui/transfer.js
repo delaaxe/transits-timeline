@@ -1,9 +1,9 @@
-// Charts stay on the device. Exporting writes the same records the app already
-// stores to a file you can keep, or to the clipboard; importing reads that back
-// from either. One dialog serves both ends, because both ask the same question:
-// which of these charts?
+// Charts stay on the device. Exporting writes them as AAF - the exchange format
+// Astro-Seek and the desktop programs read - to a file you can keep, or to the
+// clipboard; importing reads AAF back from either. One dialog serves both ends,
+// because both ask the same question: which of these charts?
 import { chartsState, isDefaultChart, saveCharts } from "../storage/charts.js";
-import { buildPayload, mergeCharts, parseCharts } from "../storage/transfer.js";
+import { buildPayload, mergeCharts, parseCharts, transferFileName, transferMimeType } from "../storage/transfer.js";
 import { el, setStatus } from "./dom.js";
 
 // Three modes: the charts here (export), somewhere to paste or a file to open
@@ -72,9 +72,9 @@ function renderActions(){
   const listed = mode !== "import";
   el.transferTitle.textContent = titles[mode];
   el.transferHint.textContent = mode === "export"
-    ? "Choose the charts to save as a file, or to copy and paste somewhere else."
+    ? "Choose the charts to save as an AAF file, or to copy and paste somewhere else."
     : mode === "import"
-      ? "Paste charts you copied, or open a file you saved."
+      ? "Paste AAF data, or open an .aaf file - from here or from another astrology app."
       : `${view.charts.length} chart${view.charts.length === 1 ? "" : "s"} found. Charts already here are skipped.`;
 
   el.transferConfirmBtn.textContent = mode === "export"
@@ -131,14 +131,14 @@ function readData(text){
 }
 
 function selectedPayload(){
-  return JSON.stringify(buildPayload(view.charts.filter((p) => view.chosen.has(p.id))), null, 2);
+  return buildPayload(view.charts.filter((p) => view.chosen.has(p.id)));
 }
 
 function downloadData(){
-  const url = URL.createObjectURL(new Blob([selectedPayload()], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([selectedPayload()], { type: transferMimeType }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = "transits-timeline-charts.json";
+  link.download = transferFileName;
   link.click();
   URL.revokeObjectURL(url);
 }

@@ -57,8 +57,10 @@ export function parseBirthUTCFor(p){
   if (p.tzName){
     return utcFromLocalPartsInTZ(y, m, d, hh, mm, p.tzName);
   }
+  // Offsets are hours and can be fractional - half-hour zones like India's are
+  // real - so they are taken off the moment, not off the hour field.
   const tz = Number(p.tzOffset || 0);
-  const utcMillis = Date.UTC(y, m-1, d, hh - tz, mm, 0, 0);
+  const utcMillis = Date.UTC(y, m-1, d, hh, mm, 0, 0) - Math.round(tz * 3600000);
   return new Date(utcMillis);
 }
 

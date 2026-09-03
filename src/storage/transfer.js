@@ -1,40 +1,41 @@
-// Moving charts between devices as JSON. The payload is the same chart records
-// the app already stores, so it can be downloaded or copied without a service.
+// Moving charts between devices as AAF, the astrological exchange format that
+// Astro-Seek and the desktop programs read and write, so charts saved here can
+// be opened elsewhere and charts kept elsewhere can be brought in. Files this
+// app wrote in its own JSON before the change still read.
 import { isDefaultChart, newId, normalizeChart, safeJSONParse } from "./charts.js";
+import { formatAAF, looksLikeAAF, parseAAF } from "./aaf.js";
 
 export const transferFormat = "transits-timeline/charts";
 export const transferVersion = 1;
+export const transferFileName = "transits-timeline-charts.aaf";
+export const transferMimeType = "text/plain";
 
-/** @param {any[]} charts */
+/** @param {any[]} charts @returns {string} */
 export function buildPayload(charts){
-  return {
-    format: transferFormat,
-    version: transferVersion,
-    charts: charts.map((p) => {
-      const c = normalizeChart(p);
-      // isDefault marks the seeded sample, which is a local fact, not a chart.
-      delete c.isDefault;
-      return c;
-    })
-  };
+  return formatAAF(charts.map((p) => normalizeChart(p)));
 }
 
-/** @param {string} text @returns {any[]} */
-export function parseCharts(text){
+function fromJSON(text){
   const data = safeJSONParse(text, null);
-  if (!data) throw new Error("That data is damaged.");
+  if (!data) return null;
   const raw = Array.isArray(data) ? data : data.charts;
   if (!Array.isArray(raw)) throw new Error("That data has no charts in it.");
   if (!Array.isArray(data) && data.format && data.format !== transferFormat){
     throw new Error("That data came from a different app.");
   }
-  const charts = raw
-    .filter((p) => p && typeof p === "object" && (p.birthDate || p.date))
-    .map((p) => {
-      const c = normalizeChart(p);
-      delete c.isDefault;
-      return c;
-    });
+  return raw.filter((p) => p && typeof p === "object" && (p.birthDate || p.date));
+}
+
+/** @param {string} text @returns {any[]} */
+export function parseCharts(text){
+  const raw = looksLikeAAF(text) ? parseAAF(text) : fromJSON(text);
+  if (!raw) throw new Error("That data is damaged.");
+  const charts = raw.map((p) => {
+    const c = normalizeChart(p);
+    // isDefault marks the seeded sample, which is a local fact, not a chart.
+    delete c.isDefault;
+    return c;
+  });
   if (charts.length === 0) throw new Error("That data has no charts in it.");
   return charts;
 }
