@@ -11,6 +11,10 @@ import { chartsState, saveCharts, reorderChartsByIds } from "../storage/charts.j
 // the click that follows still switches charts.
 const DRAG_THRESHOLD_PX = 6;
 
+// How far the pointer has to travel after one rearrangement before it can cause
+// the next.
+const SWAP_TRAVEL_PX = 8;
+
 const ADD_ID = "__add__";
 
 function chipsOf(wrap){
@@ -21,25 +25,22 @@ function chipsOf(wrap){
   );
 }
 
-// The chips wrap onto several lines on a narrow screen, so "which chip is the
-// pointer over" is a two-dimensional question: nearest centre wins, and which
-// side of that centre the pointer is on says whether the dragged chip goes
-// before or after it.
+// The chip the pointer is actually over, and which half of it, or null when it
+// is over none of them.
+//
+// Nearest centre would be the obvious rule and it is the wrong one here: the
+// chips wrap, so a chip crossing to the row below reflows the row it left, the
+// chip it just passed lands back under the pointer, and the two swap places
+// again on the next move - a flicker that never settles. Containment cannot do
+// that, because a swap carries the chip it swapped with away from the pointer.
 function dropTargetFor(wrap, dragged, x, y){
-  let best = null;
-  let bestDist = Infinity;
   for (const chip of chipsOf(wrap)){
     if (chip === dragged) continue;
     const r = chip.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    const d = Math.hypot(x - cx, y - cy);
-    if (d < bestDist){
-      bestDist = d;
-      best = { chip, after: (Math.abs(y - cy) > r.height / 2) ? y > cy : x > cx };
-    }
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    return { chip, after: x > r.left + r.width / 2 };
   }
-  return best;
+  return null;
 }
 
 export function wireChartReorder(wrap, onReordered){
@@ -55,6 +56,11 @@ export function wireChartReorder(wrap, onReordered){
   // pointer from that same spot rather than jumping its centre under it.
   let grabX = 0;
   let grabY = 0;
+  // Where the pointer was when the row last rearranged. Containment settles the
+  // flicker on its own; this is the belt to its braces, so that a reflow landing
+  // a chip back under a stationary finger cannot swap again on its own.
+  let lastSwapX = 0;
+  let lastSwapY = 0;
 
   // The chip itself is the drag preview: it is lifted out of the row and moved
   // to follow the pointer, while the gap it leaves behind is the drop it will
@@ -102,6 +108,8 @@ export function wireChartReorder(wrap, onReordered){
     const r = chip.getBoundingClientRect();
     grabX = e.clientX - r.left;
     grabY = e.clientY - r.top;
+    lastSwapX = e.clientX;
+    lastSwapY = e.clientY;
     moved = false;
   });
 
@@ -121,10 +129,19 @@ export function wireChartReorder(wrap, onReordered){
       document.getSelection()?.removeAllRanges();
     }
     e.preventDefault();
-    const target = dropTargetFor(wrap, dragged, e.clientX, e.clientY);
-    if (target){
-      if (target.after) target.chip.after(dragged);
-      else target.chip.before(dragged);
+    if (Math.hypot(e.clientX - lastSwapX, e.clientY - lastSwapY) >= SWAP_TRAVEL_PX){
+      const target = dropTargetFor(wrap, dragged, e.clientX, e.clientY);
+      // An insertion where the chip already sits moves nothing, and taking it
+      // as a rearrangement would hold the next real one back.
+      const already = target && (target.after
+        ? dragged.previousElementSibling === target.chip
+        : dragged.nextElementSibling === target.chip);
+      if (target && !already){
+        if (target.after) target.chip.after(dragged);
+        else target.chip.before(dragged);
+        lastSwapX = e.clientX;
+        lastSwapY = e.clientY;
+      }
     }
     followPointer(e.clientX, e.clientY);
   });
