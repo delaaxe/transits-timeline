@@ -100,3 +100,35 @@ export function loadCharts(){
 export function saveCharts(charts){
   localStorage.setItem(chartsKey, JSON.stringify(charts));
 }
+
+// Reordering. The list's order is the order the chips are shown in, so moving a
+// chip is moving the chart: pure here, so the drag code only has to say which
+// chart landed where.
+export function moveChart(list, id, toIndex){
+  const from = list.findIndex(p => p.id === id);
+  if (from < 0) return list.slice();
+  const next = list.slice();
+  const [moved] = next.splice(from, 1);
+  const clamped = Math.max(0, Math.min(next.length, toIndex));
+  next.splice(clamped, 0, moved);
+  return next;
+}
+
+// The chips are dragged around in the DOM for live feedback, so what comes back
+// from a drop is the order they ended up in. Ids the list does not know are
+// ignored, and charts the ids leave out keep their old relative order at the
+// end, so a partial or stale list can never drop a chart.
+export function reorderChartsByIds(list, ids){
+  const seen = new Set();
+  const ordered = [];
+  for (const id of ids){
+    const p = list.find(x => x.id === id);
+    if (!p || seen.has(id)) continue;
+    seen.add(id);
+    ordered.push(p);
+  }
+  for (const p of list){
+    if (!seen.has(p.id)) ordered.push(p);
+  }
+  return ordered;
+}

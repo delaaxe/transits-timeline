@@ -5,15 +5,18 @@
 # master is this repository's default branch. main is the name the Pages project
 # has set as its production branch, which is what makes a deploy production
 # rather than a preview. Every push to master publishes production.
+#
+# Any other branch pushed here deploys under its own name, which Pages serves as
+# a preview on its own URL and never as production.
 name: Deploy
 
 on:
   push:
-    branches: [master]
+    branches: ["**"]
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -48,6 +51,18 @@ jobs:
 
       - run: npm run build
 
+      # Pages reads production from the branch name it is given, so master maps
+      # to main and everything else deploys as itself. Slashes are legal in the
+      # name; anything else Pages does not accept is folded to a dash.
+      - name: Pick the Pages branch
+        id: pages
+        run: |
+          if [ "$GITHUB_REF_NAME" = "master" ]; then
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=$(printf '%s' "$GITHUB_REF_NAME" | tr -c 'A-Za-z0-9._/-' '-')" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
@@ -56,4 +71,4 @@ jobs:
           # Pinned so a wrangler release cannot change what a deploy does. The
           # run writes api-key.js and dist/, so the tree is dirty by design.
           wranglerVersion: "4.128.0"
-          command: pages deploy dist --project-name transits-timeline --commit-dirty=true --branch main
+          command: pages deploy dist --project-name transits-timeline --commit-dirty=true --branch ${{ steps.pages.outputs.branch }}

@@ -771,7 +771,17 @@
       background: var(--control-bg);
       font-size: 13px;
       cursor: pointer;
+      /* A chip is dragged sideways to reorder; pan-y keeps a vertical swipe
+         that starts on one scrolling the page as it always did. */
+      touch-action: pan-y;
+      user-select: none;
     }
+    .chartBtn.dragging{
+      opacity: 0.6;
+      cursor: grabbing;
+      transform: scale(1.04);
+    }
+    .chartButtons.reordering .chartBtn{ cursor: grabbing; }
     .chartBtn.active{
       background: var(--star);
       border-color: var(--star);

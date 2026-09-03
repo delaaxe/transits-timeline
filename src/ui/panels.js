@@ -9,6 +9,7 @@ import { awsAutocomplete, awsGetPlace, extractPosition } from "../services/place
 import { chartsState, defaultChartData, getActiveChart, getActiveChartA, getActiveChartB, isDefaultChart, lastChartKey, loadCharts, newId, normalizeChart, saveCharts } from "../storage/charts.js";
 import { $, debounce, el, escapeHTML, fillSelect, installHint, installHintText, setStatus } from "./dom.js";
 import { fmtCoord } from "./format.js";
+import { wireChartReorder } from "./chart-drag.js";
 import { wireTransferUI } from "./transfer.js";
 import { isIOSLike } from "./tooltip.js";
 
@@ -118,6 +119,7 @@ export function renderChartButtonsFor(wrap, activeId, { allowAdd=true, disableId
     btn.textContent = p.name || "(unnamed)";
     btn.setAttribute("role", "option");
     btn.setAttribute("aria-selected", (!chartsState.addMode && p.id === activeId) ? "true" : "false");
+    btn.title = "Drag to reorder";
     if (disableId && p.id === disableId){
       btn.disabled = true;
       btn.setAttribute("aria-disabled", "true");
@@ -578,6 +580,8 @@ export function wireChartsUI(){
     else renderPersonalSection();
     requestUpdate();
   });
+  wireChartReorder(el.chartButtons, () => renderPersonalSection());
+  wireChartReorder(el.chartButtonsB, () => renderPersonalSection());
   el.chartButtons.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-chart-id]");
     if (!btn) return;
