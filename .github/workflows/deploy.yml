@@ -130,4 +130,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Pinned so a wrangler release cannot change what a deploy does.
           wranglerVersion: "4.128.0"
-          command: pages deploy dist --project-name transits-timeline --branch ${{ steps.pages.outputs.branch }}
+          # The run writes api-key.js and dist/ before this, so the tree is dirty
+          # by design and wrangler's warning about it says nothing useful.
+          command: pages deploy dist --project-name transits-timeline --commit-dirty=true --branch ${{ steps.pages.outputs.branch }}
