@@ -1,29 +1,19 @@
-# Deploying used to be `npm run deploy` from a laptop, which meant the bundle
-# that shipped carried whatever that laptop happened to have in api-key.js and
-# whoever ran it was logged into wrangler. Here the key is a repository secret,
-# the tree is a fresh checkout, and the only thing that reaches Cloudflare is
-# dist/, rebuilt from scratch by every run.
+# Deploying used to be `npm run deploy` from a laptop, which shipped whatever
+# that laptop had in api-key.js. Here the key is a repository secret and the
+# only thing that reaches Cloudflare is dist/, rebuilt from scratch each run.
+#
+# master is this repository's default branch. main is the name the Pages project
+# has set as its production branch, which is what makes a deploy production
+# rather than a preview. Every push to master publishes production.
 name: Deploy
 
 on:
-  # This repository's default branch is master; the Pages project's production
-  # branch is a separate setting that has been main. Both names are listed so a
-  # rename of either one cannot quietly stop the trigger firing, and which of
-  # them means production is asked of Cloudflare below rather than assumed.
   push:
-    branches: [master, main]
+    branches: [master]
   workflow_dispatch:
-    inputs:
-      target:
-        description: Where to publish
-        type: choice
-        options: [preview, production]
-        default: preview
 
-# Two deploys of the same branch racing would leave the later build serving the
-# earlier one's output, so they queue instead of overlapping.
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy
   cancel-in-progress: false
 
 permissions:
@@ -42,10 +32,9 @@ jobs:
 
       - run: npm ci
 
-      # A green suite is the gate this deploy path gains over running the script
-      # by hand. Typecheck is not one: it has standing errors of its own.
-      - name: Test
-        run: npm test
+      # The gate that running the script by hand never had. Not typecheck: it
+      # has standing errors of its own.
+      - run: npm test
 
       # src/services/places.js imports api-key.js by path and .gitignore keeps
       # it out of the repo, so the secret is written back into the file the
@@ -78,58 +67,12 @@ jobs:
             echo "Unexpected files in dist/:" >&2; echo "$stray" >&2; exit 1
           fi
 
-      # A Pages deploy is production only when --branch matches the name the
-      # project has set as its production branch, and a preview otherwise. That
-      # name lives in Cloudflare, not here, so it is read from Cloudflare: a
-      # hardcoded guess that drifted would publish production deploys to a
-      # preview URL and nothing would say so.
-      - name: Ask Cloudflare which branch is production
-        id: pages
-        env:
-          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          EVENT: ${{ github.event_name }}
-          TARGET: ${{ inputs.target }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          set -o pipefail
-          project=transits-timeline
-          response="$(curl -sS \
-            -H "Authorization: Bearer $CF_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$project")"
-
-          # Read the name before deploying anything. A bad token, a renamed
-          # project or an answer shaped differently than expected stops the run
-          # here, with nothing yet sent to Cloudflare.
-          production="$(jq -r 'if .success != true then empty else .result.production_branch // empty end' <<< "$response" 2>/dev/null || true)"
-          if [[ -z "$production" ]]; then
-            echo "Could not read the production branch of Pages project '$project'." >&2
-            echo "$response" >&2
-            exit 1
-          fi
-          echo "Pages project '$project' calls '$production' production." >&2
-
-          if [[ "$EVENT" == "push" || "$TARGET" == "production" ]]; then
-            branch="$production"
-            echo "Deploying to PRODUCTION as '$branch'." >&2
-          elif [[ "$REF_NAME" == "$production" ]]; then
-            # Publishing this ref under its own name would land on production,
-            # which is the one thing a preview must not do.
-            branch="preview-$REF_NAME"
-            echo "Deploying preview as '$branch': '$REF_NAME' is the production branch." >&2
-          else
-            branch="$REF_NAME"
-            echo "Deploying preview branch '$branch'; production is untouched." >&2
-          fi
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Pinned so a wrangler release cannot change what a deploy does.
+          # Pinned so a wrangler release cannot change what a deploy does. The
+          # run writes api-key.js and dist/, so the tree is dirty by design.
           wranglerVersion: "4.128.0"
-          # The run writes api-key.js and dist/ before this, so the tree is dirty
-          # by design and wrangler's warning about it says nothing useful.
-          command: pages deploy dist --project-name transits-timeline --commit-dirty=true --branch ${{ steps.pages.outputs.branch }}
+          command: pages deploy dist --project-name transits-timeline --commit-dirty=true --branch main
