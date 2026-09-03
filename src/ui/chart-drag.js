@@ -79,6 +79,7 @@ export function wireChartReorder(wrap, onReordered){
     }
     wrap.classList.remove("reordering");
     document.removeEventListener("selectstart", blockSelect);
+    document.body.classList.remove("reorderingCharts");
     if (pointerId >= 0 && wrap.hasPointerCapture?.(pointerId)) wrap.releasePointerCapture(pointerId);
     dragged = null;
     pointerId = -1;
@@ -113,6 +114,9 @@ export function wireChartReorder(wrap, onReordered){
       dragged.classList.add("dragging");
       wrap.classList.add("reordering");
       document.addEventListener("selectstart", blockSelect);
+      // selectstart is not dispatched for touch selection on iOS, so the drag
+      // also turns selection off in CSS for as long as it lasts.
+      document.body.classList.add("reorderingCharts");
       // Whatever the press already selected before it became a drag.
       document.getSelection()?.removeAllRanges();
     }

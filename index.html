@@ -774,7 +774,13 @@
       /* A chip is dragged sideways to reorder; pan-y keeps a vertical swipe
          that starts on one scrolling the page as it always did. */
       touch-action: pan-y;
+      /* WebKit needs the prefix, and the callout is the other half of it: on
+         iOS a press held on a chip pops the magnifier and selects its label
+         before a drag has travelled far enough to be a drag. */
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
     }
     /* The dragged chip is the preview: it is translated by script to follow the
        pointer, so the lift is everything except a transform. */
@@ -786,7 +792,16 @@
       pointer-events: none;
       box-shadow: 0 6px 16px rgba(0,0,0,0.35);
     }
-    .chartButtons.reordering{ user-select: none; }
+    .chartButtons.reordering{ user-select: none; -webkit-user-select: none; }
+    /* A drag can travel off the chips and over the panel, and on iOS the
+       selection follows it there, so the whole page stops selecting for as
+       long as one is in flight. */
+    body.reorderingCharts,
+    body.reorderingCharts *{
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -webkit-touch-callout: none !important;
+    }
     .chartButtons.reordering .chartBtn{ cursor: grabbing; }
     .chartBtn.active{
       background: var(--star);
