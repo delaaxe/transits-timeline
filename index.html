@@ -682,6 +682,11 @@
       .viewBar > .viewBarToggle{ min-height: 40px; padding: 6px 8px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
+      /* Safari zooms the page in whenever it focuses a field set below 16px,
+         and "Import charts instead" focuses this one the moment it is tapped.
+         The dense 12px is a desktop nicety; keeping the page where the reader
+         left it matters more. */
+      .transferPaste{ font-size: 16px; }
     }
 
     /* Scrolled, the view bar and the date axis are the entire header, and on a
