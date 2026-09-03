@@ -1,0 +1,104 @@
+# Deploying used to be `npm run deploy` from a laptop, which meant the bundle
+# that shipped carried whatever that laptop happened to have in api-key.js and
+# whoever ran it was logged into wrangler. Here the key is a repository secret,
+# the tree is a fresh checkout, and the only thing that reaches Cloudflare is
+# dist/, rebuilt from scratch by every run.
+name: Deploy
+
+on:
+  # master is this repository's default branch; main is the Pages project's
+  # production branch. A push to the first publishes to the second.
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        type: choice
+        options: [preview, production]
+        default: preview
+
+# Two deploys of the same branch racing would leave the later build serving the
+# earlier one's output, so they queue instead of overlapping.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A green suite is the gate this deploy path gains over running the script
+      # by hand. Typecheck is not one: it has standing errors of its own.
+      - name: Test
+        run: npm test
+
+      # src/services/places.js imports api-key.js by path and .gitignore keeps
+      # it out of the repo, so the secret is written back into the file the
+      # bundler expects. It stays on the runner; only dist/ is deployed.
+      - name: Write api-key.js
+        env:
+          AWS_API_KEY: ${{ secrets.AWS_API_KEY }}
+        run: |
+          [ -n "$AWS_API_KEY" ] || { echo "AWS_API_KEY secret is empty; the build would ship a placeholder." >&2; exit 1; }
+          node -e 'require("node:fs").writeFileSync("api-key.js", "export const awsApiKey = " + JSON.stringify(process.env.AWS_API_KEY) + ";\n")'
+
+      - run: npm run build
+
+      # dist/ is rebuilt from scratch by the build, so only built output can
+      # ship. This is what replaced deploying the working directory, which once
+      # published .env.
+      - name: Check dist/ holds exactly what it should
+        run: |
+          expected=(index.html aspects.json myths.json apple-touch-icon.png)
+          for f in "${expected[@]}"; do
+            [[ -f "dist/$f" ]] || { echo "Build did not produce dist/$f" >&2; exit 1; }
+          done
+          # One page bundle, one worker, and the chunk they share.
+          for kind in app worker chunk; do
+            n="$(find dist -maxdepth 1 -name "$kind.*.js" | wc -l | tr -d ' ')"
+            [[ "$n" == "1" ]] || { echo "Expected exactly one $kind.*.js in dist/, found $n" >&2; exit 1; }
+          done
+          stray="$(find dist -type f \! -name 'app.*.js' \! -name 'worker.*.js' \! -name 'chunk.*.js' $(printf '! -name %s ' "${expected[@]}"))"
+          if [[ -n "$stray" ]]; then
+            echo "Unexpected files in dist/:" >&2; echo "$stray" >&2; exit 1
+          fi
+
+      # Anything that is not the Pages production branch publishes to a preview
+      # URL and leaves production alone, which is what the script's optional
+      # argument used to do.
+      - name: Choose the Pages branch
+        id: pages
+        env:
+          EVENT: ${{ github.event_name }}
+          TARGET: ${{ inputs.target }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$EVENT" == "push" || "$TARGET" == "production" ]]; then
+            echo "Deploying to PRODUCTION (transits-timeline.pages.dev)." >&2
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "Deploying preview branch '$REF_NAME'; production is untouched." >&2
+            echo "branch=$REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Pinned so a wrangler release cannot change what a deploy does.
+          wranglerVersion: "4.128.0"
+          command: pages deploy dist --project-name transits-timeline --branch ${{ steps.pages.outputs.branch }}
