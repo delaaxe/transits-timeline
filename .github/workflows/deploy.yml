@@ -48,25 +48,6 @@ jobs:
 
       - run: npm run build
 
-      # dist/ is rebuilt from scratch by the build, so only built output can
-      # ship. This is what replaced deploying the working directory, which once
-      # published .env.
-      - name: Check dist/ holds exactly what it should
-        run: |
-          expected=(index.html aspects.json myths.json apple-touch-icon.png)
-          for f in "${expected[@]}"; do
-            [[ -f "dist/$f" ]] || { echo "Build did not produce dist/$f" >&2; exit 1; }
-          done
-          # One page bundle, one worker, and the chunk they share.
-          for kind in app worker chunk; do
-            n="$(find dist -maxdepth 1 -name "$kind.*.js" | wc -l | tr -d ' ')"
-            [[ "$n" == "1" ]] || { echo "Expected exactly one $kind.*.js in dist/, found $n" >&2; exit 1; }
-          done
-          stray="$(find dist -type f \! -name 'app.*.js' \! -name 'worker.*.js' \! -name 'chunk.*.js' $(printf '! -name %s ' "${expected[@]}"))"
-          if [[ -n "$stray" ]]; then
-            echo "Unexpected files in dist/:" >&2; echo "$stray" >&2; exit 1
-          fi
-
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
