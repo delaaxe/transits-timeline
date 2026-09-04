@@ -69,6 +69,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Pinned so a wrangler release cannot change what a deploy does. The
-          # run writes api-key.js and dist/, so the tree is dirty by design.
+          # same pin is a devDependency, so npm ci installs wrangler once, from
+          # the cache, and the action finds it rather than fetching its own -
+          # that fetch was never cached and cost minutes on a slow npm day. The
+          # two versions have to stay equal or the action installs anyway.
+          # The run writes api-key.js and dist/, so the tree is dirty by design.
           wranglerVersion: "4.128.0"
           command: pages deploy dist --project-name transits-timeline --commit-dirty=true --branch ${{ steps.pages.outputs.branch }}
