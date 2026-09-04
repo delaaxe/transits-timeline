@@ -5,7 +5,7 @@
 // a computer needs: Julian day, latitude, longitude, zone offset, time type)
 // and annotation chunks. Fields are comma separated, so no field may hold a
 // comma, and `*` stands for a value nobody knows.
-import { tzOffsetMinutesAt } from "../core/time.js";
+import { julianDay, parseBirthUTCFor, tzOffsetMinutesAt } from "../core/time.js";
 
 const SIGNLESS = "*";
 
@@ -139,6 +139,11 @@ function parseTime(text){
   return `${pad(+m[1])}:${pad(+(m[2] || 0))}`;
 }
 
+function julianDayOf(chart){
+  try { return julianDay(parseBirthUTCFor(chart)).toFixed(6); }
+  catch { return SIGNLESS; }
+}
+
 /**
  * One chart as an AAF record.
  * @param {any} chart @returns {string}
@@ -148,9 +153,13 @@ export function formatRecord(chart){
   const { place, country } = splitPlace(chart.placeLabel);
   const year = +String(chart.birthDate).slice(0, 4) || 2000;
   const { standard, dst } = zoneOffsetsAt(chart, year);
+  // The Julian day is optional - a reader can work it out from the date, time
+  // and offset above - but the readers that want it want it, and where it is
+  // given it outranks the rest, so it has to be the same moment they describe.
+  const jd = julianDayOf(chart);
   const lines = [
     `#A93:${last},${first},${SIGNLESS},${formatDate(chart.birthDate)},${chart.birthTime || SIGNLESS},${place},${country}`,
-    `#B93:${SIGNLESS},${formatDegrees(+chart.lat, "n", "s")},${formatDegrees(+chart.lon, "e", "w")},${formatOffset(standard)},${timeTypeFor(dst)}`
+    `#B93:${jd},${formatDegrees(+chart.lat, "n", "s")},${formatDegrees(+chart.lon, "e", "w")},${formatOffset(standard)},${timeTypeFor(dst)}`
   ];
   // The zone name is the one thing AAF has no field for that this app would
   // rather not lose: with it a re-import gets the daylight rules back, without

@@ -33,8 +33,22 @@ test("an exported record is written the way AAF spells it", () => {
     tzName: "Africa/Johannesburg"
   }]).split("\n");
   assert.ok(lines.includes("#A93:Musk,Elon,*,28.6.1971,07:30,Pretoria,South Africa"));
-  assert.ok(lines.includes("#B93:*,25s44:52,28e13:45,2he00,0"));
+  assert.ok(lines.includes("#B93:2441130.729167,25s44:52,28e13:45,2he00,0"));
   assert.ok(lines.includes("#ZNAM:Africa/Johannesburg"));
+});
+
+// The format definition works one record through in full. Reproducing it is the
+// only check available here that another program's reader would recognise what
+// this one writes.
+test("a record matches the worked example in the AAF definition", () => {
+  const text = buildPayload([{
+    ...ada, name: "Peter Niehenke", birthDate: "1949-05-09", birthTime: "22:30",
+    placeLabel: "Hamm, D", lon: 7.8167, lat: 51.6833, tzName: "Europe/Berlin"
+  }]);
+  assert.ok(text.includes("#A93:Niehenke,Peter,*,9.5.1949,22:30,Hamm,D"));
+  // The definition prints this as `2433046.354167,51n41,7e49,1he,1`; the arc
+  // seconds and zero minutes here are the same values written out in full.
+  assert.ok(text.includes("#B93:2433046.354167,51n41:00,7e49:00,1he00,1"));
 });
 
 // AAF states the zone's standard offset and flags the daylight hour separately,
