@@ -70,9 +70,14 @@ export function computeTimelineLayout(svg){
   const labelW = t.labelWMax;
   const marginL = 0;
   const marginR = 12;
+  // The label column is a separate SVG laid over the chart, so the first tick
+  // of the time axis used to start on the exact pixel where that overlay ends.
+  // A sub-pixel scroll offset was enough to slide it under the overlay and out
+  // again; this gutter keeps a few transparent pixels between them.
+  const axisGutter = 3;
   const axisY = t.marginT + t.axisGap;
   const totalW = Math.max(600, Math.floor(containerW));
-  const timelineW = Math.max(360, totalW - marginL - labelW - marginR);
+  const timelineW = Math.max(360, totalW - marginL - labelW - axisGutter - marginR);
 
   return {
     containerW,
@@ -82,6 +87,7 @@ export function computeTimelineLayout(svg){
     labelWMin: t.labelWMin,
     marginL,
     marginR,
+    axisGutter,
     marginT: t.marginT,
     rowH,
     rowGap: t.rowGap,

@@ -755,7 +755,14 @@
       .presetBtn{ padding-inline: 10px; }
       .dateAxisScrollInner{ padding: 0; }
       .timelineScroll{ padding: 0; border-radius: 0; width: 100%; margin: 0; }
-      #axisCornerBlock{ display: block; }
+      /* The inner scroller loses its top padding here, so the block has to
+         start at the very top of the plate: at --axis-pad-top the month title
+         surfaced above it for those few pixels while the axis was dragged. */
+      #axisCornerBlock{
+        display: block;
+        top: 0;
+        height: calc(var(--date-axis-h, 80px) + var(--timeline-nav-total, 0px) + var(--axis-pad-top));
+      }
       .timelineNavGroup:last-child .timelineNavBtn:last-child{ margin-right: 10px; }
       .rowPlanets{ margin-top: 0 !important; }
       .rowPlanets{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }

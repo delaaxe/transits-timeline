@@ -234,8 +234,8 @@ export function wireTimelineResize(){
 export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   clearSvg(svg);
 
-  const { totalW, timelineW, labelW, marginL, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
-  const x0 = marginL + labelW;
+  const { totalW, timelineW, labelW, marginL, axisGutter = 0, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
+  const x0 = marginL + labelW + axisGutter;
   const axisHeight = axisY + 40 + axisBottomPad;
   document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
   svg.setAttribute("viewBox", `0 0 ${totalW} ${axisHeight}`);
@@ -425,8 +425,8 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, showTime, presetKey, chartRuler, layout, showYear}){
   clearSvg(svg);
 
-  const { totalW, timelineW, labelW, marginL, rowH, rowGap, bottomPad, rowsY0 } = layout;
-  const x0 = marginL + labelW;
+  const { totalW, timelineW, labelW, marginL, axisGutter = 0, rowH, rowGap, bottomPad, rowsY0 } = layout;
+  const x0 = marginL + labelW + axisGutter;
 
   const n = rules.length;
   const totalH = rowsY0 + (n*(rowH+rowGap)) + bottomPad;
