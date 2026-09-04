@@ -140,7 +140,6 @@ function syncAxisAnimations(maxScroll){
 }
 
 let lastShift = null;
-let lastOverscroll = null;
 
 export function updateAxisTransform(){
   if (!el.dateAxisSvg || !el.timelineScroll) return;
@@ -150,19 +149,6 @@ export function updateAxisTransform(){
   // The date axis follows a CSS scroll timeline where those exist.
   if (!scrollTimelineSupported){
     el.dateAxisSvg.style.transform = `translate3d(${-Math.round(scrollLeft)}px, 0, 0)`;
-  } else {
-    // A scroll timeline's progress is clamped to the scrollable range, so the
-    // axis stops dead while iOS rubber-bands past either end and the now line
-    // tears in two - its chart half rides the bounce, its axis half does not.
-    // translate is a separate property from transform, so this rides along with
-    // the animation instead of fighting it for the same declaration.
-    const maxScroll = el.timelineScroll.scrollWidth - el.timelineScroll.clientWidth;
-    const over = scrollLeft < 0 ? scrollLeft : Math.max(0, scrollLeft - maxScroll);
-    const rounded = Math.round(over);
-    if (rounded !== lastOverscroll){
-      lastOverscroll = rounded;
-      el.dateAxisSvg.style.translate = rounded ? `${-rounded}px` : "";
-    }
   }
 
   // Where scroll timelines exist the generated keyframes drive the column.
