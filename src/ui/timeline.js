@@ -234,7 +234,7 @@ export function wireTimelineResize(){
 export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   clearSvg(svg);
 
-  const { totalW, timelineW, labelW, marginL, axisGutter = 0, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
+  const { totalW, containerW, timelineW, labelW, marginL, axisGutter = 0, axisY, axisBottomPad, axisLabelSize, axisTitleSize } = layout;
   const x0 = marginL + labelW + axisGutter;
   const axisHeight = axisY + 40 + axisBottomPad;
   document.documentElement.style.setProperty("--date-axis-h", `${axisHeight}px`);
@@ -365,8 +365,16 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   // to the bottom edge of this SVG, and the timeline picks it up at its own
   // y = 0. It starts below the labels rather than at the top of the band,
   // where it used to strike through the dates it was drawn over.
+  //
+  // Only where the chart does not scroll sideways. Where it does, this SVG
+  // follows it on a scroll timeline whose progress is clamped to the scroll
+  // range, so an overdrag past either end carries the chart while this stands
+  // still and the join comes apart; there the chart draws the whole line and
+  // this segment would be the one piece that could break away. The chart is
+  // exactly as wide as the scroller can show it when totalW fits containerW.
+  const scrollsSideways = totalW > containerW;
   const now = new Date();
-  if (now >= start && now < endExclusive){
+  if (!scrollsSideways && now >= start && now < endExclusive){
     const xNow = dateToX(now);
     svg.appendChild(svgEl("line", {
       x1: xNow, y1: axisY + 29, x2: xNow, y2: axisHeight,
