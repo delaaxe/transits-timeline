@@ -430,6 +430,27 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
   }
 }
 
+// A bar whose window runs past the edge of the timeline is cut square there and
+// left rounded at the end it really has, so the two read differently. The
+// radius follows the clamp SVG applies to rx - never more than half the height,
+// and never more than the width it has to fit in - so a one-day bar keeps its
+// shape instead of growing impossible corners.
+export function barPath(x, y, w, h, roundStart, roundEnd){
+  const share = (roundStart && roundEnd) ? w / 2 : w;
+  const r = Math.max(0, Math.min(h / 2, share));
+  const rs = roundStart ? r : 0;
+  const re = roundEnd ? r : 0;
+  const x2 = x + w;
+  const y2 = y + h;
+  const p = [`M ${x + rs} ${y}`, `L ${x2 - re} ${y}`];
+  if (re) p.push(`A ${re} ${re} 0 0 1 ${x2} ${y + re}`, `L ${x2} ${y2 - re}`, `A ${re} ${re} 0 0 1 ${x2 - re} ${y2}`);
+  else p.push(`L ${x2} ${y2}`);
+  p.push(`L ${x + rs} ${y2}`);
+  if (rs) p.push(`A ${rs} ${rs} 0 0 1 ${x} ${y2 - rs}`, `L ${x} ${y + rs}`, `A ${rs} ${rs} 0 0 1 ${x + rs} ${y}`);
+  p.push("Z");
+  return p.join(" ");
+}
+
 export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, showTime, presetKey, chartRuler, layout, showYear}){
   clearSvg(svg);
 
@@ -502,11 +523,19 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
       const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
       const barH = rowH - 8;
-      const rect = svgEl("rect", {
-        x: xa, y: y + 4, width: w, height: barH,
+      // A window the scan found already open at the range start, or still open
+      // at its end, does not really begin or end here - the timeline just stops
+      // showing it. A rounded cap there would claim the transit closed inside
+      // the window, so that end is cut square instead.
+      const roundStart = !event.startClipped;
+      const roundEnd = !event.endClipped;
+      const shapeAttrs = (roundStart && roundEnd)
         // SVG clamps rx to half the width, so a one-day bar becomes a dot
         // rather than a rectangle with impossible corners.
-        rx: barH / 2,
+        ? { x: xa, y: y + 4, width: w, height: barH, rx: barH / 2 }
+        : { d: barPath(xa, y + 4, w, barH, roundStart, roundEnd) };
+      const rect = svgEl((roundStart && roundEnd) ? "rect" : "path", {
+        ...shapeAttrs,
         fill: fillFor(barColor),
         // Two windows that meet in a row would otherwise read as one long bar.
         stroke: isHexColor(barColor) ? darken(barColor, 0.4) : "none",
