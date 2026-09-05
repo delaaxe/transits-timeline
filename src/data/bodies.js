@@ -47,6 +47,44 @@ export const maxSpeedDegPerDay = {
   mc: 0
 };
 
+// How long a contact from each transiting body lasts, and whether it comes back.
+// The scan already finds the repeat hits - a retrograde pass that stays within
+// orb hits more than once, which is why an event carries a list of exact times -
+// but nothing on screen said which bodies do that, so a two-day Sun contact read
+// with the same weight as a two-year Pluto one. The rates are mean apparent
+// geocentric motion; the bar itself supplies the actual dates.
+/** @type {Record<string, string>} */
+export const transitTiming = {
+  sun: "The Sun covers a degree a day and never turns retrograde, so this crosses once and returns in a year.",
+  moon: "The Moon covers a degree every two hours and never turns retrograde, so this crosses once and returns in a month.",
+  mercury: "Mercury covers a degree in well under a day when direct, but stations often, and can cross the same degree three times in a few weeks.",
+  venus: "Venus covers a degree in under a day when direct, and crosses three times over some weeks when it turns retrograde here.",
+  mars: "Mars covers a degree in about two days, and crosses three times over some months when it stations here.",
+  jupiter: "Jupiter covers a degree in about twelve days, and often crosses three times across a year as it stations.",
+  saturn: "Saturn covers a degree in about a month, and usually crosses three times across a year or two as it stations.",
+  uranus: "Uranus covers a degree in about three months, typically crossing three times over a year or more.",
+  neptune: "Neptune covers a degree in about six months, often crossing three times over two or three years.",
+  pluto: "Pluto covers a degree in anything from half a year to a year, depending where it is in its eccentric orbit, and can cross three to five times over several years.",
+  chiron: "Chiron covers a degree in about seven weeks on average, usually crossing three times over about a year.",
+  node: "The mean node drifts backward a degree in three weeks and never turns, so this crosses once and not again for about nineteen years."
+};
+
+/**
+ * Which body sets the pace. Against a natal point only the transiting body
+ * moves; in world mode both do, and the faster of the two is what opens and
+ * closes the window.
+ */
+/**
+ * @param {string} transitKey @param {string} natalKey @param {boolean} bothMoving
+ * @returns {string}
+ */
+export function transitTimingFor(transitKey, natalKey, bothMoving){
+  const speed = /** @type {Record<string, number>} */ (maxSpeedDegPerDay);
+  let key = transitKey;
+  if (bothMoving && (speed[natalKey] ?? 0) > (speed[transitKey] ?? 0)) key = natalKey;
+  return transitTiming[key] || "";
+}
+
 export const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc"];
 
 export const orderMap = new Map(order.map((k,i)=>[k,i]));

@@ -935,7 +935,15 @@
       font-variant-numeric: tabular-nums;
       white-space: normal;
     }
+    /* Pace and repeat passes: the same label treatment as the range, because it
+       is the same kind of fact about when rather than about what. */
+    #tooltip .timing{
+      color: var(--ink-dim);
+      margin-top: 10px;
+      font-size: 13px;
+    }
     #tooltip .desc + .mythToggle,
+    #tooltip .timing + .mythToggle,
     #tooltip .tooltipCalendarBlock{
       border-top: 1px solid var(--hairline-soft);
       padding-top: 10px;

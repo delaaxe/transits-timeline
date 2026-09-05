@@ -1,4 +1,6 @@
+import { transitTimingFor } from "../data/bodies.js";
 import { aspectDescription, mythDescription } from "../data/interpretations.js";
+import { state } from "../state.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
 
@@ -172,6 +174,11 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
   shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData];
   const desc = aspectDescription(descKey);
   const myth = mythDescription(mythKey);
+  // Derived from the key rather than passed in, like the prose above it: in
+  // world mode both bodies are moving, so the pace is the faster one's.
+  const [transitKey, , natalKey] = String(descKey).split("-");
+  const timing = transitTimingFor(transitKey, natalKey, state.appMode === "world");
+  const timingHtml = timing ? `<div class="timing">${escapeHtml(timing)}</div>` : "";
   const safeMyth = myth ? escapeHtml(myth) : "";
   const useToggle = !!safeMyth;
   const mythHtml = useToggle
@@ -184,7 +191,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     const titleText = String(calendarData.title || title || "Transit");
     const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
     const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
-    const detailsText = [firstLine, desc || "", mythLine].filter(Boolean).join("\n\n");
+    const detailsText = [firstLine, desc || "", timing, mythLine].filter(Boolean).join("\n\n");
     const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
     const segmentEndForCalendar = segmentAllDay
       ? new Date(calendarData.segmentEnd.getFullYear(), calendarData.segmentEnd.getMonth(), calendarData.segmentEnd.getDate() + 1)
@@ -232,6 +239,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
   tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(title)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
     + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
     + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
+    + timingHtml
     + mythHtml
     + calendarHtml;
 }
