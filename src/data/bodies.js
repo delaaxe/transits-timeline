@@ -75,19 +75,36 @@ export const transitTiming = {
  * closes the window.
  */
 /**
- * @param {string} transitKey @param {string} natalKey @param {boolean} bothMoving
- * @returns {string}
+ * Only the transiting body moves against a natal point, so it alone sets the
+ * pace. World mode has no note of this kind - see setTooltipContent.
+ * @param {string} transitKey @returns {string}
  */
-export function transitTimingFor(transitKey, natalKey, bothMoving){
-  const speed = /** @type {Record<string, number>} */ (maxSpeedDegPerDay);
-  let key = transitKey;
-  if (bothMoving && (speed[natalKey] ?? 0) > (speed[transitKey] ?? 0)) key = natalKey;
-  return transitTiming[key] || "";
+export function transitTimingFor(transitKey){
+  return transitTiming[transitKey] || "";
 }
 
 export const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc"];
 
 export const orderMap = new Map(order.map((k,i)=>[k,i]));
+
+// Mercury and Venus orbit inside Earth's, so their elongation from the Sun is
+// bounded and some sky-to-sky aspects between the three simply cannot happen: a
+// Sun-Mercury square needs 90 degrees of separation and Mercury never manages 28.
+// Measured against this ephemeris over 1990-2050 (27.8, 47.2, 73.8) and rounded
+// up, with test/events.test.mjs re-measuring them so a wrong figure fails rather
+// than quietly dropping real aspects. Only world mode is constrained this way -
+// a natal Venus sits wherever it sits, so buildCandidateRules ignores this.
+export const maxSkySeparationDeg = {
+  "sun-mercury": 28,
+  "sun-venus": 48,
+  "mercury-venus": 76
+};
+
+/** The widest these two can get apart in the sky, or Infinity if unbounded. */
+export function maxSkySeparation(a, b){
+  const key = (orderMap.get(a) ?? 0) <= (orderMap.get(b) ?? 0) ? `${a}-${b}` : `${b}-${a}`;
+  return maxSkySeparationDeg[key] ?? Infinity;
+}
 
 /** @type {[string, string, number][]} */
 export const aspects = [

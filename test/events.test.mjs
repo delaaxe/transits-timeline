@@ -8,7 +8,7 @@ import { computeTransitEvents } from "../src/core/job.js";
 import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
 import { ephemerisAstronomy, getBodyLonAt, getBodyLonFromAll } from "../src/core/ephemeris.js";
-import { aspectAngle, maxSpeedDegPerDay } from "../src/data/bodies.js";
+import { aspectAngle, maxSkySeparation, maxSpeedDegPerDay } from "../src/data/bodies.js";
 
 const T0 = Date.UTC(2026, 0, 1);
 const days = (ms) => (ms - T0) / DAY_MS;
@@ -111,6 +111,48 @@ test("a near miss is a window with no exact hit", async () => {
 
   assert.deepEqual(event.exacts, [], "close is not exact");
   assert.ok(event.peakOrb <= 0.45 && event.peakOrb >= 0.4, `peak orb ${event.peakOrb} should be about 0.4`);
+});
+
+test("the sky-separation bounds really do bound the ephemeris", async () => {
+  // buildSkyRules drops an aspect the pair can never reach, so a bound set too
+  // low would silently lose real aspects instead of impossible ones. Twenty
+  // years covers many synodic cycles of each pair, which is where the greatest
+  // elongations fall.
+  const pairs = [["sun", "mercury"], ["sun", "venus"], ["mercury", "venus"]];
+  const worst = new Map(pairs.map(p => [p.join("-"), 0]));
+
+  for (let t = Date.UTC(2026, 0, 1); t < Date.UTC(2046, 0, 1); t += DAY_MS){
+    const d = new Date(t);
+    const all = ephemerisAstronomy.getAllPlanets(d, OBSERVER.lon, OBSERVER.lat, OBSERVER.height);
+    const lon = {};
+    for (const k of ["sun", "mercury", "venus"]) lon[k] = getBodyLonFromAll(all, k, d);
+    for (const [a, b] of pairs){
+      const key = `${a}-${b}`;
+      worst.set(key, Math.max(worst.get(key), angDist(lon[a], lon[b])));
+    }
+  }
+
+  for (const [a, b] of pairs){
+    const seen = worst.get(`${a}-${b}`);
+    const bound = maxSkySeparation(a, b);
+    assert.ok(seen < bound, `${a}-${b} reached ${seen.toFixed(1)} deg, bound is ${bound}`);
+    assert.ok(seen > bound - 5, `${a}-${b}'s bound of ${bound} sits well above its measured ${seen.toFixed(1)}`);
+  }
+
+  // The bound has to be the reason these are skipped, not an accident of orb.
+  const skyKeys = (orb) => new Set(buildSkyRules({
+    transitGroup: "all", aspects: ["conjunction", "sextile", "square", "trine", "opposition"],
+    orb, includeMoon: true, includeChiron: false, includeNode: false
+  }).map(r => `${r.transit}-${r.aspect}-${r.natal}`));
+
+  const tight = skyKeys(1);
+  assert.ok(!tight.has("sun-square-mercury"), "Mercury never gets 90 degrees from the Sun");
+  assert.ok(!tight.has("sun-sextile-venus"), "Venus never gets 60 degrees from the Sun");
+  assert.ok(!tight.has("mercury-square-venus"));
+  assert.ok(tight.has("mercury-sextile-venus"), "but 60 degrees between Mercury and Venus does happen");
+  assert.ok(tight.has("sun-square-mars"), "and nothing outside Earth's orbit is bounded at all");
+  // Widen the orb past the gap and the aspect becomes reachable again.
+  assert.ok(skyKeys(20).has("mercury-square-venus"));
 });
 
 test("the speed ceilings really do bound the ephemeris", async () => {

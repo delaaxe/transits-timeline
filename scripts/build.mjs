@@ -16,7 +16,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
 
 // Fetched at runtime by page-relative URL, so they sit beside index.html.
-const ASSETS = ["aspects.json", "myths.json", "apple-touch-icon.png"];
+const ASSETS = ["aspects.json", "myths.json", "world.json", "apple-touch-icon.png"];
 
 // api-key.js is gitignored, so CI has no copy. It can still prove everything
 // bundles; ALLOW_MISSING_API_KEY says the output is a check, not a deployable.

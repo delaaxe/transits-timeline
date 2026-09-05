@@ -1,5 +1,5 @@
 import { transitTimingFor } from "../data/bodies.js";
-import { aspectDescription, mythDescription } from "../data/interpretations.js";
+import { aspectDescription, mythDescription, worldDescription } from "../data/interpretations.js";
 import { state } from "../state.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
@@ -172,12 +172,17 @@ export function refreshTooltipContent(){
  */
 export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData){
   shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData];
-  const desc = aspectDescription(descKey);
+  // Two bodies meeting in the sky is not the same event as one of them crossing
+  // a place in a birth chart, so world mode reads from its own file rather than
+  // from natal prose written in the second person about "your natal Neptune".
+  const isWorld = state.appMode === "world";
+  const desc = isWorld ? worldDescription(descKey) : aspectDescription(descKey);
   const myth = mythDescription(mythKey);
-  // Derived from the key rather than passed in, like the prose above it: in
-  // world mode both bodies are moving, so the pace is the faster one's.
-  const [transitKey, , natalKey] = String(descKey).split("-");
-  const timing = transitTimingFor(transitKey, natalKey, state.appMode === "world");
+  // Derived from the key rather than passed in, like the prose above it. There
+  // is no timing note in world mode: the figure that matters there is how often
+  // the pair meets, which is per-pair rather than per-body, and each world entry
+  // carries it in its own words.
+  const timing = isWorld ? "" : transitTimingFor(String(descKey).split("-")[0]);
   const timingHtml = timing ? `<div class="timing">${escapeHtml(timing)}</div>` : "";
   const safeMyth = myth ? escapeHtml(myth) : "";
   const useToggle = !!safeMyth;

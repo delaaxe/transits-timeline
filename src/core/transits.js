@@ -1,6 +1,6 @@
 // Which transits to look for. The looking itself is core/events.js.
 
-import { natalGroupMap, transitGroupMap } from "../data/bodies.js";
+import { aspectAngle, maxSkySeparation, natalGroupMap, transitGroupMap } from "../data/bodies.js";
 
 export function uniquePush(arr, v){ if (!arr.includes(v)) arr.push(v); }
 
@@ -53,6 +53,9 @@ export function buildSkyRules({ transitGroup, aspects, orb, includeMoon, include
     for (let j=i+1; j<skyPlanets.length; j++){
       for (const asp of aspects){
         if ((skyPlanets[i] === "node" || skyPlanets[j] === "node") && asp !== "conjunction") continue;
+        // An aspect the pair can never reach is not a transit that never fires,
+        // it is a scan of the whole range looking for nothing.
+        if (aspectAngle(asp) - orb > maxSkySeparation(skyPlanets[i], skyPlanets[j])) continue;
         rules.push({ transit: skyPlanets[i], aspect: asp, natal: skyPlanets[j], orb });
       }
     }
