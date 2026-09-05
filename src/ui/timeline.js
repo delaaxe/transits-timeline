@@ -430,6 +430,12 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
   }
 }
 
+// Narrower than this and a bar stops reading as a segment; narrower than the
+// hit floor and there is nothing to hover or tap, so a transparent target sits
+// over it, the same trick the exact-hit markers use.
+const minBarW = 3;
+const minHitW = 12;
+
 // A bar whose window runs past the edge of the timeline is cut square there and
 // left rounded at the end it really has, so the two read differently. The
 // radius follows the clamp SVG applies to rx - never more than half the height,
@@ -518,7 +524,13 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const b = new Date(event.end);
       const xa = dateToX(a);
       const xb = dateToX(b);
-      const w = Math.max(1, xb - xa);
+      // A window can leave orb minutes after the range opens, or enter it
+      // minutes before the range closes. On a month-wide timeline that is a
+      // fraction of a pixel - honest, but it draws as a tick that reads like a
+      // stray rule and is too thin to hover. Slivers get a floor width, taken
+      // inward from the edge so the bar never leaves the timeline.
+      const w = Math.max(minBarW, xb - xa);
+      const barX = Math.max(x0, Math.min(xa, x0 + timelineW - w));
 
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
       const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
@@ -532,8 +544,8 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const shapeAttrs = (roundStart && roundEnd)
         // SVG clamps rx to half the width, so a one-day bar becomes a dot
         // rather than a rectangle with impossible corners.
-        ? { x: xa, y: y + 4, width: w, height: barH, rx: barH / 2 }
-        : { d: barPath(xa, y + 4, w, barH, roundStart, roundEnd) };
+        ? { x: barX, y: y + 4, width: w, height: barH, rx: barH / 2 }
+        : { d: barPath(barX, y + 4, w, barH, roundStart, roundEnd) };
       const rect = svgEl((roundStart && roundEnd) ? "rect" : "path", {
         ...shapeAttrs,
         fill: fillFor(barColor),
@@ -590,6 +602,15 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       bindSegmentTooltipEvents(rect);
 
       svg.appendChild(rect);
+      if (w < minHitW){
+        const hit = svgEl("rect", {
+          x: Math.max(x0, barX - (minHitW - w) / 2), y, width: minHitW, height: rowH,
+          fill: "transparent",
+          class: "bar"
+        });
+        bindSegmentTooltipEvents(hit);
+        svg.appendChild(hit);
+      }
       for (const exact of exactDates){
         const xExact = dateToX(exact);
         if (xExact < xa || xExact > xb) continue;
