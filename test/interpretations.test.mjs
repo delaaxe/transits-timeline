@@ -14,10 +14,6 @@ import { aspects, mythKeyFor, planets, transitGroups, natalGroups, transitTiming
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (name) => JSON.parse(await readFile(join(repoRoot, name), "utf8"));
 
-// Quincunx is a checkbox with no prose behind it, which is known and deliberately
-// out of scope here; every other aspect must be covered.
-const UNWRITTEN_ASPECTS = new Set(["quincunx"]);
-
 /** Every descKey a mode can build, by running the real rule builders over every
  *  combination of controls rather than restating what they do. The orb is swept
  *  too: buildSkyRules drops aspects the pair cannot reach, and how many it drops
@@ -52,9 +48,7 @@ const allKeys = () => new Set([...personalKeys(), ...worldKeys()]);
 
 test("every transit the scan can produce has a description", async () => {
   const descriptions = await readJson("aspects.json");
-  const missing = [...allKeys()]
-    .filter(k => !UNWRITTEN_ASPECTS.has(k.split("-")[1]))
-    .filter(k => !descriptions[k]);
+  const missing = [...allKeys()].filter(k => !descriptions[k]);
   assert.deepEqual(missing, [], `bars would open with an empty tooltip: ${missing.join(", ")}`);
 });
 
@@ -75,9 +69,7 @@ test("every transit the scan can produce has a myth", async () => {
 
 test("every sky-to-sky aspect has a world reading", async () => {
   const world = await readJson("world.json");
-  const missing = [...worldKeys()]
-    .filter(k => !UNWRITTEN_ASPECTS.has(k.split("-")[1]))
-    .filter(k => !world[k]);
+  const missing = [...worldKeys()].filter(k => !world[k]);
   assert.deepEqual(missing, [], `world bars would open with an empty tooltip: ${missing.join(", ")}`);
 });
 

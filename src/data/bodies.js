@@ -118,7 +118,6 @@ export const aspects = [
   ["square",      "□ 90°", 90],
   ["trine",       "△ 120°", 120],
   ["opposition",  "☍ 180°", 180],
-  ["quincunx",    "⚻ 150°", 150],
 ];
 
 // Lifted off a light-page palette onto a dark one, and every aspect given its
@@ -131,8 +130,7 @@ export const aspectColors = {
   sextile: "#43c8c0",
   square: "#ff6b5e",
   trine: "#3fbf7f",
-  opposition: "#ff9f43",
-  quincunx: "#b08ce8"
+  opposition: "#ff9f43"
 };
 
 // A return - the transiting body meeting its own natal place - is the one
