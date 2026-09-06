@@ -5,6 +5,7 @@
 import { chartsState, isDefaultChart, saveCharts } from "../storage/charts.js";
 import { buildPayload, mergeCharts, parseCharts, transferFileName, transferMimeType } from "../storage/transfer.js";
 import { el, setStatus } from "./dom.js";
+import { fmtBirthPretty } from "./format.js";
 
 // Three modes: the charts here (export), somewhere to paste or a file to open
 // (import), and the charts that turned out to hold (receive).
@@ -18,7 +19,7 @@ function placeFor(p){
   return parts[0] || `${(+p.lat).toFixed(2)}, ${(+p.lon).toFixed(2)}`;
 }
 
-function subtitleFor(p){ return `${p.birthDate} ${p.birthTime} · ${placeFor(p)}`; }
+function subtitleFor(p){ return `${fmtBirthPretty(p.birthDate, p.birthTime)} · ${placeFor(p)}`; }
 
 function renderList(){
   const list = el.transferList;

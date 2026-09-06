@@ -25,6 +25,29 @@ export function fmtTimePretty(d){
   return timeFmt.format(d);
 }
 
+// A birth time is a wall clock at the birthplace, not a moment in the reader's
+// day, so it keeps its own digits rather than going through a Date: a Date is
+// read back in the reader's zone, where a birth in an hour the local clock skips
+// comes out an hour late. Seconds, where a record carries them, are dropped -
+// nothing else here keeps them either.
+function birthTimeDigits(birthTime){
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(birthTime ?? "").trim());
+  if (!m) return "";
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+
+// A birth moment as the chart summary and the transfer dialog show it:
+// "Sep 9, 11:28". The date is taken at midday, which no zone can push onto the
+// day either side, and anything that isn't a plain ISO date - a BC year, a half
+// filled record - is left as it was written rather than guessed at.
+export function fmtBirthPretty(birthDate, birthTime){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthDate ?? "").trim());
+  if (!m) return [birthDate, birthTime].filter(Boolean).join(" ");
+  const day = fmtDatePretty(new Date(+m[1], +m[2] - 1, +m[3], 12));
+  const time = birthTimeDigits(birthTime);
+  return time ? `${day}, ${time}` : day;
+}
+
 export function formatRangePretty(a, b, showTime, showYear){
   const sameYear = a.getFullYear() === b.getFullYear();
   const includeYear = showYear || !sameYear;

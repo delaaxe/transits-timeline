@@ -8,7 +8,7 @@ import { defaultPresetKey, presets } from "../data/presets.js";
 import { awsAutocomplete, awsGetPlace, extractPosition } from "../services/places.js";
 import { chartsState, defaultChartData, getActiveChart, getActiveChartA, getActiveChartB, isDefaultChart, lastChartKey, loadCharts, newId, normalizeChart, saveCharts } from "../storage/charts.js";
 import { $, debounce, el, escapeHTML, fillSelect, installHint, installHintText, setStatus } from "./dom.js";
-import { fmtCoord } from "./format.js";
+import { fmtBirthPretty, fmtCoord } from "./format.js";
 import { wireChartReorder } from "./chart-drag.js";
 import { wireTransferUI } from "./transfer.js";
 import { isIOSLike } from "./tooltip.js";
@@ -204,7 +204,7 @@ export function buildChartSummaryText(pA, pB, { includePlacementsLine=false } = 
     }
   } catch {}
   if (chartsState.mode !== "composite"){
-    parts.push(`${pA.birthDate} ${pA.birthTime}`);
+    parts.push(fmtBirthPretty(pA.birthDate, pA.birthTime));
     if (pA.placeLabel) parts.push(pA.placeLabel);
     const cc = fmtCoord(pA.lat, pA.lon);
     if (cc) parts.push(cc);
