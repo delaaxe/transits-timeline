@@ -325,3 +325,62 @@ test("the scan reaches exact times for a fraction of what sampling to them costs
   assert.ok(res.evaluations < 6000, `five years of outer transits took ${res.evaluations} reads`);
   assert.ok(res.rules.length > 20, "five years of outer transits should match plenty of rules");
 });
+
+test("the Ascendant is a natal target and never a transiting body", () => {
+  // It is a place in the chart rather than something in the sky: the degree
+  // rising at birth. Nothing is there to move, so it can be aspected and can
+  // never aspect - the same standing the Midheaven has always had here.
+  const opts = {
+    transitGroup: "all", natalGroup: "all",
+    aspects: ["conjunction", "sextile", "square", "trine", "opposition"], orb: 1,
+    includeMoon: true, includeChiron: true, includeNode: true
+  };
+
+  const off = buildCandidateRules({ ...opts, includeAsc: false, includeMC: false });
+  assert.ok(!off.some(r => r.natal === "asc"), "unticked, it is not a target");
+
+  const on = buildCandidateRules({ ...opts, includeAsc: true, includeMC: false });
+  assert.ok(on.some(r => r.natal === "asc"), "ticked, it is");
+  assert.ok(!on.some(r => r.transit === "asc"), "but it never transits anything");
+
+  // Every transiting body reaches it, and by every aspect except the Node's,
+  // which the builder restricts to conjunctions.
+  const byBody = new Map();
+  for (const r of on.filter(r => r.natal === "asc")){
+    if (!byBody.has(r.transit)) byBody.set(r.transit, new Set());
+    byBody.get(r.transit).add(r.aspect);
+  }
+  assert.equal(byBody.get("node").size, 1, "the Node only ever conjoins");
+  for (const body of ["sun", "moon", "mercury", "venus", "mars", "jupiter",
+                      "saturn", "uranus", "neptune", "pluto", "chiron"]){
+    assert.equal(byBody.get(body)?.size, 5, `${body} should reach the Ascendant by all five aspects`);
+  }
+
+  // The sky has no Ascendant at all: world mode is two moving bodies, and an
+  // angle is neither of them.
+  const sky = buildSkyRules({ ...opts, includeAsc: true });
+  assert.ok(!sky.some(r => r.transit === "asc" || r.natal === "asc"));
+});
+
+test("a transit to the Ascendant is found where the Ascendant actually is", () => {
+  // The angle comes from the birth time and place rather than the ephemeris, so
+  // a wrong longitude would still scan cleanly and simply describe someone
+  // else's chart. This pins the scan to the computed degree.
+  const ascDeg = 123.456;
+  const rules = [{ transit: "sun", natal: "asc", aspect: "conjunction", orb: 1 }];
+  const out = computeTransitEvents({
+    mode: "personal",
+    startMs: Date.UTC(2026, 0, 1),
+    endMs: Date.UTC(2027, 0, 1),
+    observer: { lon: 0, lat: 51.5, height: 0 },
+    natalLon: { asc: ascDeg },
+    rules
+  });
+  assert.equal(out.rules.length, 1, "the Sun crosses every degree once a year");
+  const exacts = out.events[0].flatMap(e => e.exacts ?? []);
+  assert.ok(exacts.length >= 1, "and the crossing is exact at least once");
+  for (const ms of exacts){
+    const sun = getBodyLonAt("sun", new Date(ms), { lon: 0, lat: 51.5, height: 0 });
+    assert.ok(angDist(sun, ascDeg) < 0.01, `Sun was ${angDist(sun, ascDeg).toFixed(3)} deg off the Ascendant`);
+  }
+});

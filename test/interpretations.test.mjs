@@ -28,11 +28,15 @@ function reachableKeys(build){
   for (const [transitGroup] of transitGroups){
     for (const [natalGroup] of natalGroups){
       for (const orb of [1, 8, 30]){
-        for (const flags of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]){
+        // Five checkboxes now, so the sweep runs to 31 rather than 15. Missing a
+        // combination here means prose for a bar nobody can reach, or a bar that
+        // opens empty, and neither shows up until someone ticks that box.
+        for (let flags = 0; flags < 32; flags++){
           const opts = {
             transitGroup, natalGroup, aspects: aspectKeys, orb,
             includeMoon: !!(flags & 1), includeChiron: !!(flags & 2),
-            includeNode: !!(flags & 4), includeMC: !!(flags & 8)
+            includeNode: !!(flags & 4), includeMC: !!(flags & 8),
+            includeAsc: !!(flags & 16)
           };
           for (const r of build(opts)) keys.add(`${r.transit}-${r.aspect}-${r.natal}`);
         }
@@ -93,11 +97,15 @@ test("world readings never address a person", async () => {
 });
 
 test("every transiting body says how long it takes and whether it repeats", () => {
-  // MC is only ever a natal target, so it is the one body with no timing note.
-  const transiting = planets.map(p => p[0]).filter(k => k !== "mc");
+  // The two angles are only ever natal targets, so they are the entries with no
+  // timing note: there is nothing at either point to move.
+  const angles = ["mc", "asc"];
+  const transiting = planets.map(p => p[0]).filter(k => !angles.includes(k));
   const missing = transiting.filter(k => !transitTiming[k]);
   assert.deepEqual(missing, []);
-  assert.ok(!transitTiming.mc, "the Midheaven never transits, so it needs no timing note");
+  for (const k of angles){
+    assert.ok(!transitTiming[k], `${k} never transits, so it needs no timing note`);
+  }
 });
 
 test("no entry is truncated or padded", async () => {

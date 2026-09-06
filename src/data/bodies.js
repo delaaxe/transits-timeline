@@ -6,6 +6,7 @@ export const planets = [
   ["node","Node"],
   ["chiron","Chiron"],
   ["mc","Mc"],
+  ["asc","Asc"],
 ];
 
 export const planetSymbols = {
@@ -21,7 +22,10 @@ export const planetSymbols = {
   pluto: "♇",
   node: "☊",
   chiron: "⚷",
-  mc: "Mc"
+  mc: "Mc",
+  // "Ac" rather than "Asc": this is the glyph form, used where the row labels
+  // shorten, and summaryPointSymbols has spelled the point that way all along.
+  asc: "Ac"
 };
 
 // Ceilings on apparent geocentric daily motion, in degrees per day. The event
@@ -44,7 +48,8 @@ export const maxSpeedDegPerDay = {
   pluto: 0.05,    // 0.041
   chiron: 0.18,   // 0.146
   node: 0.06,     // 0.0530, and analytic rather than measured
-  mc: 0
+  mc: 0,
+  asc: 0
 };
 
 // How long a contact from each transiting body lasts, and whether it comes back.
@@ -83,7 +88,7 @@ export function transitTimingFor(transitKey){
   return transitTiming[transitKey] || "";
 }
 
-export const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc"];
+export const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc","asc"];
 
 export const orderMap = new Map(order.map((k,i)=>[k,i]));
 
@@ -147,7 +152,7 @@ export const baseGroups = [
 
 export const individualPlanets = planets
   .map(p => p[0])
-  .filter(k => k !== "node" && k !== "chiron" && k !== "mc")
+  .filter(k => k !== "node" && k !== "chiron" && k !== "mc" && k !== "asc")
   .map(k => [k, planetLabel(k), [k]]);
 
 export const sharedGroups = [...baseGroups, ...individualPlanets];

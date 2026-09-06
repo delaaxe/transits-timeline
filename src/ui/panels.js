@@ -82,7 +82,8 @@ export function readRuleOptions(){
     includeMoon: el.includeMoon.checked,
     includeChiron: el.includeChiron.checked,
     includeNode: el.includeNode.checked,
-    includeMC: el.includeMC.checked
+    includeMC: el.includeMC.checked,
+    includeAsc: el.includeAsc.checked
   };
 }
 
@@ -231,9 +232,12 @@ export function renderAppModeSection(){
     el.natalGroupField.hidden = !appModeIsPersonal;
     el.natalGroupField.style.display = appModeIsPersonal ? "" : "none";
   }
-  if (el.includeMCWrap){
-    el.includeMCWrap.hidden = !appModeIsPersonal;
-    el.includeMCWrap.style.display = appModeIsPersonal ? "" : "none";
+  // Both angles are natal-only, so both disappear with the natal chart when the
+  // app switches to the sky.
+  for (const wrap of [el.includeMCWrap, el.includeAscWrap]){
+    if (!wrap) continue;
+    wrap.hidden = !appModeIsPersonal;
+    wrap.style.display = appModeIsPersonal ? "" : "none";
   }
 }
 
@@ -699,6 +703,7 @@ export function wireAutoUpdate(){
   el.orb.addEventListener("change", requestUpdate);
   el.includeMoon.addEventListener("change", requestUpdate);
   el.includeMC.addEventListener("change", requestUpdate);
+  el.includeAsc.addEventListener("change", requestUpdate);
   el.includeChiron.addEventListener("change", requestUpdate);
   el.includeNode.addEventListener("change", requestUpdate);
   el.aspectChecks.addEventListener("change", requestUpdate);

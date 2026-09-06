@@ -5,7 +5,7 @@ import { aspectAngle, maxSkySeparation, natalGroupMap, transitGroupMap } from ".
 export function uniquePush(arr, v){ if (!arr.includes(v)) arr.push(v); }
 
 export function buildCandidateRules({ transitGroup, natalGroup, aspects, orb,
-                              includeMoon, includeChiron, includeNode, includeMC }){
+                              includeMoon, includeChiron, includeNode, includeMC, includeAsc }){
   let transitPlanets = [...(transitGroupMap.get(transitGroup) ?? transitGroupMap.get("outer") ?? [])];
   const natalTargets = [...(natalGroupMap.get(natalGroup) ?? natalGroupMap.get("classical") ?? [])];
 
@@ -19,6 +19,12 @@ export function buildCandidateRules({ transitGroup, natalGroup, aspects, orb,
   }
   if (includeMC){
     uniquePush(natalTargets, "mc");
+  }
+  // Natal side only, like the Midheaven. The Ascendant is a place in the chart
+  // rather than a body: nothing is there to move, so it can be aspected and
+  // never aspects.
+  if (includeAsc){
+    uniquePush(natalTargets, "asc");
   }
   if (!includeMoon){
     transitPlanets = transitPlanets.filter(p => p !== "moon");
@@ -47,7 +53,7 @@ export function buildSkyRules({ transitGroup, aspects, orb, includeMoon, include
   if (!includeMoon){
     skyPlanets = skyPlanets.filter(p => p !== "moon");
   }
-  skyPlanets = skyPlanets.filter(p => p !== "mc");
+  skyPlanets = skyPlanets.filter(p => p !== "mc" && p !== "asc");
   const rules = [];
   for (let i=0; i<skyPlanets.length; i++){
     for (let j=i+1; j<skyPlanets.length; j++){

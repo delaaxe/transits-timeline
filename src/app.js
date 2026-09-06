@@ -102,7 +102,9 @@ export async function updateTimeline(){
     } else if (isComposite && composite){
       natalLon = {};
       for (const k of natalTargets){
-        natalLon[k] = (k === "mc") ? composite.mc : composite.lon[k];
+        natalLon[k] = (k === "mc") ? composite.mc
+          : (k === "asc") ? composite.asc
+          : composite.lon[k];
       }
       chartRulerKey = chartRulerFromAsc(composite.asc);
     } else {
@@ -111,6 +113,8 @@ export async function updateTimeline(){
       for (const k of natalTargets){
         if (k === "mc"){
           natalLon[k] = calcNatalMCDeg(birthUTC, lon);
+        } else if (k === "asc"){
+          natalLon[k] = calcNatalAscDeg(birthUTC, lon, lat);
         } else {
           natalLon[k] = getBodyLonFromAll(birthAllPlanets, k, birthUTC);
         }

@@ -42,7 +42,10 @@ export function computeCompositeChart(pA, pB){
   const allB = ephemerisAstronomy.getAllPlanets(birthUTCB, pB.lon, pB.lat, 0);
   const lon = {};
   for (const k of order){
-    if (k === "mc") continue;
+    // The angles are not in the ephemeris: they are computed from the birth
+    // time and place, and each gets its own midpoint below. Asking the
+    // ephemeris for either one throws.
+    if (k === "mc" || k === "asc") continue;
     lon[k] = midpointAngle(getBodyLonFromAll(allA, k, birthUTCA), getBodyLonFromAll(allB, k, birthUTCB));
   }
   const mcA = calcNatalMCDeg(birthUTCA, pA.lon);
