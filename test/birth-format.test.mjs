@@ -1,5 +1,5 @@
 // How a birth moment reads on screen: the chart summary and the transfer dialog
-// both show it as "Sep 9, 11:28".
+// both show it as "Sep 9, 1990, 11:28".
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,13 +10,19 @@ import { fmtBirthPretty } from "../src/ui/format.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("a birth moment reads as a short month, a day and a 24-hour clock", () => {
-  assert.equal(fmtBirthPretty("1990-09-09", "11:28"), "Sep 9, 11:28");
-  assert.equal(fmtBirthPretty("1971-06-28", "07:30"), "Jun 28, 07:30");
-  assert.equal(fmtBirthPretty("2001-01-01", "00:00"), "Jan 1, 00:00");
+test("a birth moment reads as a short month, a day, a year and a 24-hour clock", () => {
+  assert.equal(fmtBirthPretty("1990-09-09", "11:28"), "Sep 9, 1990, 11:28");
+  assert.equal(fmtBirthPretty("1971-06-28", "07:30"), "Jun 28, 1971, 07:30");
+  assert.equal(fmtBirthPretty("2001-01-01", "00:00"), "Jan 1, 2001, 00:00");
   // An hour written without its leading zero, as the older JSON files have it.
-  assert.equal(fmtBirthPretty("1990-09-09", "9:05"), "Sep 9, 09:05");
-  assert.equal(fmtBirthPretty("1990-09-09", ""), "Sep 9");
+  assert.equal(fmtBirthPretty("1990-09-09", "9:05"), "Sep 9, 1990, 09:05");
+  assert.equal(fmtBirthPretty("1990-09-09", ""), "Sep 9, 1990");
+});
+
+// The year is what tells two charts of the same calendar day apart, and this is
+// the only line in the app that shows it.
+test("two births a year apart do not read alike", () => {
+  assert.notEqual(fmtBirthPretty("1990-09-09", "11:28"), fmtBirthPretty("1962-09-09", "11:28"));
 });
 
 // The birth time is a clock on the wall where someone was born, not a moment in
@@ -32,7 +38,7 @@ test("a birth moment reads the same in every zone the reader might be in", () =>
     const out = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
       cwd: repoRoot, encoding: "utf8", env: { ...process.env, TZ }
     });
-    assert.equal(out.trim(), "Apr 1, 02:30", `read wrong in ${TZ}`);
+    assert.equal(out.trim(), "Apr 1, 1990, 02:30", `read wrong in ${TZ}`);
   }
 });
 

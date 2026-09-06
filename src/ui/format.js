@@ -37,13 +37,15 @@ function birthTimeDigits(birthTime){
 }
 
 // A birth moment as the chart summary and the transfer dialog show it:
-// "Sep 9, 11:28". The date is taken at midday, which no zone can push onto the
-// day either side, and anything that isn't a plain ISO date - a BC year, a half
+// "Sep 9, 1990, 11:28". The year is always written - it is what tells a father's
+// chart from a son's born the same day, and this line is the only place the app
+// shows it. The date is taken at midday, which no zone can push onto the day
+// either side, and anything that isn't a plain ISO date - a BC year, a half
 // filled record - is left as it was written rather than guessed at.
 export function fmtBirthPretty(birthDate, birthTime){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthDate ?? "").trim());
   if (!m) return [birthDate, birthTime].filter(Boolean).join(" ");
-  const day = fmtDatePretty(new Date(+m[1], +m[2] - 1, +m[3], 12));
+  const day = fmtDatePretty(new Date(+m[1], +m[2] - 1, +m[3], 12), true);
   const time = birthTimeDigits(birthTime);
   return time ? `${day}, ${time}` : day;
 }
