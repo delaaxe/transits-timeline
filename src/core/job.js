@@ -95,7 +95,8 @@ function speedCeiling(mode, transit, natal){
 
 /**
  * @param {TransitJob} job
- * @param {(done:number, total:number)=>void} [onProgress]
+ * @param {(done:number, total:number)=>void} [onProgress] done is fractional:
+ *   it advances within a group as well as between them
  * @returns {{rules: Rule[], events: AspectEvent[][], evaluations: number}}
  */
 export function computeTransitEvents(job, onProgress){
@@ -118,7 +119,11 @@ export function computeTransitEvents(job, onProgress){
       startMs,
       endMs,
       baseAt,
-      maxSpeedDegPerDay: speedCeiling(mode, g.transit, g.natal)
+      maxSpeedDegPerDay: speedCeiling(mode, g.transit, g.natal),
+      // Groups are wildly uneven - a Saturn scan is a few dozen steps and a
+      // lunar one is tens of thousands - so done advances through a group as
+      // well as between groups, and is fractional.
+      onProgress: onProgress ? (frac) => onProgress(gi + frac, groups.length) : undefined
     });
 
     for (const member of g.members){

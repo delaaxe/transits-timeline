@@ -7,16 +7,22 @@ export function fmtCoord(lat, lon){
   return `${Math.abs(lat).toFixed(2)}°${ns}, ${Math.abs(lon).toFixed(2)}°${ew}`;
 }
 
+// toLocaleDateString and toLocaleTimeString construct an Intl.DateTimeFormat
+// on every single call, and these run per bar, again per exact hit on that bar,
+// and again for every tooltip that opens. A month view built several hundred
+// formatters per render, which put these two functions at the top of the main
+// thread in a CPU profile - above every piece of SVG work they were formatting
+// labels for. The locale is fixed, so three formatters cover every call.
+const dateFmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
+const dateYearFmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric" });
+const timeFmt = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+
 export function fmtDatePretty(d, includeYear){
-  return d.toLocaleDateString(locale, {
-    month: "short",
-    day: "numeric",
-    ...(includeYear ? { year: "numeric" } : {})
-  });
+  return (includeYear ? dateYearFmt : dateFmt).format(d);
 }
 
 export function fmtTimePretty(d){
-  return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return timeFmt.format(d);
 }
 
 export function formatRangePretty(a, b, showTime, showYear){

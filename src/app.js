@@ -130,8 +130,13 @@ export async function updateTimeline(){
       natalLon,
       rules: candidateRules
     }, (done, total) => {
-      setStatus(`Computing\u2026 ${done}/${total}`);
-      if (!hadResults) setTimelineState(`Computing\u2026 ${done}/${total}`, "busy");
+      // A percentage rather than a count of groups: done is fractional now, and
+      // "3.4/7" reads worse than the figure it replaced. It also stops the
+      // display implying that the seven groups are seven equal pieces of work,
+      // which they never were.
+      const pct = total > 0 ? Math.min(99, Math.round((done / total) * 100)) : 0;
+      setStatus(`Computing\u2026 ${pct}%`);
+      if (!hadResults) setTimelineState(`Computing\u2026 ${pct}%`, "busy");
     });
 
     const firstHitByRule = eventsByRule.map(events => events[0].start);

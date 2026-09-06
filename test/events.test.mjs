@@ -384,3 +384,42 @@ test("a transit to the Ascendant is found where the Ascendant actually is", () =
     assert.ok(angDist(sun, ascDeg) < 0.01, `Sun was ${angDist(sun, ascDeg).toFixed(3)} deg off the Ascendant`);
   }
 });
+
+test("a long scan reports progress while it is still running", () => {
+  // A group used to report only when it finished, so the transiting Moon over a
+  // couple of years - tens of thousands of steps, and most of the wall clock -
+  // left the counter on one figure long enough to look like a hang.
+  const seen = [];
+  const offsets = [0, 90, 180, 270];
+  scanAspectWindows({
+    offsets,
+    orbDeg: 1,
+    startMs: T0,
+    endMs: T0 + 400 * DAY_MS,
+    baseAt: (ms) => (days(ms) * 13.2) % 360,   // roughly lunar
+    maxSpeedDegPerDay: 15.6,
+    onProgress: (f) => seen.push(f)
+  });
+
+  assert.ok(seen.length > 1, `expected progress during the scan, got ${seen.length} reports`);
+  for (const f of seen) assert.ok(f >= 0 && f <= 1, `progress ${f} is outside 0..1`);
+  for (let i = 1; i < seen.length; i++){
+    assert.ok(seen[i] >= seen[i-1], "progress went backwards");
+  }
+  assert.ok(seen[seen.length-1] > 0.5, "the last report should be well into the range");
+});
+
+test("progress is optional and costs the scan nothing when absent", () => {
+  // Every other caller, the tests included, passes no callback.
+  const opts = {
+    offsets: [0, 120],
+    orbDeg: 1,
+    startMs: T0,
+    endMs: T0 + 60 * DAY_MS,
+    baseAt: (ms) => (days(ms) * 1.02) % 360,
+    maxSpeedDegPerDay: 1.05
+  };
+  const without = scanAspectWindows(opts);
+  const with_ = scanAspectWindows({ ...opts, onProgress: () => {} });
+  assert.deepEqual(with_, without, "reporting progress changed what the scan found");
+});

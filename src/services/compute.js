@@ -82,7 +82,14 @@ export function cancelCompute(){
  * @returns {Promise<{rules: any[], events: any[][], evaluations: number}>}
  */
 export function computeEvents(job, onProgress){
-  cancelCompute();
+  // Only tear the worker down when there is actually a scan running inside it.
+  // Terminating is how an in-flight scan gets stopped, since a dedicated worker
+  // cannot read its own messages while one is under way - but an idle worker
+  // has nothing to interrupt, and killing it costs a fresh parse of the
+  // ephemeris on the very next update, which is most of the bundle. This ran
+  // unconditionally, so the worker the comment above calls warm was rebuilt for
+  // every date change, every dropdown, every checkbox.
+  if (pending) cancelCompute();
   return new Promise((resolve, reject) => {
     const entry = { id: nextId++, resolve, reject, job, onProgress };
     pending = entry;

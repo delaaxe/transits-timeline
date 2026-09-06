@@ -117,9 +117,11 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  * @param {(ms:number)=>number} opts.baseAt the moving angle, in degrees
  * @param {number} opts.maxSpeedDegPerDay ceiling on |d base / dt|
  * @param {number} [opts.rootTolMs]
+ * @param {(fraction:number)=>void} [opts.onProgress] how much of the range is behind
+ *   the scan, 0 to 1, reported periodically rather than per step
  * @returns {AspectEvent[][]}
  */
-export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, maxSpeedDegPerDay, rootTolMs = 1000 }){
+export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, maxSpeedDegPerDay, rootTolMs = 1000, onProgress }){
   /** @type {AspectEvent[][]} */
   const out = offsets.map(() => []);
   if (!offsets.length || !(endMs > startMs)) return out;
@@ -147,9 +149,19 @@ export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, max
   // an error rather than as a worker that never answers.
   const maxSteps = 5_000_000;
   let steps = 0;
+  const span = endMs - startMs;
 
   while (prevT < endMs){
     if (++steps > maxSteps) throw new Error("Transit scan did not converge");
+    // One group can be nearly all of the wall clock - the transiting Moon over
+    // a couple of years is tens of thousands of steps at roughly a quarter of a
+    // millisecond each - and the caller only hears about it when the group ends.
+    // That left the progress counter sitting on one figure for ten seconds,
+    // which is indistinguishable from the app having hung. A step costs roughly
+    // a quarter of a millisecond, so every 256 of them is a report about six
+    // times a second: often enough that the figure never looks stuck, rare
+    // enough that the check itself is not measurable against the scan.
+    if (onProgress && (steps & 255) === 0) onProgress((prevT - startMs) / span);
 
     let step = Infinity;
     for (let i = 0; i < offsets.length; i++){
