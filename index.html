@@ -4,6 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#06070f" />
+  <!-- The status bar style below is only read once the page says it is an app,
+       and the safe-area insets come with it: without this the installed app
+       reported every env(safe-area-inset-*) as 0, which is why the app bar sits
+       under the clock in the notch rather than below it. Both spellings,
+       because Chrome warns about the Apple one on its own. -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Transits Timeline</title>
   <script>
@@ -76,6 +83,8 @@
       /* Shell. The page is a column now, not the whole screen: the sky needs
          somewhere to be seen. */
       --shell-max: 1280px;
+      /* How far past every edge of the viewport the sky reaches; see .sky. */
+      --sky-overhang: 80px;
       --gutter: clamp(14px, 2.4vw, 28px);
       /* Two tokens, not one, and deliberately so: --viewbar-min sizes the bar,
          --viewbar-h is the measured result the date axis sticks below. Driving
@@ -158,7 +167,14 @@
        fixed, which repaints every scroll frame on iOS. */
     .sky{
       position: fixed;
-      inset: 0;
+      /* Not inset: 0. Installed as a web app on iOS the fixed viewport ends at
+         the safe area, so a sky pinned to the edges stops short of the strip
+         around the camera and of the home indicator, and those bands show the
+         page's own --void instead - a black frame around the nebula. The
+         overhang clears the tallest inset iOS has (59pt beside the island) and
+         carries the washes through it. Nothing scrolls from it: the element is
+         fixed, so it adds no overflow. */
+      inset: calc(-1 * var(--sky-overhang));
       z-index: -1;
       pointer-events: none;
       background:
