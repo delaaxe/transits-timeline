@@ -1,4 +1,5 @@
 import { state } from "../state.js";
+import { isLeadingStub } from "../core/events.js";
 import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
@@ -31,6 +32,33 @@ export function clearTimeline(){
   }
 }
 
+// How much of the range a bar hard against the left edge has to cover before it
+// earns a row. A share of the range rather than a pixel count, so that the same
+// rows exist at every window width - a threshold in pixels would add and remove
+// lines as the chart is resized or the phone is turned, and the row cap counts
+// with it.
+//
+// Five per cent leaves ninety-five per cent of the line empty, which is what the
+// eye is reacting to. Bars already floor at minBarW so a sliver stays visible
+// and tappable; this is the separate question of whether a line consisting only
+// of that sliver is worth the row it costs.
+const STUB_FRACTION = 0.05;
+
+// The rows worth drawing, as indices into the cache. Kept as a list rather than
+// a slice because the row cap and the label column both have to agree with the
+// chart about which lines exist.
+function visibleRows(){
+  const cache = state.cachedResults;
+  const startMs = cache.start.getTime();
+  const endMs = cache.endExclusive.getTime();
+  const idxs = [];
+  for (let i = 0; i < cache.rules.length; i++){
+    if (isLeadingStub(cache.events[i], startMs, endMs, STUB_FRACTION)) continue;
+    idxs.push(i);
+  }
+  return idxs;
+}
+
 export function renderFromCache(limit){
   if (!state.cachedResults){
     updateShowMore(0, 0);
@@ -40,10 +68,11 @@ export function renderFromCache(limit){
   state.currentLayout = layout;
   const threshold = Math.max(0, layout.labelWMax - layout.labelWMin);
   state.labelsUseSymbols = !!el.timelineScroll && el.timelineScroll.scrollLeft >= threshold;
-  const total = state.cachedResults.rules.length;
+  const keep = visibleRows();
+  const total = keep.length;
   const shown = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
-  const rules = state.cachedResults.rules.slice(0, shown);
-  const events = state.cachedResults.events.slice(0, shown);
+  const rules = keep.slice(0, shown).map(i => state.cachedResults.rules[i]);
+  const events = keep.slice(0, shown).map(i => state.cachedResults.events[i]);
 
   const spanMs = state.cachedResults.endExclusive.getTime() - state.cachedResults.start.getTime();
   const showYear = (spanMs / (365.25 * 24 * 3600 * 1000)) >= 3;
@@ -177,11 +206,12 @@ export function updateLabelsMode(){
   if (shouldUseSymbols === state.labelsUseSymbols) return;
   state.labelsUseSymbols = shouldUseSymbols;
 
-  const total = state.cachedResults.rules.length;
+  const keep = visibleRows();
+  const total = keep.length;
   const shown = Math.min(total, Math.max(0, Math.floor(Number(state.currentMaxRows || 0))));
   renderLabelsSVG({
     svg: el.aspectAxisSvg,
-    rules: state.cachedResults.rules.slice(0, shown),
+    rules: keep.slice(0, shown).map(i => state.cachedResults.rules[i]),
     chartRuler: state.cachedResults.chartRuler,
     layout: state.currentLayout,
     useSymbols: state.labelsUseSymbols

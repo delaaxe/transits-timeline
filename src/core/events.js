@@ -107,6 +107,41 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  */
 
 /**
+ * Whether a row holds nothing but the tail of a transit that was already
+ * finishing when the range opened.
+ *
+ * Sorted by date these land at the very top, and each one draws as a few pixels
+ * hard against the left edge with the rest of the line empty. The bar is honest
+ * - the contact really was in orb for those first minutes - but it belongs to
+ * the period before this one, it has already made whatever exact hit it was
+ * going to make, and a stack of them is the first thing the eye meets.
+ *
+ * A stub in the middle of the range is a real short transit and stays. So does
+ * one against the right edge, which is something starting rather than ending,
+ * and so does anything that becomes exact inside the range however briefly.
+ *
+ * @param {AspectEvent[]} events the row's windows, clipped to the range
+ * @param {number} startMs
+ * @param {number} endMs exclusive
+ * @param {number} minFraction how much of the range a window has to occupy to
+ *   be worth a row
+ * @returns {boolean}
+ */
+export function isLeadingStub(events, startMs, endMs, minFraction){
+  if (!Array.isArray(events) || events.length === 0) return false;
+  const span = endMs - startMs;
+  if (!(span > 0)) return false;
+  for (const e of events){
+    // Only the first window of a row can be open at the range start, so a row
+    // with anything after it fails here and keeps its line.
+    if (!e.startClipped) return false;
+    if ((e.exacts ?? []).length > 0) return false;
+    if ((e.end - startMs) / span > minFraction) return false;
+  }
+  return true;
+}
+
+/**
  * Every orb window across a range, one list per offset.
  *
  * @param {Object} opts

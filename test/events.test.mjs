@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DAY_MS, aspectTargets, brentRoot, scanAspectWindows, wrap180 } from "../src/core/events.js";
+import { DAY_MS, aspectTargets, brentRoot, isLeadingStub, scanAspectWindows, wrap180 } from "../src/core/events.js";
 import { computeTransitEvents } from "../src/core/job.js";
 import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
@@ -422,4 +422,45 @@ test("progress is optional and costs the scan nothing when absent", () => {
   const without = scanAspectWindows(opts);
   const with_ = scanAspectWindows({ ...opts, onProgress: () => {} });
   assert.deepEqual(with_, without, "reporting progress changed what the scan found");
+});
+
+// A range of 100 days, and windows placed inside it by day.
+const R0 = T0, R1 = T0 + 100 * DAY_MS;
+const ev = (fromDay, toDay, { startClipped = false, endClipped = false, exacts = [] } = {}) => ({
+  start: T0 + fromDay * DAY_MS,
+  end: T0 + toDay * DAY_MS,
+  exacts: exacts.map(d => T0 + d * DAY_MS),
+  startClipped, endClipped,
+  peakOrb: exacts.length ? 0 : 0.5
+});
+
+test("a row that is only the tail of a transit already ending is a stub", () => {
+  // Open at the range start, closed again almost immediately, and it never
+  // becomes exact - whatever it was doing, it did before this view begins.
+  assert.equal(isLeadingStub([ev(0, 3, { startClipped: true })], R0, R1, 0.05), true);
+});
+
+test("a stub keeps its row once anything actually happens in it", () => {
+  // Exact inside the range, however briefly, is an event and not a leftover.
+  assert.equal(isLeadingStub([ev(0, 3, { startClipped: true, exacts: [1] })], R0, R1, 0.05), false);
+  // Wide enough to be worth reading as a separating contact.
+  assert.equal(isLeadingStub([ev(0, 40, { startClipped: true })], R0, R1, 0.05), false);
+});
+
+test("only the left edge is trimmed", () => {
+  // A short window in the middle of the range is a real short transit.
+  assert.equal(isLeadingStub([ev(50, 53)], R0, R1, 0.05), false);
+  // One against the right edge is something starting, which is news.
+  assert.equal(isLeadingStub([ev(97, 100, { endClipped: true })], R0, R1, 0.05), false);
+});
+
+test("a row with a later window keeps its line whatever opens it", () => {
+  const events = [ev(0, 2, { startClipped: true }), ev(60, 70, { exacts: [65] })];
+  assert.equal(isLeadingStub(events, R0, R1, 0.05), false);
+});
+
+test("the stub test survives an empty or degenerate range", () => {
+  assert.equal(isLeadingStub([], R0, R1, 0.05), false);
+  assert.equal(isLeadingStub(undefined, R0, R1, 0.05), false);
+  assert.equal(isLeadingStub([ev(0, 1, { startClipped: true })], R0, R0, 0.05), false);
 });
