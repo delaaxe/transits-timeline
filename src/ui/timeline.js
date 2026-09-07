@@ -1,12 +1,21 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor } from "../data/bodies.js";
+import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor, ruleKey } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
 import { formatExactPretty, formatRangePretty } from "./format.js";
 import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
+
+/** @type {((e:PointerEvent|MouseEvent, rule:any) => void)|null} */
+let rowLabelHandler = null;
+
+// The aspect axis is a separate SVG from the chart and is drawn from a separate
+// entry point, so what a row label does when it is tapped is registered rather
+// than imported: the module that answers needs the timeline, and importing it
+// back the other way would close the loop.
+export function onRowLabelClick(fn){ rowLabelHandler = fn; }
 
 export function updateShowMore(shown, total){
   const wrap = el.moreWrap;
@@ -216,6 +225,56 @@ export function updateLabelsMode(){
     layout: state.currentLayout,
     useSymbols: state.labelsUseSymbols
   });
+}
+
+/**
+ * The index of a rule among the rows actually drawn, or -1. The row cap and the
+ * stub filter both sit between the cache and the chart, so a rule's place in the
+ * cache is not its place on screen.
+ */
+export function visibleRowIndexOf(rule){
+  if (!state.cachedResults || !rule) return -1;
+  const key = ruleKey(rule);
+  const keep = visibleRows();
+  for (let i = 0; i < keep.length; i++){
+    if (ruleKey(state.cachedResults.rules[keep[i]]) === key) return i;
+  }
+  return -1;
+}
+
+// The sticky header is the view bar and the date axis, and a row scrolled to
+// the top of the document sits underneath both of them.
+function stickyHeaderBottom(){
+  const axis = el.dateAxisScroll;
+  if (!axis) return 0;
+  return Math.max(0, axis.getBoundingClientRect().bottom);
+}
+
+/**
+ * Brings the focused row onto the screen after a search has moved the range.
+ * It may be past the row cap - the cap is fifty and the row can be the two
+ * hundredth - so the cap is raised to reach it rather than the row being
+ * reported as missing.
+ */
+export function revealFocusRow(){
+  if (!state.cachedResults || !state.focusRule) return false;
+  const idx = visibleRowIndexOf(state.focusRule);
+  if (idx < 0) return false;
+  if (idx >= state.currentMaxRows){
+    state.currentMaxRows = Math.ceil((idx + 1) / 50) * 50;
+    renderFromCache(state.currentMaxRows);
+  }
+  const layout = state.currentLayout;
+  const svg = el.timelineSvg;
+  if (!layout || !svg) return true;
+
+  const rowTop = svg.getBoundingClientRect().top + layout.rowsY0 + idx * (layout.rowH + layout.rowGap);
+  const headroom = stickyHeaderBottom() + layout.rowH * 2;
+  const floor = window.innerHeight - layout.rowH * 2;
+  if (rowTop < headroom || rowTop > floor){
+    window.scrollBy({ top: Math.round(rowTop - headroom), behavior: "smooth" });
+  }
+  return true;
 }
 
 export function wireAxisScrollSync(){
@@ -429,15 +488,26 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
   svg.appendChild(svgEl("rect", {x:0, y:0, width: labelW, height: totalH, fill:"var(--axis-bg)"}));
 
   const labelX = labelW - 8;
+  const focusKey = ruleKey(state.focusRule);
 
   for (let idx=0; idx<rules.length; idx++){
     const r = rules[idx];
     const y = rowsY0 + idx*(rowH+rowGap);
+    const isFocused = focusKey && ruleKey(r) === focusKey;
+    if (isFocused){
+      svg.appendChild(svgEl("rect", {
+        x: 0, y, width: labelW, height: rowH,
+        fill: "var(--focus-band)", "pointer-events": "none"
+      }));
+    }
     const t = svgEl("text", {
       x: labelX,
       y: y + rowH/2 + 4,
       "font-size": String(labelFontSize),
-      fill:"var(--text)",
+      // Colour rather than weight: these labels are already as wide as the
+      // column allows, and bold costs a character off the front of the long
+      // ones. The band behind it is doing most of the work anyway.
+      fill: isFocused ? "var(--accent)" : "var(--text)",
       "text-anchor":"end"
     });
 
@@ -457,6 +527,30 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
     }
 
     svg.appendChild(t);
+
+    // The label itself is a line of text a couple of pixels tall in the places
+    // between the glyphs, so the row's whole strip is what is tapped. It sits
+    // over the text on purpose: a pointer that is anywhere on the row is on the
+    // target, and the text under it is not asked to catch anything.
+    const hit = svgEl("rect", {
+      x: 0, y, width: labelW, height: rowH,
+      fill: "transparent",
+      class: "rowLabelHit"
+    });
+    const title = document.createElementNS(svgNs, "title");
+    title.textContent = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)} - when this last happened, and when it happens next`;
+    hit.appendChild(title);
+    // A tap, not a drag. The column sits over a chart that scrolls sideways, so
+    // a finger that started here and travelled was panning; the browser still
+    // synthesises a click for it, and opening a card at the end of a scroll is
+    // the worst kind of surprise.
+    let downAt = null;
+    hit.addEventListener("pointerdown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+    hit.addEventListener("click", (e) => {
+      if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 8) return;
+      rowLabelHandler?.(e, r);
+    });
+    svg.appendChild(hit);
   }
 }
 
@@ -527,6 +621,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
   const endMs = endExclusive.getTime();
   const spanMs = Math.max(1, endMs - startMs);
   const dateToX = (d) => x0 + ((d.getTime() - startMs) / spanMs) * timelineW;
+  const focusKey = ruleKey(state.focusRule);
 
   for (let idx=0; idx<rules.length; idx++){
     const r = rules[idx];
@@ -538,6 +633,15 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       svg.appendChild(svgEl("rect", {
         x:x0, y, width: timelineW, height: rowH,
         fill:"var(--row-band)", "pointer-events": "none"
+      }));
+    }
+    // A search that moves the range by fifty years lands on a chart the reader
+    // has never seen, and the row they asked about is one of sixty. This is the
+    // thread back to it, and it is drawn in both SVGs so it crosses the seam.
+    if (focusKey && ruleKey(r) === focusKey){
+      svg.appendChild(svgEl("rect", {
+        x:x0, y, width: timelineW, height: rowH,
+        fill:"var(--focus-band)", "pointer-events": "none"
       }));
     }
     svg.appendChild(svgEl("line", {

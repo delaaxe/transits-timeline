@@ -4,6 +4,15 @@ import { state } from "../state.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
 
+/** @type {((action:string) => void)|null} */
+let rowActionHandler = null;
+
+// The popup is the one card the app has, so the row menu is drawn in it rather
+// than in a second thing that looks like it. What its buttons do belongs to the
+// module that opened it, which is registered rather than imported: this file is
+// below the timeline, not beside it.
+export function onRowAction(fn){ rowActionHandler = fn; }
+
 export function wireTooltipDismiss(){
   window.addEventListener("scroll", () => {
     if (isCoarsePointer()) hideTooltip();
@@ -23,6 +32,13 @@ export function ensureTooltipListeners(){
     const closeBtn = e.target.closest(".tooltipClose");
     if (closeBtn){
       hideTooltip();
+      return;
+    }
+    const rowActionBtn = e.target.closest("[data-row-action]");
+    if (rowActionBtn){
+      const action = rowActionBtn.dataset.rowAction;
+      hideTooltip();
+      rowActionHandler?.(action);
       return;
     }
     const titleEl = e.target.closest(".tooltipTitle");
@@ -163,15 +179,15 @@ let shownArgs = null;
 
 export function refreshTooltipContent(){
   if (tooltip.style.display !== "block" || !shownArgs) return;
-  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any]} */ (shownArgs)));
+  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,any]} */ (shownArgs)));
 }
 
 /**
  * `descKey` and `mythKey` are looked up here rather than passed as text, so a
  * redraw picks up prose that was not loaded when the bar was drawn.
  */
-export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData){
-  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData];
+export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, actions){
+  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, actions];
   // Two bodies meeting in the sky is not the same event as one of them crossing
   // a place in a birth chart, so world mode reads from its own file rather than
   // from natal prose written in the second person about "your natal Neptune".
@@ -241,8 +257,18 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
       calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}${appLinksHtml}</div></div>`;
     }
   }
+  // A row menu has no dates to show - it is about the pairing rather than about
+  // one of its passes - so the line that carries them is left out entirely
+  // instead of drawn empty.
+  const subHtml = (range || exactHtml) ? `<div class="sub">${escapeHtml(range)}${exactHtml}</div>` : "";
+  const actionsHtml = (popupMode && actions?.length)
+    ? `<div class="tooltipRowActions">` + actions.map(a =>
+        `<button type="button" class="rowActionBtn" data-row-action="${escapeHtml(a.action)}">${escapeHtml(a.label)}</button>`
+      ).join("") + `</div>`
+    : "";
   tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(title)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
-    + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
+    + subHtml
+    + actionsHtml
     + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
     + timingHtml
     + mythHtml
@@ -275,8 +301,9 @@ export function isCoarsePointer(){
   return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
-export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null){
-  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData);
+/** @param {{action:string, label:string}[]|null} [actions] */
+export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, actions=null){
+  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, actions);
   tooltip.style.display = "block";
   tooltip.style.visibility = "hidden";
   tooltip.classList.toggle("popup", !!popupMode);

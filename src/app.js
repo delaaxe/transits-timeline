@@ -1,16 +1,18 @@
 import { state } from "./state.js";
 import { onRequestUpdate } from "./refresh.js";
-import { calcNatalAscDeg, calcNatalMCDeg, chartRulerFromAsc, computeCompositeChart } from "./core/chart.js";
-import { ephemerisAstronomy, getBodyLonFromAll } from "./core/ephemeris.js";
-import { addDaysLocal, parseBirthUTCFor, parseLocalDateOnly } from "./core/time.js";
+import { ephemerisAstronomy } from "./core/ephemeris.js";
+import { addDaysLocal, parseLocalDateOnly } from "./core/time.js";
 import { buildCandidateRules, buildSkyRules } from "./core/transits.js";
 import { orderMap } from "./data/bodies.js";
+import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./services/chart-context.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
 import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
-import { chartsState, getActiveChartA, getActiveChartB } from "./storage/charts.js";
 import { el, setStatus, setTimelineState } from "./ui/dom.js";
-import { bootPresets, bootSelects, getCheckedAspects, initCharts, readRuleOptions, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
-import { clearTimeline, renderFromCache, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
+import { getCheckedAspects } from "./ui/aspects.js";
+import { onBodiesChanged, wireBodyPicker } from "./ui/bodies.js";
+import { bootPresets, initCharts, readRuleOptions, renderPresetSection, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
+import { clearRowFocus, renderRowFocus, wireRowFocus } from "./ui/rowfocus.js";
+import { clearTimeline, renderFromCache, updateShowMore, visibleRowIndexOf, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
 
 export function maybeRefreshTimelineOnRefocus(){
@@ -57,25 +59,9 @@ export async function updateTimeline(){
     const hadResults = !!state.cachedResults;
     if (!hadResults) setTimelineState("Computing…", "busy");
 
-    const chartA = getActiveChartA();
-    const chartB = getActiveChartB();
-    const isPersonalMode = state.appMode === "personal";
-    const isComposite = isPersonalMode && chartsState.mode === "composite";
-    if (isPersonalMode && !chartA) throw new Error("Pick a chart first.");
-    if (isComposite && !chartB) throw new Error("Pick two charts for composite.");
-    let lon = Number(chartA?.lon || 0);
-    let lat = Number(chartA?.lat || 0);
-    const height = 0;
-    let composite = null;
-    if (isComposite){
-      composite = computeCompositeChart(chartA, chartB);
-      lon = composite.location.lon;
-      lat = composite.location.lat;
-    }
+    const ctx = currentChartContext();
 
     state.currentMaxRows = 50;
-
-    const birthUTC = (isPersonalMode && chartA) ? parseBirthUTCFor(chartA) : null;
 
     const rangeStartLocal = parseLocalDateOnly(el.rangeStart.value);
     const rangeEndLocal = parseLocalDateOnly(el.rangeEnd.value);
@@ -83,9 +69,17 @@ export async function updateTimeline(){
     if (!(rangeStartLocal < endExclusive)) throw new Error("Timeline end must be after start.");
 
     const ruleOptions = readRuleOptions();
-    const candidateRules = (state.appMode === "world") ? buildSkyRules(ruleOptions) : buildCandidateRules(ruleOptions);
     const aspectsChecked = getCheckedAspects();
     if (aspectsChecked.length === 0) throw new Error("Select at least one aspect.");
+    if (ctx.mode === "world"){
+      if (ruleOptions.skyBodies.length < 2) throw new Error("Pick at least two bodies: a sky aspect needs both ends.");
+    } else {
+      if (ruleOptions.transitBodies.length === 0) throw new Error("Pick at least one transiting body.");
+      if (ruleOptions.natalBodies.length === 0) throw new Error("Pick at least one natal point.");
+    }
+    const candidateRules = (ctx.mode === "world")
+      ? buildSkyRules({ bodies: ruleOptions.skyBodies, aspects: ruleOptions.aspects, orb: ruleOptions.orb })
+      : buildCandidateRules(ruleOptions);
 
     const spanDays = (endExclusive.getTime() - rangeStartLocal.getTime()) / (24 * 3600 * 1000);
     // Windows now carry real times, so this only decides whether showing them
@@ -93,40 +87,14 @@ export async function updateTimeline(){
     const showTime = spanDays <= 60;
 
     const natalTargets = Array.from(new Set(candidateRules.map(r => r.natal)));
-
-    let chartRulerKey = null;
-    /** @type {Record<string, number>|null} */
-    let natalLon = null;
-    if (state.appMode === "world"){
-      chartRulerKey = null;
-    } else if (isComposite && composite){
-      natalLon = {};
-      for (const k of natalTargets){
-        natalLon[k] = (k === "mc") ? composite.mc
-          : (k === "asc") ? composite.asc
-          : composite.lon[k];
-      }
-      chartRulerKey = chartRulerFromAsc(composite.asc);
-    } else {
-      natalLon = {};
-      const birthAllPlanets = ephemerisAstronomy.getAllPlanets(birthUTC, lon, lat, height);
-      for (const k of natalTargets){
-        if (k === "mc"){
-          natalLon[k] = calcNatalMCDeg(birthUTC, lon);
-        } else if (k === "asc"){
-          natalLon[k] = calcNatalAscDeg(birthUTC, lon, lat);
-        } else {
-          natalLon[k] = getBodyLonFromAll(birthAllPlanets, k, birthUTC);
-        }
-      }
-      chartRulerKey = chartRulerFromAsc(calcNatalAscDeg(birthUTC, lon, lat));
-    }
+    const natalLon = natalLongitudes(ctx, natalTargets);
+    const chartRulerKey = chartRulerKeyFor(ctx);
 
     const { rules: rulesOut, events: eventsByRule } = await computeEvents({
-      mode: state.appMode === "world" ? "world" : "personal",
+      mode: ctx.mode,
       startMs: rangeStartLocal.getTime(),
       endMs: endExclusive.getTime(),
-      observer: { lon, lat, height },
+      observer: ctx.observer,
       natalLon,
       rules: candidateRules
     }, (done, total) => {
@@ -166,6 +134,12 @@ export async function updateTimeline(){
 
     renderFromCache(state.currentMaxRows);
     state.lastTimelineRefreshAt = Date.now();
+    // A row picked off the axis keeps its highlight across recomputes, but only
+    // while it is still one of the rows: narrowing the chooser past it, or
+    // switching charts, leaves nothing to point at. Nothing scrolls here - only
+    // a search, which moves the range out from under the reader, has earned
+    // that; a recompute they asked for should leave the page where it was.
+    if (state.focusRule && rulesSorted.length > 0 && visibleRowIndexOf(state.focusRule) < 0) clearRowFocus();
 
     const nothingFound = rulesSorted.length === 0;
     setTimelineState(nothingFound ? "No transits match these settings in this range." : null,
@@ -205,7 +179,11 @@ export async function updateTimeline(){
 export // All DOM work hangs off boot, so every module stays importable in Node.
 async function boot(){
   onRequestUpdate(updateTimeline);
-  bootSelects();
+  wireBodyPicker();
+  onBodiesChanged(() => {
+    renderPresetSection();
+    renderRowFocus();
+  });
   bootPresets();
 
   if (el.showMoreBtn){
@@ -219,6 +197,7 @@ async function boot(){
   initCharts();
   wireChartsUI();
   wireAdvancedUI();
+  wireRowFocus();
   wireViewBar();
   wireAutoUpdate();
   wireAxisScrollSync();

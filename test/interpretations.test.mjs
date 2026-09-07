@@ -9,34 +9,30 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
-import { aspects, mythKeyFor, planets, transitGroups, natalGroups, transitTiming } from "../src/data/bodies.js";
+import { aspects, mythKeyFor, natalKeys, planets, transitingKeys, transitTiming } from "../src/data/bodies.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (name) => JSON.parse(await readFile(join(repoRoot, name), "utf8"));
 
-/** Every descKey a mode can build, by running the real rule builders over every
- *  combination of controls rather than restating what they do. The orb is swept
- *  too: buildSkyRules drops aspects the pair cannot reach, and how many it drops
- *  depends on how wide the orb is. */
+/** Every descKey a mode can build, by running the real rule builders rather than
+ *  restating what they do.
+ *
+ *  The chooser holds sets now, so this no longer has to sweep combinations of
+ *  controls: both builders are monotone in the bodies they are given - adding a
+ *  body only ever adds rules - so every selection's keys are a subset of the
+ *  keys the full sets produce, in both link modes. The orb is still swept, since
+ *  buildSkyRules drops aspects a pair cannot reach and how many depends on how
+ *  wide the orb is. */
 function reachableKeys(build){
   const keys = new Set();
   const aspectKeys = aspects.map(a => a[0]);
-  for (const [transitGroup] of transitGroups){
-    for (const [natalGroup] of natalGroups){
-      for (const orb of [1, 8, 30]){
-        // Five checkboxes now, so the sweep runs to 31 rather than 15. Missing a
-        // combination here means prose for a bar nobody can reach, or a bar that
-        // opens empty, and neither shows up until someone ticks that box.
-        for (let flags = 0; flags < 32; flags++){
-          const opts = {
-            transitGroup, natalGroup, aspects: aspectKeys, orb,
-            includeMoon: !!(flags & 1), includeChiron: !!(flags & 2),
-            includeNode: !!(flags & 4), includeMC: !!(flags & 8),
-            includeAsc: !!(flags & 16)
-          };
-          for (const r of build(opts)) keys.add(`${r.transit}-${r.aspect}-${r.natal}`);
-        }
-      }
+  for (const orb of [1, 8, 30]){
+    for (const link of ["directed", "either"]){
+      const rules = build({
+        transitBodies: transitingKeys, natalBodies: natalKeys, bodies: natalKeys,
+        aspects: aspectKeys, orb, link
+      });
+      for (const r of rules) keys.add(`${r.transit}-${r.aspect}-${r.natal}`);
     }
   }
   return keys;

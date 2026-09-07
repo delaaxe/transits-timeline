@@ -44,6 +44,10 @@
          opaque greys, so they hold whatever the plate is doing behind them. */
       --row-band: rgba(255,255,255,.022);
       --row-guide: rgba(255,255,255,.06);
+      /* The row being followed. Warm rather than white, because it is the star
+         colour saying "this is the one you asked about" - the same band the
+         chips take when they are on. */
+      --focus-band: rgba(242,228,190,.13);
 
       /* Spacing: 6 / 10 / 16 / 24, replacing a mix of six ad-hoc values. */
       --sp-1: 6px;
@@ -679,6 +683,14 @@
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
+      .bodyChip,
+      .rowActionBtn,
+      .rowFocus .smallBtn{ min-height: 36px; }
+      /* The chips are what a selection is made of; these name a whole set at
+         once and are re-tapped in a second if one is missed, so they get the
+         checkbox row's height rather than the chips'. */
+      .bodyPresetBtn,
+      .bodyLinkBtn{ min-height: 32px; }
       .viewBar > .viewBarToggle{ min-height: 40px; padding: 6px 8px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
@@ -764,10 +776,6 @@
         height: calc(var(--date-axis-h, 80px) + var(--timeline-nav-total, 0px) + var(--axis-pad-top));
       }
       .timelineNavGroup:last-child .timelineNavBtn:last-child{ margin-right: 10px; }
-      .rowPlanets{ margin-top: 0 !important; }
-      .rowPlanets{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
-      .rowPlanets .field:nth-child(3){ grid-column: 1 / -1; }
-      .rowPlanets .field select{ width: 100%; }
     }
 
     .chartButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
@@ -830,6 +838,148 @@
     }
     .appModeLink{ font-size: 15px; }
     .appModeLink.active{ font-weight: 700; color: var(--star); }
+
+    /* The body chooser. Two panes side by side where there is room for them and
+       stacked where there is not, because the two ends of a transit are one
+       question - "these bodies, against those points" - and reading it as one
+       line is what a pair of tabs would have taken away. */
+    .bodyPicker{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-2) var(--sp-3);
+    }
+    .bodyPane{ min-width: 0; }
+    .bodyPaneTitle{ font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .bodyPresets{ display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+    /* Presets are what fills the chips, so they read as the quieter control:
+       no border, and the star band only when the chips happen to match one. A
+       preset that is lit is a description of the selection, not a mode it is
+       locked into. */
+    .bodyPresetBtn{
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: none;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.35;
+      cursor: pointer;
+    }
+    .bodyPresetBtn:hover{ background: var(--hover); color: var(--ink); }
+    .bodyPresetBtn.on{ background: var(--star); border-color: var(--star); color: var(--accent-contrast); }
+    .bodyPresetBtn.ghost{ color: var(--ink-faint); }
+    .bodyChips{ display: flex; flex-wrap: wrap; gap: 6px; }
+    .bodyChip{
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--control-border);
+      background: var(--control-bg);
+      color: var(--ink-soft);
+      font-family: var(--font-glyph);
+      font-size: 13px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bodyChip:hover{ border-color: var(--star); color: var(--ink); }
+    .bodyChip.on{
+      background: var(--star);
+      border-color: var(--star);
+      color: var(--accent-contrast);
+    }
+    .bodyFoot{
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--sp-1) var(--sp-2);
+    }
+    /* Two chips in one shell, because they are one choice with two settings
+       rather than two things that can both be on. */
+    .bodyLink{
+      display: inline-flex;
+      border: 1px solid var(--control-border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bodyLinkBtn{
+      padding: 4px 10px;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      color: var(--ink-soft);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .bodyLinkBtn:hover{ background: var(--hover); color: var(--ink); }
+    .bodyLinkBtn.on{ background: var(--star); color: var(--accent-contrast); }
+    /* What the chips add up to, in the app's own glyphs - the one line that
+       still says what is selected once the reader has stopped counting chips. */
+    .bodySummary{
+      font-family: var(--font-glyph);
+      font-size: 13px;
+      color: var(--muted);
+      min-width: 0;
+    }
+    .bodySummary.warn{ font-family: var(--font-ui); color: var(--danger); }
+    /* Two panes side by side on a phone are two columns three chips wide, and
+       every name in them wraps. One under the other instead. This sits with the
+       rule it overrides rather than with the other narrow-screen rules further
+       up the file: they have the same specificity, so whichever is written last
+       is the one that applies. */
+    @media (max-width: 700px){
+      .bodyPicker{ grid-template-columns: 1fr; }
+    }
+
+    /* The bar that follows one row. It is a line of the view bar rather than
+       something below it, so the sticky date axis clears it without being told:
+       --viewbar-h is measured from the bar's real height. */
+    .rowFocus{
+      flex: 1 0 100%;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--sp-1);
+      padding-top: var(--sp-1);
+      border-top: 1px solid var(--hairline-soft);
+    }
+    .rowFocusTitle{ font-size: 13px; color: var(--accent); font-weight: 700; }
+    .rowFocus .smallBtn{ padding: 4px 8px; font-size: 12px; }
+    .rowFocusResult{ font-size: 12px; color: var(--muted); min-width: 0; }
+    .rowFocusClear{ margin-left: auto; }
+
+    /* The label column answers a tap now, so its rows - and only its rows - take
+       pointer events back from the wrapper. The wrapper stays transparent to
+       them: it is an overlay across the top of a chart that scrolls sideways
+       under it, and a drag that starts anywhere else on it still belongs to the
+       chart. What a drag that starts on a row does is settled in the renderer,
+       which ignores a click that travelled. */
+    #aspectAxisSvg .rowLabelHit{
+      pointer-events: auto;
+      cursor: pointer;
+      touch-action: pan-y;
+    }
+    #aspectAxisSvg .rowLabelHit:hover{ fill: var(--hover); }
+
+    /* Buttons in the popup that act on the whole row rather than on the pass
+       that was tapped. */
+    .tooltipRowActions{
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-1);
+      margin: 10px 0 2px;
+    }
+    .rowActionBtn{
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 8px;
+      background: var(--control-bg);
+      border: 1px solid var(--control-border);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .rowActionBtn:hover{ border-color: var(--star); }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
     .presetBtn{
@@ -1149,6 +1299,13 @@
         <circle cx="10" cy="16" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
       </svg>
     </button>
+    <div class="rowFocus" id="rowFocus" role="status" aria-live="polite" hidden>
+      <span class="rowFocusTitle symbolGlyphText" id="rowFocusTitle"></span>
+      <button id="rowFocusPrev" type="button" class="smallBtn">‹ Last time</button>
+      <button id="rowFocusNext" type="button" class="smallBtn">Next time ›</button>
+      <span class="rowFocusResult" id="rowFocusResult"></span>
+      <button id="rowFocusClear" type="button" class="iconBtn rowFocusClear" aria-label="Stop following this row">✕</button>
+    </div>
   </div>
 
   <div class="optionsDrawer" data-advanced>
@@ -1157,17 +1314,23 @@
       <div class="field"><label>End</label><input id="rangeEnd" type="date" value="2026-12-31" /></div>
     </div>
 
-    <div class="row rowPlanets">
-      <div class="field med"><label>Planets</label><select id="transitGroup"></select></div>
-      <div class="field med" id="natalGroupField"><label>Natal targets</label><select id="natalGroup"></select></div>
-      <div class="field">
-        <div class="checks" style="padding:0;">
-          <label><input id="includeMoon" type="checkbox" checked /> Transiting Moon</label>
-          <label><input id="includeChiron" type="checkbox" checked /> Chiron</label>
-          <label><input id="includeNode" type="checkbox" /> Node</label>
-          <label id="includeMCWrap"><input id="includeMC" type="checkbox" checked /> Mc</label>
-          <label id="includeAscWrap"><input id="includeAsc" type="checkbox" checked /> Asc</label>
+    <div class="bodyPicker" id="bodyPicker">
+      <div class="bodyPane" id="transitPane">
+        <div class="bodyPaneTitle" id="transitPaneTitle">Transiting</div>
+        <div class="bodyPresets" id="transitBodyPresets"></div>
+        <div class="bodyChips" id="transitBodyChips" role="group" aria-label="Transiting bodies"></div>
+      </div>
+      <div class="bodyPane" id="natalPane">
+        <div class="bodyPaneTitle">Natal points</div>
+        <div class="bodyPresets" id="natalBodyPresets"></div>
+        <div class="bodyChips" id="natalBodyChips" role="group" aria-label="Natal points"></div>
+      </div>
+      <div class="bodyFoot">
+        <div class="bodyLink" id="bodyLinkWrap" role="group" aria-label="Pairing">
+          <button type="button" class="bodyLinkBtn" data-body-link="directed">Transiting → natal</button>
+          <button type="button" class="bodyLinkBtn" data-body-link="either">Either side</button>
         </div>
+        <div class="bodySummary" id="bodySummary"></div>
       </div>
     </div>
 

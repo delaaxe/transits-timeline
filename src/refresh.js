@@ -5,4 +5,7 @@ let handler = null;
 
 export function onRequestUpdate(fn){ handler = fn; }
 
-export function requestUpdate(){ if (handler) handler(); }
+// The handler's promise comes back out: the occurrence search moves the range
+// and then has to wait for the chart it moved to before it can scroll the row
+// it went looking for into view.
+export function requestUpdate(){ return handler ? handler() : undefined; }

@@ -3,11 +3,14 @@ import { requestUpdate } from "../refresh.js";
 import { calcNatalAscDeg, calcNatalMCDeg, computeCompositeChart } from "../core/chart.js";
 import { ephemerisAstronomy, getBodyLonFromAll } from "../core/ephemeris.js";
 import { addDaysLocal, fmtLocalYYYYMMDD, parseBirthUTCFor, parseLocalDateOnly } from "../core/time.js";
-import { aspects, natalGroups, planetSymbols, summaryPlanetOrder, summaryPointSymbols, summaryTailOrder, transitGroups, zodiacSignSymbol } from "../data/bodies.js";
+import { planetSymbols, summaryPlanetOrder, summaryPointSymbols, summaryTailOrder, zodiacSignSymbol } from "../data/bodies.js";
 import { defaultPresetKey, presets } from "../data/presets.js";
 import { awsAutocomplete, awsGetPlace, extractPosition } from "../services/places.js";
 import { chartsState, defaultChartData, getActiveChart, getActiveChartA, getActiveChartB, isDefaultChart, lastChartKey, loadCharts, newId, normalizeChart, saveCharts } from "../storage/charts.js";
-import { $, debounce, el, escapeHTML, fillSelect, installHint, installHintText, setStatus } from "./dom.js";
+import { $, debounce, el, escapeHTML, installHint, installHintText, setStatus } from "./dom.js";
+import { getCheckedAspects, renderAspectChecks } from "./aspects.js";
+import { applyBodySets, renderBodyPicker, selectedBodies } from "./bodies.js";
+import { clearRowFocus } from "./rowfocus.js";
 import { fmtBirthPretty, fmtCoord } from "./format.js";
 import { wireChartReorder } from "./chart-drag.js";
 import { wireTransferUI } from "./transfer.js";
@@ -51,46 +54,16 @@ export function wireRangeNav(){
   if (el.rangeExpandForward) el.rangeExpandForward.addEventListener("click", () => expandRange(1));
 }
 
-export function bootSelects(){
-  fillSelect(el.transitGroup, transitGroups.map(g => [g[0], g[1]]));
-  fillSelect(el.natalGroup, natalGroups.map(g => [g[0], g[1]]));
-}
-
-export function renderAspectChecks(selectedKeys){
-  const wrap = el.aspectChecks;
-  wrap.innerHTML = "";
-  for (const [key, label] of aspects){
-    const lab = document.createElement("label");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selectedKeys.includes(key);
-    cb.dataset.aspectKey = key;
-    lab.appendChild(cb);
-    const span = document.createElement("span");
-    span.textContent = label;
-    lab.appendChild(span);
-    wrap.appendChild(lab);
-  }
-}
-
 export function readRuleOptions(){
+  const bodies = selectedBodies();
   return {
-    transitGroup: $("transitGroup").value,
-    natalGroup: $("natalGroup").value,
+    transitBodies: bodies.transit ?? [],
+    natalBodies: bodies.natal ?? [],
+    skyBodies: bodies.sky ?? [],
+    link: state.bodyLink,
     aspects: getCheckedAspects(),
-    orb: Number($("orb").value || 1.0),
-    includeMoon: el.includeMoon.checked,
-    includeChiron: el.includeChiron.checked,
-    includeNode: el.includeNode.checked,
-    includeMC: el.includeMC.checked,
-    includeAsc: el.includeAsc.checked
+    orb: Number($("orb").value || 1.0)
   };
-}
-
-export function getCheckedAspects(){
-  return Array.from(el.aspectChecks.querySelectorAll("input[type=checkbox]"))
-    .filter(cb => cb.checked)
-    .map(cb => cb.dataset.aspectKey);
 }
 
 export let advancedVisible = false;
@@ -228,17 +201,9 @@ export function renderAppModeSection(){
   }
   if (el.personalPanel) el.personalPanel.hidden = !appModeIsPersonal;
   if (el.personalSection) el.personalSection.hidden = !appModeIsPersonal;
-  if (el.natalGroupField){
-    el.natalGroupField.hidden = !appModeIsPersonal;
-    el.natalGroupField.style.display = appModeIsPersonal ? "" : "none";
-  }
-  // Both angles are natal-only, so both disappear with the natal chart when the
-  // app switches to the sky.
-  for (const wrap of [el.includeMCWrap, el.includeAscWrap]){
-    if (!wrap) continue;
-    wrap.hidden = !appModeIsPersonal;
-    wrap.style.display = appModeIsPersonal ? "" : "none";
-  }
+  // The natal end of the chooser, and with it both angles, belongs to a birth
+  // chart: the sky has neither a natal side nor an Ascendant.
+  renderBodyPicker();
 }
 
 export function renderPersonalSection(){
@@ -399,9 +364,15 @@ export function setAppMode(modeKey){
     chartsState.addMode = false;
     state.chartSummaryVisible = false;
     if (el.addChartPanel) el.addChartPanel.style.display = "none";
-    state.activePresetKey = "week";
   }
-  applyPreset(state.activePresetKey);
+  // A row of the sky is not a row of a birth chart, so whatever was focused
+  // does not survive the crossing.
+  clearRowFocus();
+  // A preset describes both modes at once - each carries its own set of bodies
+  // for the sky - so reapplying it is what puts the sky's half in place. A
+  // selection built by hand is left alone: the three lists are separate, and
+  // glancing at the sky and coming back is no way to lose one.
+  if (state.activePresetKey) applyPreset(state.activePresetKey);
   renderPersonalSection();
 }
 
@@ -695,18 +666,24 @@ export function wireAdvancedUI(){
 
 export function wireAutoUpdate(){
   const updateDebounced = debounce(() => requestUpdate(), 150);
-  el.transitGroup.addEventListener("change", requestUpdate);
-  if (el.natalGroup) el.natalGroup.addEventListener("change", requestUpdate);
   el.rangeStart.addEventListener("change", requestUpdate);
   el.rangeEnd.addEventListener("change", requestUpdate);
-  el.orb.addEventListener("input", updateDebounced);
-  el.orb.addEventListener("change", requestUpdate);
-  el.includeMoon.addEventListener("change", requestUpdate);
-  el.includeMC.addEventListener("change", requestUpdate);
-  el.includeAsc.addEventListener("change", requestUpdate);
-  el.includeChiron.addEventListener("change", requestUpdate);
-  el.includeNode.addEventListener("change", requestUpdate);
-  el.aspectChecks.addEventListener("change", requestUpdate);
+  // Bodies, aspects and orb are the shape of the question, and a preset is a
+  // name for one shape: edit any of them and no preset describes what is on
+  // screen any more, so none is lit. The range is navigation rather than shape -
+  // the arrows either side of the chart are for moving around inside a view, not
+  // for leaving it - so it leaves the chips alone.
+  const divergeFromPreset = () => {
+    if (!state.activePresetKey) return;
+    state.activePresetKey = null;
+    renderPresetSection();
+  };
+  el.orb.addEventListener("input", () => { divergeFromPreset(); updateDebounced(); });
+  el.orb.addEventListener("change", () => { divergeFromPreset(); requestUpdate(); });
+  el.aspectChecks.addEventListener("change", () => {
+    divergeFromPreset();
+    requestUpdate();
+  });
 }
 
 export function applyPreset(key){
@@ -714,16 +691,12 @@ export function applyPreset(key){
   state.activePresetKey = p.key;
   renderPresetSection();
 
-  /** @type {any} */
-  const worldPreset = p.world || {};
-  const useWorld = state.appMode === "world";
-  el.transitGroup.value = useWorld ? (worldPreset.transitGroup || "all") : p.transitGroup;
-  if (el.natalGroup) el.natalGroup.value = p.natalGroup;
+  // Both ends and the sky set at once, whichever mode is showing: a preset is a
+  // whole query, and half-filling the one that is out of sight would leave the
+  // other mode holding a selection nothing chose.
+  applyBodySets({ transit: p.transit, natal: p.natal, sky: p.world.bodies, link: p.link });
   el.orb.value = String(p.orb);
   state.currentMaxRows = 50;
-  el.includeMoon.checked = useWorld ? (worldPreset.includeMoon !== false) : (p.includeMoon !== false);
-  el.includeChiron.checked = useWorld ? (worldPreset.includeChiron !== false) : (p.includeChiron !== false);
-  el.includeNode.checked = useWorld ? (worldPreset.includeNode !== false) : (p.includeNode !== false);
   renderAspectChecks(p.aspects);
 
   const today = new Date();

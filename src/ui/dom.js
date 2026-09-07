@@ -36,9 +36,6 @@ export const el = {
   composeStopBtn: $("composeStopBtn"),
   chartPickerB: $("chartPickerB"),
   mainContent: $("mainContent"),
-  natalGroupField: $("natalGroupField"),
-  includeMCWrap: $("includeMCWrap"),
-  includeAscWrap: $("includeAscWrap"),
   addChartPanel: $("addChartPanel"),
   addChartName: $("addChartName"),
   addChartBirthDate: $("addChartBirthDate"),
@@ -47,18 +44,27 @@ export const el = {
   placeSuggest: $("placeSuggest"),
   presetButtons: $("presetButtons"),
   viewBar: $("viewBar"),
-  transitGroup: $("transitGroup"),
-  natalGroup: $("natalGroup"),
+  bodyPicker: $("bodyPicker"),
+  transitPane: $("transitPane"),
+  transitPaneTitle: $("transitPaneTitle"),
+  transitBodyPresets: $("transitBodyPresets"),
+  transitBodyChips: $("transitBodyChips"),
+  natalPane: $("natalPane"),
+  natalBodyPresets: $("natalBodyPresets"),
+  natalBodyChips: $("natalBodyChips"),
+  bodyLinkWrap: $("bodyLinkWrap"),
+  bodySummary: $("bodySummary"),
+  rowFocus: $("rowFocus"),
+  rowFocusTitle: $("rowFocusTitle"),
+  rowFocusPrev: $("rowFocusPrev"),
+  rowFocusNext: $("rowFocusNext"),
+  rowFocusResult: $("rowFocusResult"),
+  rowFocusClear: $("rowFocusClear"),
   rangeStart: $("rangeStart"),
   rangeEnd: $("rangeEnd"),
   orb: $("orb"),
   aspectChecks: $("aspectChecks"),
   advancedToggle: $("advancedToggle"),
-  includeMoon: $("includeMoon"),
-  includeMC: $("includeMC"),
-  includeAsc: $("includeAsc"),
-  includeChiron: $("includeChiron"),
-  includeNode: $("includeNode"),
   updateBtn: $("updateBtn"),
   status: $("status"),
   rangeShiftBack: $("rangeShiftBack"),
@@ -82,16 +88,6 @@ export const tooltipBackdrop = $("tooltipBackdrop");
 export const installHint = $("installHint");
 
 export const installHintText = $("installHintText");
-
-export function fillSelect(sel, items){
-  sel.innerHTML = "";
-  for (const it of items){
-    const opt = document.createElement("option");
-    opt.value = it[0];
-    opt.textContent = it[1];
-    sel.appendChild(opt);
-  }
-}
 
 export function setStatus(msg, isError=false){
   el.status.textContent = msg;

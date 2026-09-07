@@ -1,68 +1,74 @@
 // Which transits to look for. The looking itself is core/events.js.
 
-import { aspectAngle, maxSkySeparation, natalGroupMap, transitGroupMap } from "../data/bodies.js";
+import { aspectAngle, isAngle, maxSkySeparation, normalizeBodies } from "../data/bodies.js";
 
-export function uniquePush(arr, v){ if (!arr.includes(v)) arr.push(v); }
+/**
+ * Every transiting-body-to-natal-point pair the selection asks for.
+ *
+ * The two ends are independent sets, so any combination is expressible: the
+ * named groups the dropdowns used to offer, and equally "just Mars and Venus
+ * against just natal Mars and Venus", which no pair of dropdowns could say.
+ *
+ * `link` covers the one thing two sets cannot say between them. Directed reads
+ * left to right - these bodies transiting those points - which is the usual
+ * question. "Either side" adds each pair's mirror image, so a Mars on the
+ * transiting side and a whole chart on the natal side also brings back
+ * everything crossing natal Mars: one body, both roles, without having to put
+ * every other body on both sides to get there.
+ *
+ * @param {{transitBodies:string[], natalBodies:string[], aspects:string[],
+ *          orb:number, link?:"directed"|"either"}} opts
+ */
+export function buildCandidateRules({ transitBodies, natalBodies, aspects, orb, link = "directed" }){
+  const transit = normalizeBodies(transitBodies).filter(k => !isAngle(k));
+  const natal = normalizeBodies(natalBodies);
 
-export function buildCandidateRules({ transitGroup, natalGroup, aspects, orb,
-                              includeMoon, includeChiron, includeNode, includeMC, includeAsc }){
-  let transitPlanets = [...(transitGroupMap.get(transitGroup) ?? transitGroupMap.get("outer") ?? [])];
-  const natalTargets = [...(natalGroupMap.get(natalGroup) ?? natalGroupMap.get("classical") ?? [])];
+  /** @type {[string, string][]} */
+  const pairs = [];
+  const seen = new Set();
+  const addPair = (tp, np) => {
+    // An angle is a place rather than a body, so it never transits - not even
+    // when the mirror of a pair would put it on the moving side.
+    if (isAngle(tp)) return;
+    const key = `${tp}|${np}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pairs.push([tp, np]);
+  };
 
-  if (includeChiron){
-    uniquePush(transitPlanets, "chiron");
-    uniquePush(natalTargets, "chiron");
-  }
-  if (includeNode){
-    uniquePush(transitPlanets, "node");
-    uniquePush(natalTargets, "node");
-  }
-  if (includeMC){
-    uniquePush(natalTargets, "mc");
-  }
-  // Natal side only, like the Midheaven. The Ascendant is a place in the chart
-  // rather than a body: nothing is there to move, so it can be aspected and
-  // never aspects.
-  if (includeAsc){
-    uniquePush(natalTargets, "asc");
-  }
-  if (!includeMoon){
-    transitPlanets = transitPlanets.filter(p => p !== "moon");
+  for (const tp of transit) for (const np of natal) addPair(tp, np);
+  if (link === "either"){
+    for (const tp of natal) for (const np of transit) addPair(tp, np);
   }
 
   const rules = [];
-  for (const tp of transitPlanets){
-    for (const np of natalTargets){
-      for (const asp of aspects){
-        if (tp === "node" && asp !== "conjunction") continue;
-        rules.push({ transit: tp, natal: np, aspect: asp, orb });
-      }
+  for (const [tp, np] of pairs){
+    for (const asp of aspects){
+      if (tp === "node" && asp !== "conjunction") continue;
+      rules.push({ transit: tp, natal: np, aspect: asp, orb });
     }
   }
   return rules;
 }
 
-export function buildSkyRules({ transitGroup, aspects, orb, includeMoon, includeChiron, includeNode }){
-  let skyPlanets = [...(transitGroupMap.get(transitGroup) ?? transitGroupMap.get("outer") ?? [])];
-  if (includeChiron){
-    uniquePush(skyPlanets, "chiron");
-  }
-  if (includeNode){
-    uniquePush(skyPlanets, "node");
-  }
-  if (!includeMoon){
-    skyPlanets = skyPlanets.filter(p => p !== "moon");
-  }
-  skyPlanets = skyPlanets.filter(p => p !== "mc" && p !== "asc");
+/**
+ * Every aspect between two bodies in the sky. One set rather than two: both
+ * ends move, so a pair has no direction and each is generated once, in chart
+ * order.
+ *
+ * @param {{bodies:string[], aspects:string[], orb:number}} opts
+ */
+export function buildSkyRules({ bodies, aspects, orb }){
+  const sky = normalizeBodies(bodies).filter(k => !isAngle(k));
   const rules = [];
-  for (let i=0; i<skyPlanets.length; i++){
-    for (let j=i+1; j<skyPlanets.length; j++){
+  for (let i=0; i<sky.length; i++){
+    for (let j=i+1; j<sky.length; j++){
       for (const asp of aspects){
-        if ((skyPlanets[i] === "node" || skyPlanets[j] === "node") && asp !== "conjunction") continue;
+        if ((sky[i] === "node" || sky[j] === "node") && asp !== "conjunction") continue;
         // An aspect the pair can never reach is not a transit that never fires,
         // it is a scan of the whole range looking for nothing.
-        if (aspectAngle(asp) - orb > maxSkySeparation(skyPlanets[i], skyPlanets[j])) continue;
-        rules.push({ transit: skyPlanets[i], aspect: asp, natal: skyPlanets[j], orb });
+        if (aspectAngle(asp) - orb > maxSkySeparation(sky[i], sky[j])) continue;
+        rules.push({ transit: sky[i], aspect: asp, natal: sky[j], orb });
       }
     }
   }

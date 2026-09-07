@@ -141,8 +141,8 @@ test("the sky-separation bounds really do bound the ephemeris", async () => {
 
   // The bound has to be the reason these are skipped, not an accident of orb.
   const skyKeys = (orb) => new Set(buildSkyRules({
-    transitGroup: "all", aspects: ["conjunction", "sextile", "square", "trine", "opposition"],
-    orb, includeMoon: true, includeChiron: false, includeNode: false
+    bodies: ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"],
+    aspects: ["conjunction", "sextile", "square", "trine", "opposition"], orb
   }).map(r => `${r.transit}-${r.aspect}-${r.natal}`));
 
   const tight = skyKeys(1);
@@ -207,10 +207,10 @@ function natalLonFor(birthUTC){
 
 test("every exact hit really is exact", async () => {
   const natalLon = natalLonFor(new Date("1985-07-13T16:45:00Z"));
+  const classicalPlus = ["sun","moon","mercury","venus","mars","jupiter","saturn","node","chiron"];
   const rules = buildCandidateRules({
-    transitGroup: "classical", natalGroup: "classical",
-    aspects: ["conjunction","sextile","square","trine","opposition"],
-    orb: 1, includeMoon: true, includeChiron: true, includeNode: true, includeMC: false
+    transitBodies: classicalPlus, natalBodies: classicalPlus,
+    aspects: ["conjunction","sextile","square","trine","opposition"], orb: 1
   });
   const res = computeTransitEvents({
     mode: "personal", startMs: Date.UTC(2026, 0, 1), endMs: Date.UTC(2026, 1, 1),
@@ -241,9 +241,9 @@ test("the scan agrees with brute-force sampling about when a transit is on", asy
   // sampler would have flagged. Anything the scan stepped over shows up here.
   const natalLon = natalLonFor(new Date("1990-03-02T09:20:00Z"));
   const rules = buildCandidateRules({
-    transitGroup: "personal", natalGroup: "classical",
-    aspects: ["conjunction","square","opposition"],
-    orb: 1, includeMoon: true, includeChiron: false, includeNode: false, includeMC: false
+    transitBodies: ["sun","moon","mercury","venus","mars"],
+    natalBodies: ["sun","moon","mercury","venus","mars","jupiter","saturn"],
+    aspects: ["conjunction","square","opposition"], orb: 1
   });
   const startMs = Date.UTC(2026, 5, 1);
   const endMs = Date.UTC(2026, 5, 15);
@@ -276,8 +276,8 @@ test("the scan agrees with brute-force sampling about when a transit is on", asy
 
 test("world mode scans both ends of the pair", async () => {
   const rules = buildSkyRules({
-    transitGroup: "classical", aspects: ["conjunction","opposition"],
-    orb: 1, includeMoon: false, includeChiron: false, includeNode: false
+    bodies: ["sun","mercury","venus","mars","jupiter","saturn"],
+    aspects: ["conjunction","opposition"], orb: 1
   });
   const startMs = Date.UTC(2026, 0, 1);
   const endMs = Date.UTC(2026, 3, 1);
@@ -302,9 +302,9 @@ test("world mode scans both ends of the pair", async () => {
 test("the scan reaches exact times for a fraction of what sampling to them costs", async () => {
   const natalLon = natalLonFor(new Date("1985-07-13T16:45:00Z"));
   const rules = buildCandidateRules({
-    transitGroup: "outer", natalGroup: "all",
-    aspects: ["conjunction","sextile","square","trine","opposition"],
-    orb: 1, includeMoon: false, includeChiron: true, includeNode: true, includeMC: false
+    transitBodies: ["jupiter","saturn","uranus","neptune","pluto","node","chiron"],
+    natalBodies: ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron"],
+    aspects: ["conjunction","sextile","square","trine","opposition"], orb: 1
   });
   const startMs = Date.UTC(2026, 0, 1);
   const endMs = Date.UTC(2031, 0, 1);
@@ -330,18 +330,24 @@ test("the Ascendant is a natal target and never a transiting body", () => {
   // It is a place in the chart rather than something in the sky: the degree
   // rising at birth. Nothing is there to move, so it can be aspected and can
   // never aspect - the same standing the Midheaven has always had here.
+  const everyBody = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron"];
   const opts = {
-    transitGroup: "all", natalGroup: "all",
-    aspects: ["conjunction", "sextile", "square", "trine", "opposition"], orb: 1,
-    includeMoon: true, includeChiron: true, includeNode: true
+    transitBodies: everyBody,
+    aspects: ["conjunction", "sextile", "square", "trine", "opposition"], orb: 1
   };
 
-  const off = buildCandidateRules({ ...opts, includeAsc: false, includeMC: false });
-  assert.ok(!off.some(r => r.natal === "asc"), "unticked, it is not a target");
+  const off = buildCandidateRules({ ...opts, natalBodies: everyBody });
+  assert.ok(!off.some(r => r.natal === "asc"), "unchosen, it is not a target");
 
-  const on = buildCandidateRules({ ...opts, includeAsc: true, includeMC: false });
-  assert.ok(on.some(r => r.natal === "asc"), "ticked, it is");
+  const on = buildCandidateRules({ ...opts, natalBodies: [...everyBody, "asc"] });
+  assert.ok(on.some(r => r.natal === "asc"), "chosen, it is");
   assert.ok(!on.some(r => r.transit === "asc"), "but it never transits anything");
+
+  // Not even when "either side" would otherwise put it on the moving end: the
+  // mirror of a pair is still a pair with something in the sky at one end.
+  const mirrored = buildCandidateRules({ ...opts, natalBodies: [...everyBody, "asc", "mc"], link: "either" });
+  assert.ok(!mirrored.some(r => r.transit === "asc" || r.transit === "mc"),
+    "an angle has nothing at it to move, whichever way the pair is read");
 
   // Every transiting body reaches it, and by every aspect except the Node's,
   // which the builder restricts to conjunctions.
@@ -358,7 +364,7 @@ test("the Ascendant is a natal target and never a transiting body", () => {
 
   // The sky has no Ascendant at all: world mode is two moving bodies, and an
   // angle is neither of them.
-  const sky = buildSkyRules({ ...opts, includeAsc: true });
+  const sky = buildSkyRules({ bodies: [...everyBody, "asc", "mc"], aspects: opts.aspects, orb: opts.orb });
   assert.ok(!sky.some(r => r.transit === "asc" || r.natal === "asc"));
 });
 

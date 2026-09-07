@@ -9,6 +9,7 @@ export const planets = [
   ["asc","Asc"],
 ];
 
+/** @type {Record<string, string>} */
 export const planetSymbols = {
   sun: "☉",
   moon: "☾",
@@ -137,27 +138,48 @@ export const aspectColors = {
 // event that is not really an aspect, and it has always been drawn in gold.
 export const returnColor = "#ffc94d";
 
-// Dropdown groups exclude Node/Chiron/MC; checkboxes add them.
-export const baseGroups = [
-  ["luminaries","Luminaries (Sun, Moon)", ["sun","moon"]],
-  ["personal",  "Personal (Sun–Mars)", ["sun","moon","mercury","venus","mars"]],
-  ["classical", "Classical (Sun–Saturn)", ["sun","moon","mercury","venus","mars","jupiter","saturn"]],
-  ["outer",     "Outer (Jupiter–Pluto)", ["jupiter","saturn","uranus","neptune","pluto"]],
-  ["social",    "Social (Jupiter–Saturn)", ["jupiter","saturn"]],
-  ["slow",      "Slow (Saturn–Pluto)",   ["saturn","uranus","neptune","pluto"]],
-  ["all",       "All (Sun-Pluto)", ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"]],
+// Everything the app can put on either end of a transit, in chart order, split
+// by what each end can hold: an angle is a place in the chart rather than
+// something in the sky, so nothing is there to move and it can only be aspected.
+export const angleKeys = ["mc", "asc"];
+
+export const transitingKeys = order.filter(k => !angleKeys.includes(k));
+
+export const natalKeys = [...order];
+
+export function isAngle(key){ return angleKeys.includes(key); }
+
+/** A body list in chart order, with repeats and unknown keys dropped. */
+export function normalizeBodies(list){
+  const wanted = new Set(list ?? []);
+  return order.filter(k => wanted.has(k));
+}
+
+/** Whether two lists name the same bodies, in whatever order they were given. */
+export function sameBodies(a, b){
+  const x = normalizeBodies(a);
+  const y = normalizeBodies(b);
+  return x.length === y.length && x.every((k, i) => k === y[i]);
+}
+
+// What the two dropdowns used to offer. They were never anything but named sets
+// of bodies, and naming a set is not the same as being the only sets on offer:
+// "Mars and Venus, whichever of the two is transiting" was not expressible at
+// all. So they are presets over the chips now - tapping one fills the selection
+// rather than constraining it - and the Node, Chiron and the two angles, which
+// were five separate checkboxes bolted onto whichever group was chosen, are
+// chips like every other body, named by the presets that want them.
+/** @type {[string, string, string[]][]} */
+export const bodyPresets = [
+  ["lights",    "Lights",    ["sun","moon"]],
+  ["personal",  "Personal",  ["sun","moon","mercury","venus","mars"]],
+  ["classical", "Classical", ["sun","moon","mercury","venus","mars","jupiter","saturn"]],
+  ["social",    "Social",    ["jupiter","saturn"]],
+  ["outer",     "Outer",     ["jupiter","saturn","uranus","neptune","pluto"]],
+  ["slow",      "Slow",      ["saturn","uranus","neptune","pluto"]],
+  ["angles",    "Angles",    ["mc","asc"]],
+  ["all",       "All",       [...order]]
 ];
-
-export const individualPlanets = planets
-  .map(p => p[0])
-  .filter(k => k !== "node" && k !== "chiron" && k !== "mc" && k !== "asc")
-  .map(k => [k, planetLabel(k), [k]]);
-
-export const sharedGroups = [...baseGroups, ...individualPlanets];
-
-export const transitGroups = sharedGroups;
-
-export const natalGroups = sharedGroups;
 
 export function planetLabel(key){ return planets.find(p => p[0] === key)?.[1] ?? key; }
 
@@ -195,12 +217,7 @@ export function zodiacSign(deg){
   return signs[idx] || "";
 }
 
-export function groupByKey(list){
-  const m = new Map();
-  for (const [key, label, arr] of list) m.set(key, arr);
-  return m;
+/** The key a rule is known by everywhere prose is looked up. */
+export function ruleKey(rule){
+  return rule ? `${rule.transit}-${rule.aspect}-${rule.natal}` : "";
 }
-
-export const transitGroupMap = groupByKey(transitGroups);
-
-export const natalGroupMap = groupByKey(natalGroups);

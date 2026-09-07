@@ -1,4 +1,5 @@
 export const chartsState = {
+  /** @type {any[]} */
   list: [],
   activeIdA: "",
   activeIdB: "",
