@@ -106,11 +106,13 @@ export function setBodyLink(link){
   setSelection({ link });
 }
 
-/** A chip reads as a glyph and a name, except where the glyph is the name. */
-function chipLabel(key){
-  const glyph = planetSymbols[key];
-  const name = planetLabel(key);
-  return (!glyph || isAngle(key)) ? name : `${glyph} ${name}`;
+// A chip is its glyph. The names were spelled out at first, and two panes of
+// fourteen named chips is most of a phone screen spent on an alphabet the
+// reader already has - this app writes the same glyphs on every row label, in
+// the chart summary, and in the line under these chips. The name is still on
+// the chip, as its title and as what a screen reader says; it is only not drawn.
+function chipGlyph(key){
+  return planetSymbols[key] || planetLabel(key);
 }
 
 function renderBodyChips(pane){
@@ -123,11 +125,17 @@ function renderBodyChips(pane){
     const on = selected.has(key);
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "bodyChip" + (on ? " on" : "");
+    // The two angles are written rather than drawn - "Mc" and "Ac" are their
+    // glyph forms - so they take the label font at a size that sits level with
+    // the symbols instead of towering over them.
+    btn.className = "bodyChip" + (on ? " on" : "") + (isAngle(key) ? " lettered" : "");
     btn.dataset.bodyKey = key;
-    btn.textContent = chipLabel(key);
+    btn.textContent = chipGlyph(key);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
     btn.setAttribute("aria-label", planetLabel(key));
+    // The name a chip no longer draws. A pointer gets it on hover; a screen
+    // reader has it from aria-label either way.
+    btn.title = planetLabel(key);
     wrap.appendChild(btn);
   }
 }
@@ -177,7 +185,7 @@ function renderPresetChips(pane){
 }
 
 function glyphList(keys){
-  return keys.map(k => planetSymbols[k] || planetLabel(k)).join(" ");
+  return keys.map(k => planetSymbols[k] || planetLabel(k)).join(" ");
 }
 
 /**

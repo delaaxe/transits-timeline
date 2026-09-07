@@ -683,7 +683,7 @@
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
-      .bodyChip,
+      .bodyChip{ min-width: 44px; min-height: 40px; }
       .rowActionBtn,
       .rowFocus .smallBtn{ min-height: 36px; }
       /* The chips are what a selection is made of; these name a whole set at
@@ -869,19 +869,29 @@
     .bodyPresetBtn.on{ background: var(--star); border-color: var(--star); color: var(--accent-contrast); }
     .bodyPresetBtn.ghost{ color: var(--ink-faint); }
     .bodyChips{ display: flex; flex-wrap: wrap; gap: 6px; }
+    /* A glyph and nothing else, so the chip is a target rather than a word: the
+       box is sized by its minimum rather than by what is in it, and every chip
+       in the row is the same width whatever it holds. */
     .bodyChip{
-      padding: 5px 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      min-width: 34px;
+      min-height: 30px;
+      padding: 2px 6px;
       border-radius: 999px;
       border: 1px solid var(--control-border);
       background: var(--control-bg);
       color: var(--ink-soft);
       font-family: var(--font-glyph);
-      font-size: 13px;
-      line-height: 1.2;
+      font-size: 18px;
+      line-height: 1;
       cursor: pointer;
       white-space: nowrap;
       -webkit-tap-highlight-color: transparent;
     }
+    .bodyChip.lettered{ font-family: var(--font-ui); font-size: 14px; }
     .bodyChip:hover{ border-color: var(--star); color: var(--ink); }
     .bodyChip.on{
       background: var(--star);
