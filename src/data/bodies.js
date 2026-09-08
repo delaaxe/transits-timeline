@@ -171,10 +171,8 @@ export function sameBodies(a, b){
 // chips like every other body, named by the presets that want them.
 /** @type {[string, string, string[]][]} */
 export const bodyPresets = [
-  ["lights",    "Lights",    ["sun","moon"]],
   ["personal",  "Personal",  ["sun","moon","mercury","venus","mars"]],
   ["classical", "Classical", ["sun","moon","mercury","venus","mars","jupiter","saturn"]],
-  ["social",    "Social",    ["jupiter","saturn"]],
   ["outer",     "Outer",     ["jupiter","saturn","uranus","neptune","pluto"]],
   ["slow",      "Slow",      ["saturn","uranus","neptune","pluto"]],
   ["angles",    "Angles",    ["mc","asc"]],

@@ -848,25 +848,37 @@
       gap: var(--sp-2) var(--sp-3);
     }
     .bodyPane{ min-width: 0; }
-    .bodyPaneTitle{ font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-    .bodyPresets{ display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-    /* Presets are what fills the chips, so they read as the quieter control:
-       no border, and the star band only when the chips happen to match one. A
-       preset that is lit is a description of the selection, not a mode it is
-       locked into. */
+    /* A heading, not another word in the row of words under it. Set in small
+       caps and tracked out, it stops reading as the first item of the preset
+       list - which is exactly what a 12px muted phrase directly above a line of
+       12px muted phrases was doing. */
+    .bodyPaneTitle{
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 6px;
+    }
+    .bodyPresets{ display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    /* And the presets take an outline, so that what can be tapped is drawn as a
+       thing rather than as text. It stays a hairline: these fill the chips
+       below, which are the selection itself, and should not compete with them.
+       A lit preset describes the selection rather than locking it. */
     .bodyPresetBtn{
-      padding: 3px 8px;
+      padding: 3px 9px;
       border-radius: 999px;
-      border: 1px solid transparent;
+      border: 1px solid var(--hairline);
       background: none;
       color: var(--ink-soft);
       font-size: 12px;
       line-height: 1.35;
       cursor: pointer;
     }
-    .bodyPresetBtn:hover{ background: var(--hover); color: var(--ink); }
+    .bodyPresetBtn:hover{ background: var(--hover); border-color: var(--control-border); color: var(--ink); }
     .bodyPresetBtn.on{ background: var(--star); border-color: var(--star); color: var(--accent-contrast); }
-    .bodyPresetBtn.ghost{ color: var(--ink-faint); }
+    /* The two that clear or copy rather than name a set of bodies. */
+    .bodyPresetBtn.ghost{ color: var(--ink-faint); border-style: dashed; }
     .bodyChips{ display: flex; flex-wrap: wrap; gap: 6px; }
     /* A glyph and nothing else, so the chip is a target rather than a word: the
        box is sized by its minimum rather than by what is in it, and every chip

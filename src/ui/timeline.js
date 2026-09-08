@@ -5,7 +5,7 @@ import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
 import { formatExactPretty, formatRangePretty } from "./format.js";
-import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
+import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, getYearStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
 
 /** @type {((e:PointerEvent|MouseEvent, rule:any) => void)|null} */
@@ -348,8 +348,19 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   const minLabelPx = axisLabelSize * 2.2;
   const monthLabelPx = axisLabelSize * 1.6;
 
+  const spanYears = spanDays / 365.25;
   const useHours = (spanDays <= 2 && showTime);
   const useDays  = (!useHours) && (spanDays <= 45);
+  // Past about three years the month names stop telling anyone anything: they
+  // come round again every twelve boxes, so the axis reads "Jan Jul Jan Jul"
+  // for the length of the chart while the year - the one figure that is
+  // actually changing - sits in small print above it. From here the year is
+  // the label, and the months become an unlabelled rhythm inside it.
+  const useYears = (!useHours) && (!useDays) && (spanYears >= 3);
+
+  const stepYears = useYears
+    ? pickStep(spanYears, timelineW, minBoxPx, [1,2,5,10,20,25,50,100])
+    : 0;
 
   const boundaries = (() => {
     if (useHours){
@@ -362,10 +373,32 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
       const stepDays = pickStep(totalDays, timelineW, minBoxPx, [1,2,3,4,5,7,10,14,21,30]);
       return [start, ...getDayStartsLocal(start, endExclusive, stepDays), endExclusive];
     }
+    if (useYears){
+      return [start, ...getYearStartsLocal(start, endExclusive, stepYears), endExclusive];
+    }
     const totalMonths = spanDays / 30.44;
     const stepMonths = pickStep(totalMonths, timelineW, minBoxPx, [1,2,3,4,6,12]);
     return [start, ...getMonthStartsLocal(start, endExclusive, stepMonths), endExclusive];
   })();
+
+  // A year-wide box says which year and nothing about where inside it, which is
+  // the one thing a decade view loses. These are the quarters - or the years,
+  // where a box holds several - marked as a short tick and never labelled: the
+  // eye gets somewhere to put a bar without another row of words to read past.
+  if (useYears){
+    const minorStep = stepYears === 1 ? 3 : 12;
+    const minor = getMonthStartsLocal(start, endExclusive, minorStep);
+    const gap = timelineW / Math.max(1, (spanDays / 30.44) / minorStep);
+    if (gap >= 12){
+      for (const m of minor){
+        const xm = dateToX(m);
+        svg.appendChild(svgEl("line", {
+          x1: xm, y1: axisY + 30, x2: xm, y2: axisY + 40,
+          stroke: "var(--axis-line)", "stroke-width": "1", opacity: "0.45"
+        }));
+      }
+    }
+  }
 
   if (useHours){
     const dateLabel = start.toLocaleDateString(locale, {month:"short", day:"numeric", year:"numeric"});
@@ -382,7 +415,7 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
       if (monthChanged) topLabelByMs.add(a.getTime());
     }
   }
-  if (!useHours && !useDays){
+  if (!useHours && !useDays && !useYears){
     const months = getMonthStartsLocal(start, endExclusive);
     for (const m of months){
       if (m.getMonth() === 0) topLabelByMs.add(m.getTime());
@@ -426,6 +459,9 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
         mt.textContent = mon;
         svg.appendChild(mt);
       }
+    } else if (useYears){
+      label = String(a.getFullYear());
+      shouldLabel = (w >= minLabelPx);
     } else {
       label = a.toLocaleString(locale, {month:"short"});
       shouldLabel = (w >= monthLabelPx);
@@ -438,7 +474,7 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
     }
   }
 
-  if (!useHours && !useDays){
+  if (!useHours && !useDays && !useYears){
     const months = getMonthStartsLocal(start, endExclusive);
     for (const m of months){
       if (m.getMonth() === 0){
@@ -638,9 +674,15 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     // A search that moves the range by fifty years lands on a chart the reader
     // has never seen, and the row they asked about is one of sixty. This is the
     // thread back to it, and it is drawn in both SVGs so it crosses the seam.
+    //
+    // Over the seam, in fact: the band starts where the label column ends
+    // rather than where the ticks do, so the three transparent pixels between
+    // the two SVGs are painted too and the highlight arrives unbroken. The
+    // three pixels are also exactly what the column gives back as it narrows
+    // under a sideways scroll, so the join holds at every scroll position.
     if (focusKey && ruleKey(r) === focusKey){
       svg.appendChild(svgEl("rect", {
-        x:x0, y, width: timelineW, height: rowH,
+        x: marginL + labelW, y, width: timelineW + axisGutter, height: rowH,
         fill:"var(--focus-band)", "pointer-events": "none"
       }));
     }

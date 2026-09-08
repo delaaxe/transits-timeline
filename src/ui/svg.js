@@ -134,6 +134,23 @@ export function getDayStartsLocal(start, endExclusive, stepDays=1){
   return out;
 }
 
+export function getYearStartsLocal(start, endExclusive, stepYears=1){
+  const out = [];
+  const d = new Date(start.getFullYear(), 0, 1, 0, 0, 0, 0);
+  if (d < start) d.setFullYear(d.getFullYear() + 1);
+  // Stepped years land on multiples of the step, so a decade view is labelled
+  // 2030, 2040 rather than wherever the range happened to open.
+  if (stepYears > 1){
+    const over = d.getFullYear() % stepYears;
+    if (over !== 0) d.setFullYear(d.getFullYear() + (stepYears - over));
+  }
+  while (d < endExclusive){
+    out.push(new Date(d.getTime()));
+    d.setFullYear(d.getFullYear() + stepYears);
+  }
+  return out;
+}
+
 export function getHourStartsLocal(start, endExclusive, stepHours=1){
   const out = [];
   const d = new Date(start.getTime());
