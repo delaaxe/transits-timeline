@@ -943,13 +943,6 @@
       border-color: var(--star);
       color: var(--accent-contrast);
     }
-    .bodyFoot{
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: var(--sp-1) var(--sp-2);
-    }
     /* Which question is being asked. It sits above the lists rather than under
        them because it decides what lists there are: "involving" has one, and
        nothing to say about direction. Two chips in one shell, because it is one
@@ -974,15 +967,6 @@
     }
     .bodyModeBtn:hover{ background: var(--hover); color: var(--ink); }
     .bodyModeBtn.on{ background: var(--star); color: var(--accent-contrast); }
-    /* What the chips add up to, in the app's own glyphs - the one line that
-       still says what is selected once the reader has stopped counting chips. */
-    .bodySummary{
-      font-family: var(--font-glyph);
-      font-size: 13px;
-      color: var(--muted);
-      min-width: 0;
-    }
-    .bodySummary.warn{ font-family: var(--font-ui); color: var(--danger); }
     /* Two panes side by side on a phone are two columns three chips wide, and
        every name in them wraps. One under the other instead. This sits with the
        rule it overrides rather than with the other narrow-screen rules further
@@ -995,19 +979,33 @@
     /* The bar that follows one row. It is a line of the view bar rather than
        something below it, so the sticky date axis clears it without being told:
        --viewbar-h is measured from the bar's real height. */
+    /* Two children, and only the inner one wraps. The row is a title, three
+       buttons and a result, which on a phone is more than one line - and the
+       way out of the mode was being carried down with them by a margin that
+       pushed it right, so it ended up alone at the bottom of a bar it belongs
+       at the top of. It is a sibling of the wrapping part now, pinned to the
+       first line whatever that part does. */
     .rowFocus{
       flex: 1 0 100%;
       display: flex;
-      align-items: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      align-items: flex-start;
       gap: var(--sp-1);
       padding-top: var(--sp-1);
       border-top: 1px solid var(--hairline-soft);
     }
+    .rowFocusMain{
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--sp-1);
+    }
     .rowFocusTitle{ font-size: 13px; color: var(--accent); font-weight: 700; }
     .rowFocus .smallBtn{ padding: 4px 8px; font-size: 12px; }
     .rowFocusResult{ font-size: 12px; color: var(--muted); min-width: 0; }
-    .rowFocusClear{ margin-left: auto; }
+    .rowFocusClear{ flex: none; }
 
     /* The label column answers a tap now, so its rows - and only its rows - take
        pointer events back from the wrapper. The wrapper stays transparent to
@@ -1341,11 +1339,13 @@
       </svg>
     </button>
     <div class="rowFocus" id="rowFocus" role="status" aria-live="polite" hidden>
-      <span class="rowFocusTitle symbolGlyphText" id="rowFocusTitle"></span>
-      <button id="rowFocusPrev" type="button" class="smallBtn">‹ Last time</button>
-      <button id="rowFocusNext" type="button" class="smallBtn">Next time ›</button>
-      <button id="rowFocusOnly" type="button" class="smallBtn">Only this</button>
-      <span class="rowFocusResult" id="rowFocusResult"></span>
+      <div class="rowFocusMain">
+        <span class="rowFocusTitle symbolGlyphText" id="rowFocusTitle"></span>
+        <button id="rowFocusPrev" type="button" class="smallBtn">‹ Last time</button>
+        <button id="rowFocusNext" type="button" class="smallBtn">Next time ›</button>
+        <button id="rowFocusOnly" type="button" class="smallBtn">Only this</button>
+        <span class="rowFocusResult" id="rowFocusResult"></span>
+      </div>
       <button id="rowFocusClear" type="button" class="iconBtn rowFocusClear" aria-label="Stop following this row">✕</button>
     </div>
   </div>
@@ -1370,9 +1370,6 @@
         <div class="bodyPaneTitle">Natal points</div>
         <div class="bodyPresets" id="natalBodyPresets"></div>
         <div class="bodyChips" id="natalBodyChips" role="group" aria-label="Natal points"></div>
-      </div>
-      <div class="bodyFoot">
-        <div class="bodySummary" id="bodySummary"></div>
       </div>
     </div>
 

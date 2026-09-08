@@ -53,7 +53,6 @@ export const el = {
   natalBodyPresets: $("natalBodyPresets"),
   natalBodyChips: $("natalBodyChips"),
   bodyModeWrap: $("bodyModeWrap"),
-  bodySummary: $("bodySummary"),
   rowFocus: $("rowFocus"),
   rowFocusTitle: $("rowFocusTitle"),
   rowFocusPrev: $("rowFocusPrev"),

@@ -29,7 +29,7 @@ export function activePanes(){
   if (state.appMode === "world"){
     return [{
       field: "sky", title: "Bodies in the sky", keys: transitingKeys,
-      chips: el.transitBodyChips, presets: el.transitBodyPresets, mirror: false
+      chips: el.transitBodyChips, presets: el.transitBodyPresets
     }];
   }
   // One list, and every point on it: an angle can be involved in a transit -
@@ -37,14 +37,14 @@ export function activePanes(){
   if (state.bodyMode === "involving"){
     return [{
       field: "involving", title: "Involving", keys: natalKeys,
-      chips: el.transitBodyChips, presets: el.transitBodyPresets, mirror: false
+      chips: el.transitBodyChips, presets: el.transitBodyPresets
     }];
   }
   return [
     { field: "transit", title: "Transiting", keys: transitingKeys,
-      chips: el.transitBodyChips, presets: el.transitBodyPresets, mirror: false },
+      chips: el.transitBodyChips, presets: el.transitBodyPresets },
     { field: "natal", title: "Natal points", keys: natalKeys,
-      chips: el.natalBodyChips, presets: el.natalBodyPresets, mirror: true }
+      chips: el.natalBodyChips, presets: el.natalBodyPresets }
   ];
 }
 
@@ -127,9 +127,9 @@ export function setBodyMode(mode){
 
 // A chip is its glyph. The names were spelled out at first, and two panes of
 // fourteen named chips is most of a phone screen spent on an alphabet the
-// reader already has - this app writes the same glyphs on every row label, in
-// the chart summary, and in the line under these chips. The name is still on
-// the chip, as its title and as what a screen reader says; it is only not drawn.
+// reader already has - the same glyphs are on every row label and in the chart
+// summary. The name is still on the chip, as its title and as what a screen
+// reader says; it is only not drawn.
 function chipGlyph(key){
   return planetSymbols[key] || planetLabel(key);
 }
@@ -186,47 +186,12 @@ function renderPresetChips(pane){
     wrap.appendChild(btn);
   }
 
-  if (pane.mirror){
-    const mirror = document.createElement("button");
-    mirror.type = "button";
-    mirror.className = "bodyPresetBtn ghost";
-    mirror.dataset.bodyPreset = "__mirror__";
-    mirror.textContent = "Same as transiting";
-    wrap.appendChild(mirror);
-  }
-
   const none = document.createElement("button");
   none.type = "button";
   none.className = "bodyPresetBtn ghost";
   none.dataset.bodyPreset = "__none__";
   none.textContent = "None";
   wrap.appendChild(none);
-}
-
-function glyphList(keys){
-  return keys.map(k => planetSymbols[k] || planetLabel(k)).join(" ");
-}
-
-/**
- * What the chips add up to, in one line, for the reader who has just tapped
- * eleven of them and wants to know what they asked for.
- */
-export function bodySummaryText(){
-  if (state.appMode === "world"){
-    const sky = getBodies("sky");
-    if (sky.length < 2) return "Pick at least two bodies: a sky aspect needs both ends.";
-    return `${glyphList(sky)} · every pair between them`;
-  }
-  if (state.bodyMode === "involving"){
-    const involving = getBodies("involving");
-    if (!involving.length) return "Pick at least one body to look for.";
-    return `${glyphList(involving)} · at either end, against the whole chart`;
-  }
-  const transit = getBodies("transit").filter(k => !isAngle(k));
-  const natal = getBodies("natal");
-  if (!transit.length) return "Pick at least one transiting body.";
-  if (!natal.length) return "Pick at least one natal point.";
-  return `${glyphList(transit)} → ${glyphList(natal)}`;
 }
 
 function renderModeChips(){
@@ -251,10 +216,6 @@ export function renderBodyPicker(){
     renderBodyChips(pane);
   }
   renderModeChips();
-  if (el.bodySummary){
-    el.bodySummary.textContent = bodySummaryText();
-    el.bodySummary.classList.toggle("warn", /^Pick /.test(bodySummaryText()));
-  }
 }
 
 export function wireBodyPicker(){
@@ -277,10 +238,6 @@ export function wireBodyPicker(){
       const key = presetBtn.dataset.bodyPreset;
       if (key === "__none__"){
         setBodies(field, []);
-        return;
-      }
-      if (key === "__mirror__"){
-        setBodies(field, getBodies("transit"));
         return;
       }
       const preset = bodyPresets.find(p => p[0] === key);
