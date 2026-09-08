@@ -32,23 +32,44 @@ test("both ends move independently, so any pair of sets is a query", () => {
   ], "every pairing of the two, its own return included");
 });
 
-test("either side adds the mirror of each pair and nothing twice", () => {
-  const opts = { transitBodies: ["mars"], natalBodies: ["sun", "moon"], aspects: ["trine"], orb: 1 };
+test("involving asks about a body rather than about a direction", () => {
+  // The other question: everything Mars is part of, whichever end it lands on.
+  // One list and no direction - the far end is the rest of the chart, so there
+  // is no second set to ask for.
+  const rules = buildCandidateRules({
+    mode: "involving", involvingBodies: ["mars"], aspects: ["trine"], orb: 1
+  });
+  const keys = keysOf(rules);
 
-  assert.deepEqual(keysOf(buildCandidateRules(opts)).sort(),
-    ["mars-trine-moon", "mars-trine-sun"],
-    "directed reads left to right: this body, over those points");
+  assert.ok(keys.includes("mars-trine-sun"), "Mars crossing the chart");
+  assert.ok(keys.includes("sun-trine-mars"), "and the chart crossing natal Mars");
+  assert.ok(keys.includes("mars-trine-mars"), "its own return included");
+  assert.ok(keys.includes("mars-trine-mc") && keys.includes("mars-trine-asc"),
+    "the angles are points Mars can reach");
+  assert.ok(!keys.includes("mc-trine-mars") && !keys.includes("asc-trine-mars"),
+    "but they are never the end that moves");
+  assert.ok(keys.every(k => k.includes("mars")), "and nothing that is not about Mars");
+  assert.equal(new Set(keys).size, keys.length, "no pair is generated twice");
+});
 
-  assert.deepEqual(keysOf(buildCandidateRules({ ...opts, link: "either" })).sort(),
-    ["mars-trine-moon", "mars-trine-sun", "moon-trine-mars", "sun-trine-mars"],
-    "either side also brings back what crosses the natal Mars");
+test("involving several bodies is the union, and each pair is named once", () => {
+  const keys = keysOf(buildCandidateRules({
+    mode: "involving", involvingBodies: ["venus", "mars"], aspects: ["square"], orb: 1
+  }));
+  assert.equal(new Set(keys).size, keys.length, "Venus-Mars is reachable from both and appears once");
+  assert.ok(keys.includes("venus-square-mars") && keys.includes("mars-square-venus"),
+    "both directions of the pair, since either of them can be the one transiting");
+  assert.ok(keys.includes("venus-square-saturn") && keys.includes("saturn-square-mars"));
+  assert.ok(keys.every(k => k.includes("venus") || k.includes("mars")));
+});
 
-  // The mirror of a pair that is already there is the same pair.
-  const symmetric = { transitBodies: ["venus", "mars"], natalBodies: ["venus", "mars"], aspects: ["square"], orb: 1 };
-  assert.deepEqual(
-    keysOf(buildCandidateRules({ ...symmetric, link: "either" })).sort(),
-    keysOf(buildCandidateRules(symmetric)).sort()
-  );
+test("involving over every body is the whole chart, and no more than it", () => {
+  // The two modes meet here: asking about everything is the same question as
+  // asking for everything against everything.
+  const opts = { aspects: ["conjunction", "square"], orb: 1 };
+  const involving = keysOf(buildCandidateRules({ ...opts, mode: "involving", involvingBodies: natalKeys })).sort();
+  const directed = keysOf(buildCandidateRules({ ...opts, transitBodies: transitingKeys, natalBodies: natalKeys })).sort();
+  assert.deepEqual(involving, directed);
 });
 
 test("the mean node is read by conjunction alone, on the side that moves", () => {

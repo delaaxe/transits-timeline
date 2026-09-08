@@ -12,12 +12,12 @@ export const state = {
   // The body chooser's selection. Three lists rather than two: world mode asks
   // about one set of bodies in the sky, and losing a personal selection because
   // the sky was glanced at would be its own small annoyance.
-  /** @type {{transit:string[], natal:string[], sky:string[]}} */
-  bodies: { transit: [], natal: [], sky: [] },
-  // "directed" reads left to right; "either" also counts each pair the other
-  // way round. See buildCandidateRules.
-  /** @type {"directed"|"either"} */
-  bodyLink: "directed",
+  /** @type {{transit:string[], natal:string[], sky:string[], involving:string[]}} */
+  bodies: { transit: [], natal: [], sky: [], involving: [] },
+  // Which question is being asked, and so which lists the chooser shows.
+  // See buildCandidateRules.
+  /** @type {"directed"|"involving"} */
+  bodyMode: "directed",
   // The row picked off the aspect axis, if any: {transit, aspect, natal}. It is
   // highlighted in the chart and is what the previous/next search steps through.
   /** @type {{transit:string, aspect:string, natal:string, orb?:number}|null} */

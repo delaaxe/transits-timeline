@@ -57,10 +57,11 @@ export function wireRangeNav(){
 export function readRuleOptions(){
   const bodies = selectedBodies();
   return {
+    mode: state.bodyMode,
     transitBodies: bodies.transit ?? [],
     natalBodies: bodies.natal ?? [],
+    involvingBodies: bodies.involving ?? [],
     skyBodies: bodies.sky ?? [],
-    link: state.bodyLink,
     aspects: getCheckedAspects(),
     orb: Number($("orb").value || 1.0)
   };
@@ -694,7 +695,7 @@ export function applyPreset(key){
   // Both ends and the sky set at once, whichever mode is showing: a preset is a
   // whole query, and half-filling the one that is out of sight would leave the
   // other mode holding a selection nothing chose.
-  applyBodySets({ transit: p.transit, natal: p.natal, sky: p.world.bodies, link: p.link });
+  applyBodySets({ transit: p.transit, natal: p.natal, sky: p.world.bodies });
   el.orb.value = String(p.orb);
   state.currentMaxRows = 50;
   renderAspectChecks(p.aspects);

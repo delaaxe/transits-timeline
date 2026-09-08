@@ -8,7 +8,7 @@ import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./servic
 import { cancelCompute, computeEvents } from "./services/compute.js";
 import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
 import { el, setStatus, setTimelineState } from "./ui/dom.js";
-import { getCheckedAspects } from "./ui/aspects.js";
+import { getCheckedAspects, wireAspectShortcuts } from "./ui/aspects.js";
 import { onBodiesChanged, wireBodyPicker } from "./ui/bodies.js";
 import { bootPresets, initCharts, readRuleOptions, renderPresetSection, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
 import { clearRowFocus, renderRowFocus, wireRowFocus } from "./ui/rowfocus.js";
@@ -73,6 +73,8 @@ export async function updateTimeline(){
     if (aspectsChecked.length === 0) throw new Error("Select at least one aspect.");
     if (ctx.mode === "world"){
       if (ruleOptions.skyBodies.length < 2) throw new Error("Pick at least two bodies: a sky aspect needs both ends.");
+    } else if (ruleOptions.mode === "involving"){
+      if (ruleOptions.involvingBodies.length === 0) throw new Error("Pick at least one body to look for.");
     } else {
       if (ruleOptions.transitBodies.length === 0) throw new Error("Pick at least one transiting body.");
       if (ruleOptions.natalBodies.length === 0) throw new Error("Pick at least one natal point.");
@@ -197,6 +199,7 @@ async function boot(){
   initCharts();
   wireChartsUI();
   wireAdvancedUI();
+  wireAspectShortcuts();
   wireRowFocus();
   wireViewBar();
   wireAutoUpdate();

@@ -27,10 +27,11 @@ function reachableKeys(build){
   const keys = new Set();
   const aspectKeys = aspects.map(a => a[0]);
   for (const orb of [1, 8, 30]){
-    for (const link of ["directed", "either"]){
+    for (const mode of ["directed", "involving"]){
       const rules = build({
-        transitBodies: transitingKeys, natalBodies: natalKeys, bodies: natalKeys,
-        aspects: aspectKeys, orb, link
+        mode, transitBodies: transitingKeys, natalBodies: natalKeys,
+        involvingBodies: natalKeys, bodies: natalKeys,
+        aspects: aspectKeys, orb
       });
       for (const r of rules) keys.add(`${r.transit}-${r.aspect}-${r.natal}`);
     }

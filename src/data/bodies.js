@@ -20,7 +20,10 @@ export const planetSymbols = {
   saturn: "♄",
   uranus: "♅",
   neptune: "♆",
-  pluto: "♇",
+  // PLUTO FORM TWO (U+2BD3), the chart symbol - a circle held in a crescent
+  // over a cross - rather than U+2647, the PL monogram from Percival Lowell's
+  // initials that the astronomers gave it in 1930.
+  pluto: "\u2BD3",
   node: "☊",
   chiron: "⚷",
   mc: "Mc",

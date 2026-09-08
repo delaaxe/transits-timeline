@@ -30,27 +30,27 @@ const SKY_OUTER = ["jupiter","saturn","uranus","neptune","pluto","node","chiron"
 export const defaultPresetKey = "week";
 
 /** @type {{key:string, label:string, transit:string[], natal:string[],
- *   link:"directed"|"either", aspects:string[], orb:number,
+ *   aspects:string[], orb:number,
  *   range:{startOffsetDays:number, endOffsetDays:number},
  *   world:{bodies:string[]}}[]} */
 export const presets = [
   { key:"today", label:"Today",
-    transit: TRANSIT_TODAY, natal: NATAL_NEAR, link:"directed",
+    transit: TRANSIT_TODAY, natal: NATAL_NEAR,
     aspects: ALL_ASPECTS, orb:1.5,
     range:{startOffsetDays:0, endOffsetDays:0},
     world:{ bodies: SKY_ALL } },
   { key:"week", label:"Week",
-    transit: TRANSIT_WEEK, natal: NATAL_NEAR, link:"directed",
+    transit: TRANSIT_WEEK, natal: NATAL_NEAR,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-1, endOffsetDays:6},
     world:{ bodies: SKY_NO_MOON } },
   { key:"month", label:"Month",
-    transit: TRANSIT_MONTH, natal: NATAL_NEAR, link:"directed",
+    transit: TRANSIT_MONTH, natal: NATAL_NEAR,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-7, endOffsetDays:29},
     world:{ bodies: SKY_NO_MOON } },
   { key:"basic_longterm", label:"Year",
-    transit: TRANSIT_YEAR, natal: NATAL_ALL, link:"directed",
+    transit: TRANSIT_YEAR, natal: NATAL_ALL,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-90, endOffsetDays:364},
     world:{ bodies: SKY_OUTER } }

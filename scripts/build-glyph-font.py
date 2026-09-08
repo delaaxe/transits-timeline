@@ -43,16 +43,20 @@ SOURCES = [
     (
         "NotoSansSymbols-Regular.ttf",
         f"{NOTO}/NotoSansSymbols/hinted/ttf/NotoSansSymbols-Regular.ttf",
-        # moon mercury venus mars jupiter saturn uranus neptune pluto node
+        # moon mercury venus mars jupiter saturn uranus neptune node
         # chiron conjunction sextile opposition
         [0x263E, 0x263F, 0x2640, 0x2642, 0x2643, 0x2644, 0x2645, 0x2646,
-         0x2647, 0x260A, 0x26B7, 0x260C, 0x26B9, 0x260D],
+         0x260A, 0x26B7, 0x260C, 0x26B9, 0x260D],
     ),
     (
         "NotoSansSymbols2-Regular.ttf",
         f"{NOTO}/NotoSansSymbols2/hinted/ttf/NotoSansSymbols2-Regular.ttf",
-        # sun, square, trine
-        [0x2609, 0x25A1, 0x25B3],
+        # sun, square, trine, and Pluto. U+2BD3 is PLUTO FORM TWO - the circle
+        # held in a crescent over a cross - rather than U+2647, which is the PL
+        # monogram Percival Lowell's initials gave the planet in 1930. The chart
+        # symbol is the one astrologers draw, and it is the only one of the two
+        # this font has.
+        [0x2609, 0x25A1, 0x25B3, 0x2BD3],
     ),
 ]
 

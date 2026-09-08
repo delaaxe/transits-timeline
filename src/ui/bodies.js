@@ -32,6 +32,14 @@ export function activePanes(){
       chips: el.transitBodyChips, presets: el.transitBodyPresets, mirror: false
     }];
   }
+  // One list, and every point on it: an angle can be involved in a transit -
+  // "everything crossing my Ascendant" - it just cannot be the end that moves.
+  if (state.bodyMode === "involving"){
+    return [{
+      field: "involving", title: "Involving", keys: natalKeys,
+      chips: el.transitBodyChips, presets: el.transitBodyPresets, mirror: false
+    }];
+  }
   return [
     { field: "transit", title: "Transiting", keys: transitingKeys,
       chips: el.transitBodyChips, presets: el.transitBodyPresets, mirror: false },
@@ -40,25 +48,29 @@ export function activePanes(){
   ];
 }
 
-/** @param {"transit"|"natal"|"sky"} field */
+/** @param {"transit"|"natal"|"sky"|"involving"} field */
 export function getBodies(field){ return normalizeBodies(state.bodies[field]); }
 
 /** The bodies a scan will actually use, whichever mode is showing. */
 export function selectedBodies(){
   if (state.appMode === "world") return { sky: getBodies("sky") };
+  if (state.bodyMode === "involving") return { involving: getBodies("involving") };
   return { transit: getBodies("transit"), natal: getBodies("natal") };
 }
 
 /**
  * Fills the selection from a preset. Not an edit, so the preset stays lit.
- * @param {{transit:string[], natal:string[], sky:string[],
- *          link?:"directed"|"either"}} sets
+ *
+ * The involving list is left alone. A preset is a view - a range, an orb, a set
+ * of bodies to watch - and "everything involving Mars" is a question the reader
+ * poses rather than a view they picked, so nothing overwrites it behind them.
+ *
+ * @param {{transit:string[], natal:string[], sky:string[]}} sets
  */
-export function applyBodySets({ transit, natal, sky, link }){
+export function applyBodySets({ transit, natal, sky }){
   state.bodies.transit = normalizeBodies(transit);
   state.bodies.natal = normalizeBodies(natal);
   state.bodies.sky = normalizeBodies(sky);
-  state.bodyLink = (link === "either") ? "either" : "directed";
   renderBodyPicker();
 }
 
@@ -73,27 +85,28 @@ function edited(){
 }
 
 /**
- * An edit to the selection: any of the three lists and the link at once, so a
- * change that touches both ends costs one recompute rather than two.
+ * An edit to the selection: any of the lists at once, so a change that touches
+ * both ends costs one recompute rather than two.
  *
  * @param {{transit?:string[], natal?:string[], sky?:string[],
- *          link?:"directed"|"either"}} selection
+ *          involving?:string[], mode?:"directed"|"involving"}} selection
  */
 export function setSelection(selection){
-  const { transit, natal, sky, link } = selection;
+  const { transit, natal, sky, involving, mode } = selection;
   if (transit !== undefined) state.bodies.transit = normalizeBodies(transit);
   if (natal !== undefined) state.bodies.natal = normalizeBodies(natal);
   if (sky !== undefined) state.bodies.sky = normalizeBodies(sky);
-  if (link !== undefined) state.bodyLink = (link === "either") ? "either" : "directed";
+  if (involving !== undefined) state.bodies.involving = normalizeBodies(involving);
+  if (mode !== undefined) state.bodyMode = (mode === "involving") ? "involving" : "directed";
   edited();
 }
 
-/** @param {"transit"|"natal"|"sky"} field @param {string[]} list */
+/** @param {"transit"|"natal"|"sky"|"involving"} field @param {string[]} list */
 export function setBodies(field, list){
   setSelection({ [field]: list });
 }
 
-/** @param {"transit"|"natal"|"sky"} field @param {string} key */
+/** @param {"transit"|"natal"|"sky"|"involving"} field @param {string} key */
 export function toggleBody(field, key){
   const cur = new Set(getBodies(field));
   if (cur.has(key)) cur.delete(key);
@@ -101,9 +114,15 @@ export function toggleBody(field, key){
   setBodies(field, [...cur]);
 }
 
-/** @param {"directed"|"either"} link */
-export function setBodyLink(link){
-  setSelection({ link });
+/** @param {"directed"|"involving"} mode */
+export function setBodyMode(mode){
+  // Coming in cold, the question starts from whatever was being watched: an
+  // empty list would draw an empty chart and leave the reader to guess that it
+  // wants a body before it will say anything.
+  const seed = (mode === "involving" && getBodies("involving").length === 0)
+    ? getBodies("transit")
+    : undefined;
+  setSelection({ mode, involving: seed });
 }
 
 // A chip is its glyph. The names were spelled out at first, and two panes of
@@ -198,35 +217,40 @@ export function bodySummaryText(){
     if (sky.length < 2) return "Pick at least two bodies: a sky aspect needs both ends.";
     return `${glyphList(sky)} · every pair between them`;
   }
+  if (state.bodyMode === "involving"){
+    const involving = getBodies("involving");
+    if (!involving.length) return "Pick at least one body to look for.";
+    return `${glyphList(involving)} · at either end, against the whole chart`;
+  }
   const transit = getBodies("transit").filter(k => !isAngle(k));
   const natal = getBodies("natal");
   if (!transit.length) return "Pick at least one transiting body.";
   if (!natal.length) return "Pick at least one natal point.";
-  const arrow = state.bodyLink === "either" ? "↔" : "→";
-  const note = state.bodyLink === "either" ? " · either side" : "";
-  return `${glyphList(transit)} ${arrow} ${glyphList(natal)}${note}`;
+  return `${glyphList(transit)} → ${glyphList(natal)}`;
 }
 
-function renderLinkChips(){
-  const wrap = el.bodyLinkWrap;
+function renderModeChips(){
+  const wrap = el.bodyModeWrap;
   if (!wrap) return;
+  // The sky has no direction to choose and no chart to be involved with.
   wrap.hidden = state.appMode === "world";
-  for (const btn of wrap.querySelectorAll("button[data-body-link]")){
-    const on = btn.dataset.bodyLink === state.bodyLink;
+  for (const btn of wrap.querySelectorAll("button[data-body-mode]")){
+    const on = btn.dataset.bodyMode === state.bodyMode;
     btn.classList.toggle("on", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   }
 }
 
 export function renderBodyPicker(){
-  const isWorld = state.appMode === "world";
-  if (el.natalPane) el.natalPane.hidden = isWorld;
-  if (el.transitPaneTitle) el.transitPaneTitle.textContent = isWorld ? "Bodies in the sky" : "Transiting";
-  for (const pane of activePanes()){
+  const panes = activePanes();
+  if (el.natalPane) el.natalPane.hidden = panes.length === 1;
+  if (el.bodyPicker) el.bodyPicker.classList.toggle("oneList", panes.length === 1);
+  if (el.transitPaneTitle) el.transitPaneTitle.textContent = panes[0].title;
+  for (const pane of panes){
     renderPresetChips(pane);
     renderBodyChips(pane);
   }
-  renderLinkChips();
+  renderModeChips();
   if (el.bodySummary){
     el.bodySummary.textContent = bodySummaryText();
     el.bodySummary.classList.toggle("warn", /^Pick /.test(bodySummaryText()));
@@ -267,7 +291,7 @@ export function wireBodyPicker(){
       return;
     }
 
-    const linkBtn = /** @type {any} */ (target.closest("button[data-body-link]"));
-    if (linkBtn) setBodyLink(linkBtn.dataset.bodyLink);
+    const modeBtn = /** @type {any} */ (target.closest("button[data-body-mode]"));
+    if (modeBtn) setBodyMode(modeBtn.dataset.bodyMode);
   });
 }

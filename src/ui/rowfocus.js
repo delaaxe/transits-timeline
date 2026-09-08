@@ -144,7 +144,7 @@ function showOnlyFocused(){
   if (!rule) return;
   renderAspectChecks([rule.aspect]);
   if (state.appMode === "world") setSelection({ sky: [rule.transit, rule.natal] });
-  else setSelection({ transit: [rule.transit], natal: [rule.natal], link: "directed" });
+  else setSelection({ mode: "directed", transit: [rule.transit], natal: [rule.natal] });
 }
 
 export function wireRowFocus(){
