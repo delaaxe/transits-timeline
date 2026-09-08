@@ -17,7 +17,7 @@
 
 import { addDaysLocal, fmtLocalYYYYMMDD, parseLocalDateOnly } from "../core/time.js";
 import { DAY_MS } from "../core/events.js";
-import { aspectSymbol, planetLabel } from "../data/bodies.js";
+import { aspectSymbol, planetLabel, planetSymbols } from "../data/bodies.js";
 import { requestUpdate } from "../refresh.js";
 import { currentChartContext, natalLongitudes } from "../services/chart-context.js";
 import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow } from "../services/search.js";
@@ -36,6 +36,24 @@ const MAX_JUMP_DAYS = 3650;
 /** @param {{transit:string, aspect:string, natal:string}} rule */
 function ruleTitle(rule){
   return `${planetLabel(rule.transit)} ${aspectSymbol(rule.aspect)} ${planetLabel(rule.natal)}`;
+}
+
+/**
+ * The same pairing in glyphs. The bar carries a name and three buttons on one
+ * line, and a name is anything from "Sun ☌ Mc" to "Neptune △ Neptune" - four
+ * times the width, which is what was pushing the last button onto a line of its
+ * own. Glyphs are the same width whatever the pairing, so the row is the same
+ * shape every time.
+ *
+ * Truncation would have been the other answer, and a worse one here: an ellipsis
+ * eats the natal end, and "Neptune △ Nep…" is exactly the half you cannot guess.
+ * The words are on the row itself, highlighted, directly below.
+ *
+ * @param {{transit:string, aspect:string, natal:string}} rule
+ */
+function ruleGlyphs(rule){
+  const glyph = (k) => planetSymbols[k] || planetLabel(k);
+  return `${glyph(rule.transit)} ${aspectSymbol(rule.aspect)} ${glyph(rule.natal)}`;
 }
 
 function rangeDays(){
@@ -67,7 +85,11 @@ export function renderRowFocus(){
   const rule = state.focusRule;
   bar.hidden = !rule;
   if (!rule) return;
-  if (el.rowFocusTitle) el.rowFocusTitle.textContent = ruleTitle(rule);
+  if (el.rowFocusTitle){
+    el.rowFocusTitle.textContent = ruleGlyphs(rule);
+    el.rowFocusTitle.title = ruleTitle(rule);
+    el.rowFocusTitle.setAttribute("aria-label", ruleTitle(rule));
+  }
   if (el.rowFocusResult) el.rowFocusResult.textContent = state.focusStatus;
   for (const btn of [el.rowFocusPrev, el.rowFocusNext, el.rowFocusOnly]){
     if (btn) btn.disabled = state.focusSearching;

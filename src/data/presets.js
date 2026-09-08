@@ -15,9 +15,11 @@ const TRANSIT_WEEK = ["sun","mercury","venus","mars","node","chiron"];
 const TRANSIT_MONTH = ["sun","mercury","venus","mars","jupiter","saturn","node","chiron"];
 const TRANSIT_YEAR = ["jupiter","saturn","uranus","neptune","pluto","node","chiron"];
 
-// What a natal chart offers when nothing has been narrowed. The classical seven
-// carry the near view; a year is long enough for a transit to reach the outer
-// planets' own places, which is where the generational readings live.
+// What a natal chart offers when nothing has been narrowed. Today keeps to the
+// classical seven and the points, which is as much as a single day can fill;
+// every longer view watches the whole chart, the reader's own outer planets
+// included - those are where the generational readings live, and leaving them
+// out of a week was a guess about what would be looked at.
 const NATAL_NEAR = ["sun","moon","mercury","venus","mars","jupiter","saturn","node","chiron","mc","asc"];
 const NATAL_ALL = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc","asc"];
 
@@ -40,12 +42,12 @@ export const presets = [
     range:{startOffsetDays:0, endOffsetDays:0},
     world:{ bodies: SKY_ALL } },
   { key:"week", label:"Week",
-    transit: TRANSIT_WEEK, natal: NATAL_NEAR,
+    transit: TRANSIT_WEEK, natal: NATAL_ALL,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-1, endOffsetDays:6},
     world:{ bodies: SKY_NO_MOON } },
   { key:"month", label:"Month",
-    transit: TRANSIT_MONTH, natal: NATAL_NEAR,
+    transit: TRANSIT_MONTH, natal: NATAL_ALL,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-7, endOffsetDays:29},
     world:{ bodies: SKY_NO_MOON } },
