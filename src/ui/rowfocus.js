@@ -39,15 +39,11 @@ function ruleTitle(rule){
 }
 
 /**
- * The same pairing in glyphs. The bar carries a name and three buttons on one
- * line, and a name is anything from "Sun ☌ Mc" to "Neptune △ Neptune" - four
- * times the width, which is what was pushing the last button onto a line of its
- * own. Glyphs are the same width whatever the pairing, so the row is the same
- * shape every time.
+ * The same pairing in glyphs, for when the words do not fit.
  *
- * Truncation would have been the other answer, and a worse one here: an ellipsis
- * eats the natal end, and "Neptune △ Nep…" is exactly the half you cannot guess.
- * The words are on the row itself, highlighted, directly below.
+ * Truncation would have been the other answer, and a worse one: an ellipsis eats
+ * the natal end, and "Neptune △ Nep…" is exactly the half nobody can guess.
+ * Glyphs lose no half, and are the same width whatever the pairing.
  *
  * @param {{transit:string, aspect:string, natal:string}} rule
  */
@@ -85,15 +81,40 @@ export function renderRowFocus(){
   const rule = state.focusRule;
   bar.hidden = !rule;
   if (!rule) return;
-  if (el.rowFocusTitle){
-    el.rowFocusTitle.textContent = ruleGlyphs(rule);
-    el.rowFocusTitle.title = ruleTitle(rule);
-    el.rowFocusTitle.setAttribute("aria-label", ruleTitle(rule));
-  }
   if (el.rowFocusResult) el.rowFocusResult.textContent = state.focusStatus;
   for (const btn of [el.rowFocusPrev, el.rowFocusNext, el.rowFocusOnly]){
     if (btn) btn.disabled = state.focusSearching;
   }
+  fitFocusTitle();
+}
+
+/**
+ * The words wherever they fit, and the glyphs where they do not.
+ *
+ * A pairing is anything from "Sun ☌ Mc" to "Neptune △ Neptune" - four times the
+ * width - so which of the two forms the bar has room for is a question about
+ * this pairing at this width, not about the screen. It is asked by writing the
+ * words and looking: if the buttons are still on the title's line they fit, and
+ * if they have dropped to the next one they did not. Either way the full name
+ * stays on the title and the accessible name.
+ */
+export function fitFocusTitle(){
+  const title = el.rowFocusTitle;
+  const rule = state.focusRule;
+  if (!title || !rule || el.rowFocus?.hidden) return;
+
+  const words = ruleTitle(rule);
+  title.title = words;
+  title.setAttribute("aria-label", words);
+  title.textContent = words;
+
+  const last = el.rowFocusOnly;
+  if (!last) return;
+  // Below the title's last line, not merely lower than its top: the row centres
+  // its items, so a taller button on the same line already starts above the
+  // title's own top and comparing those would read as a wrap every time.
+  const wrapped = last.getBoundingClientRect().top > title.getBoundingClientRect().bottom;
+  if (wrapped) title.textContent = ruleGlyphs(rule);
 }
 
 function setFocusStatus(text){
@@ -175,5 +196,7 @@ export function wireRowFocus(){
   if (el.rowFocusNext) el.rowFocusNext.addEventListener("click", () => stepOccurrence(1));
   if (el.rowFocusOnly) el.rowFocusOnly.addEventListener("click", () => showOnlyFocused());
   if (el.rowFocusClear) el.rowFocusClear.addEventListener("click", () => clearRowFocus());
+  // Turning a phone gives the bar another 400px, or takes them away.
+  window.addEventListener("resize", () => fitFocusTitle(), { passive: true });
   renderRowFocus();
 }

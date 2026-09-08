@@ -1002,24 +1002,22 @@
       flex-wrap: wrap;
       gap: var(--sp-1);
     }
+    /* Never wraps within itself: whether the whole row wraps is the measurement
+       fitFocusTitle takes to decide between the words and the glyphs, and a
+       title that broke over two lines of its own would hide the answer. */
     .rowFocusTitle{
       font-size: 15px;
       color: var(--accent);
       font-weight: 700;
-      /* Glyphs are already short; this is the guard for whatever is put here
-         next, so a long label shortens itself rather than reflowing the row. */
-      max-width: 40%;
-      overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
     }
     .rowFocus .smallBtn{ padding: 4px 8px; font-size: 12px; }
     .rowFocusResult{ font-size: 12px; color: var(--muted); min-width: 0; }
     .rowFocusClear{ flex: none; }
-    /* Below about 360px the three buttons and the title are a few pixels wider
-       than the bar, and "Only this" drops. The row keeps the fuller label
-       wherever it fits and gives up the one word it can spare where it does
-       not - the aspects panel calls the same action "only" already. */
+    /* Below about 360px the three buttons and the title are wider than the bar
+       between them. The row keeps the fuller labels wherever they fit and gives
+       up the words it can spare where they do not: "‹ Last", "Next ›" and
+       "Only", which the aspects panel calls the same action already. */
     @media (max-width: 360px){
       .rowFocus .wideWord{ display: none; }
       .rowFocus{ gap: 4px; }
@@ -1360,8 +1358,8 @@
     <div class="rowFocus" id="rowFocus" role="status" aria-live="polite" hidden>
       <div class="rowFocusMain">
         <span class="rowFocusTitle symbolGlyphText" id="rowFocusTitle"></span>
-        <button id="rowFocusPrev" type="button" class="smallBtn">‹ Last time</button>
-        <button id="rowFocusNext" type="button" class="smallBtn">Next time ›</button>
+        <button id="rowFocusPrev" type="button" class="smallBtn">‹ Last<span class="wideWord"> time</span></button>
+        <button id="rowFocusNext" type="button" class="smallBtn">Next<span class="wideWord"> time</span> ›</button>
         <button id="rowFocusOnly" type="button" class="smallBtn">Only<span class="wideWord"> this</span></button>
         <span class="rowFocusResult" id="rowFocusResult"></span>
       </div>
