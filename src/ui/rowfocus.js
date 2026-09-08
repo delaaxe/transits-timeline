@@ -2,19 +2,22 @@
 //
 // The label column was the one part of the chart that did nothing. It is also
 // the part a reader points at: a row is a question - "Saturn square my Sun" -
-// and the chart only ever answers it for the window on screen. Tapping the
-// label opens that question instead of one of its passes, and carries the two
-// answers the window cannot give: when this last happened, and when it happens
-// next. Both live outside the range by definition, so both move the range.
+// and the chart only ever answers it for the window on screen.
 //
-// The focus bar is what makes the second and third tap cheap. A found
-// occurrence can be fifty years away and the chart it lands on is one the
-// reader has never seen, so the bar stays up naming the row, keeps the
-// highlight on it, and offers the same two steps again.
+// So a tap on a label follows the row rather than opening anything over it. The
+// row lights up and the focus bar appears, carrying what the window cannot
+// give: when this last happened, and when it happens next. Both live outside
+// the range by definition, so both move the range - and a found occurrence can
+// be fifty years away, on a chart the reader has never seen, which is why the
+// bar stays up naming the row and offering the same steps again rather than
+// being a card that has to be reopened.
+//
+// A card is what the bars are for. Reading the prose about a pairing means
+// tapping one of its passes, where the dates that prose is about are.
 
 import { addDaysLocal, fmtLocalYYYYMMDD, parseLocalDateOnly } from "../core/time.js";
 import { DAY_MS } from "../core/events.js";
-import { aspectSymbol, mythKeyFor, planetLabel, ruleKey } from "../data/bodies.js";
+import { aspectSymbol, planetLabel } from "../data/bodies.js";
 import { requestUpdate } from "../refresh.js";
 import { currentChartContext, natalLongitudes } from "../services/chart-context.js";
 import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow } from "../services/search.js";
@@ -24,7 +27,6 @@ import { setSelection } from "./bodies.js";
 import { el } from "./dom.js";
 import { fmtDatePretty } from "./format.js";
 import { onRowLabelClick, renderFromCache, revealFocusRow } from "./timeline.js";
-import { onRowAction, showTooltip } from "./tooltip.js";
 
 // A range wide enough to hold the whole of one contact, and no wider: a ten
 // degree orb on Pluto is a window measured in decades, and centring the view on
@@ -67,7 +69,7 @@ export function renderRowFocus(){
   if (!rule) return;
   if (el.rowFocusTitle) el.rowFocusTitle.textContent = ruleTitle(rule);
   if (el.rowFocusResult) el.rowFocusResult.textContent = state.focusStatus;
-  for (const btn of [el.rowFocusPrev, el.rowFocusNext]){
+  for (const btn of [el.rowFocusPrev, el.rowFocusNext, el.rowFocusOnly]){
     if (btn) btn.disabled = state.focusSearching;
   }
 }
@@ -145,27 +147,11 @@ function showOnlyFocused(){
   else setSelection({ transit: [rule.transit], natal: [rule.natal], link: "directed" });
 }
 
-function openRowMenu(e, rule){
-  setFocusRule(rule);
-  // No dates: a bar's popup is about one pass and opens with the window it
-  // covers, and this is about the pairing itself. What it carries instead is
-  // the reading, and the three things there are to do with a row.
-  showTooltip(e, ruleTitle(rule), ruleKey(rule), "", true, mythKeyFor(rule.transit, rule.natal), "", null, [
-    { action: "prev", label: "‹ Last time" },
-    { action: "next", label: "Next time ›" },
-    { action: "only", label: "Only this" }
-  ]);
-}
-
 export function wireRowFocus(){
-  onRowLabelClick(openRowMenu);
-  onRowAction((action) => {
-    if (action === "prev") stepOccurrence(-1);
-    else if (action === "next") stepOccurrence(1);
-    else if (action === "only") showOnlyFocused();
-  });
+  onRowLabelClick((e, rule) => setFocusRule(rule));
   if (el.rowFocusPrev) el.rowFocusPrev.addEventListener("click", () => stepOccurrence(-1));
   if (el.rowFocusNext) el.rowFocusNext.addEventListener("click", () => stepOccurrence(1));
+  if (el.rowFocusOnly) el.rowFocusOnly.addEventListener("click", () => showOnlyFocused());
   if (el.rowFocusClear) el.rowFocusClear.addEventListener("click", () => clearRowFocus());
   renderRowFocus();
 }

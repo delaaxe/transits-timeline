@@ -538,12 +538,12 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
       class: "rowLabelHit"
     });
     const title = document.createElementNS(svgNs, "title");
-    title.textContent = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)} - when this last happened, and when it happens next`;
+    title.textContent = `Follow ${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}: when it last happened, and when it happens next`;
     hit.appendChild(title);
     // A tap, not a drag. The column sits over a chart that scrolls sideways, so
     // a finger that started here and travelled was panning; the browser still
-    // synthesises a click for it, and opening a card at the end of a scroll is
-    // the worst kind of surprise.
+    // synthesises a click for it, and a row quietly taking the highlight at the
+    // end of a scroll is a change nobody asked for.
     let downAt = null;
     hit.addEventListener("pointerdown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
     hit.addEventListener("click", (e) => {

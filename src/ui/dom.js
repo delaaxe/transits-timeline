@@ -58,6 +58,7 @@ export const el = {
   rowFocusTitle: $("rowFocusTitle"),
   rowFocusPrev: $("rowFocusPrev"),
   rowFocusNext: $("rowFocusNext"),
+  rowFocusOnly: $("rowFocusOnly"),
   rowFocusResult: $("rowFocusResult"),
   rowFocusClear: $("rowFocusClear"),
   rangeStart: $("rangeStart"),

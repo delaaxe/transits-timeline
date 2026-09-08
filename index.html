@@ -684,7 +684,6 @@
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
       .bodyChip{ min-width: 44px; min-height: 40px; }
-      .rowActionBtn,
       .rowFocus .smallBtn{ min-height: 36px; }
       /* The chips are what a selection is made of; these name a whole set at
          once and are re-tapped in a second if one is missed, so they get the
@@ -971,25 +970,6 @@
       touch-action: pan-y;
     }
     #aspectAxisSvg .rowLabelHit:hover{ fill: var(--hover); }
-
-    /* Buttons in the popup that act on the whole row rather than on the pass
-       that was tapped. */
-    .tooltipRowActions{
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--sp-1);
-      margin: 10px 0 2px;
-    }
-    .rowActionBtn{
-      padding: 6px 10px;
-      font-size: 13px;
-      border-radius: 8px;
-      background: var(--control-bg);
-      border: 1px solid var(--control-border);
-      color: var(--ink);
-      cursor: pointer;
-    }
-    .rowActionBtn:hover{ border-color: var(--star); }
 
     .presetButtons{ display:flex; gap: 8px; flex-wrap: wrap; }
     .presetBtn{
@@ -1313,6 +1293,7 @@
       <span class="rowFocusTitle symbolGlyphText" id="rowFocusTitle"></span>
       <button id="rowFocusPrev" type="button" class="smallBtn">‹ Last time</button>
       <button id="rowFocusNext" type="button" class="smallBtn">Next time ›</button>
+      <button id="rowFocusOnly" type="button" class="smallBtn">Only this</button>
       <span class="rowFocusResult" id="rowFocusResult"></span>
       <button id="rowFocusClear" type="button" class="iconBtn rowFocusClear" aria-label="Stop following this row">✕</button>
     </div>
