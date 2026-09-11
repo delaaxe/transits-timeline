@@ -35,8 +35,7 @@ jobs:
 
       - run: npm ci
 
-      # The gate that running the script by hand never had. Not typecheck: it
-      # has standing errors of its own.
+      # The gate that running the script by hand never had.
       - run: npm test
 
       # src/services/places.js imports api-key.js by path and .gitignore keeps
@@ -48,6 +47,15 @@ jobs:
         run: |
           [ -n "$AWS_API_KEY" ] || { echo "AWS_API_KEY secret is empty; the build would ship a placeholder." >&2; exit 1; }
           node -e 'require("node:fs").writeFileSync("api-key.js", "export const awsApiKey = " + JSON.stringify(process.env.AWS_API_KEY) + ";\n")'
+
+      # The other half of `npm run check`, and the reason the types are written
+      # as JSDoc and checked with checkJs at all. It sits below the key rather
+      # than beside the tests because the only thing tsc cannot resolve without
+      # api-key.js is api-key.js itself - one TS2307 on the import in
+      # src/services/places.js, and nothing else. esbuild strips types without
+      # checking them, so before this step a renamed export or a changed
+      # argument list reached production whenever no test covered that line.
+      - run: npm run typecheck
 
       - run: npm run build
 
