@@ -104,6 +104,7 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  * @property {boolean} startClipped the window was already open at the range start
  * @property {boolean} endClipped   the window was still open at the range end
  * @property {number} peakOrb smallest separation from exact reached, in degrees
+ * @property {number} peakAt  ms at which that separation was reached
  */
 
 /**
@@ -177,7 +178,7 @@ export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, max
 
   /** @type {(AspectEvent|null)[]} */
   const open = offsets.map((_, i) => Math.abs(prevF[i]) <= orb
-    ? { start: startMs, end: startMs, exacts: [], startClipped: true, endClipped: false, peakOrb: Math.abs(prevF[i]) }
+    ? { start: startMs, end: startMs, exacts: [], startClipped: true, endClipped: false, peakOrb: Math.abs(prevF[i]), peakAt: startMs }
     : null);
 
   // The scan is guaranteed to advance, but a bad speed bound should surface as
@@ -226,7 +227,8 @@ export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, max
           exacts: [],
           startClipped: false,
           endClipped: false,
-          peakOrb: Math.abs(f)
+          peakOrb: Math.abs(f),
+          peakAt: t
         };
       }
 
@@ -238,12 +240,17 @@ export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, max
         if (at !== null && cur){
           cur.exacts.push(at);
           cur.peakOrb = 0;
+          cur.peakAt = at;
         }
       }
 
       const cur = open[i];
       if (cur){
-        if (Math.abs(f) < cur.peakOrb) cur.peakOrb = Math.abs(f);
+        // The closest sample, not the true minimum: inside the band the scan
+        // steps by bandStepMs, so this is accurate to that step. Good enough to
+        // name a day in the popup, and it is the same resolution peakOrb itself
+        // has always had.
+        if (Math.abs(f) < cur.peakOrb){ cur.peakOrb = Math.abs(f); cur.peakAt = t; }
         if (!inside){
           const at = brentRoot(gOfT, prevT, t, Math.abs(before) - orb, Math.abs(f) - orb, rootTolMs);
           cur.end = at ?? t;

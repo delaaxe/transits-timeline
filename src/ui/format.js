@@ -81,6 +81,27 @@ export function formatExactPretty(exact, rangeStart, rangeEnd, showYear){
   return `${fmtDatePretty(exact, includeYear)}, ${fmtTimePretty(exact)}`;
 }
 
+/**
+ * How close a window that never went exact actually came: "0.11° on Oct 16".
+ *
+ * Only ever shown for a window with no exact hit, where the bar otherwise
+ * reads as a transit missing its marker. Two decimals, because the orb control
+ * moves in tenths of a degree and anything finer is noise; a contact closer
+ * than that is reported as under a hundredth rather than rounded to zero,
+ * which would claim an exact hit the scan did not find.
+ *
+ * @param {number} peakOrb closest separation reached, in degrees
+ * @param {number} peakAtMs when it was reached
+ * @param {Date} rangeStart @param {Date} rangeEnd @param {boolean} showYear
+ */
+export function formatClosestPretty(peakOrb, peakAtMs, rangeStart, rangeEnd, showYear){
+  if (!Number.isFinite(peakOrb) || !Number.isFinite(peakAtMs)) return "";
+  const deg = peakOrb < 0.01 ? "<0.01°" : `${peakOrb.toFixed(2)}°`;
+  const sameYear = rangeStart.getFullYear() === rangeEnd.getFullYear();
+  const includeYear = showYear || !sameYear;
+  return `${deg} on ${fmtDatePretty(new Date(peakAtMs), includeYear)}`;
+}
+
 export function isMultiDayLocal(start, end){
   if (!(start instanceof Date) || !(end instanceof Date)) return false;
   return start.getFullYear() !== end.getFullYear()

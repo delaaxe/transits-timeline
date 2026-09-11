@@ -80,7 +80,8 @@ export const el = {
   timelineSvg: $("timelineSvg"),
   timelineState: $("timelineState"),
   moreWrap: $("moreWrap"),
-  showMoreBtn: $("showMoreBtn")
+  showMoreBtn: $("showMoreBtn"),
+  rowSortWrap: $("rowSortWrap")
 };
 
 export const tooltip = $("tooltip");

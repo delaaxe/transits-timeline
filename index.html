@@ -956,6 +956,22 @@
       overflow: hidden;
     }
     .bodyPicker.oneList .bodyPane{ grid-column: 1 / -1; }
+    /* The same pill as the question switch above, without its grid placement -
+       that one is positioned by the body picker's grid and this one is not.
+       Sharing .bodyModeBtn keeps the drawer to one vocabulary. */
+    .segmented{
+      display: inline-flex;
+      border: 1px solid var(--control-border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .sortRow{
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      flex-wrap: wrap;
+    }
+    .sortRow > label{ color: var(--muted); font-size: 12px; }
     .bodyModeBtn{
       padding: 4px 10px;
       border: 0;
@@ -1407,6 +1423,14 @@
           </div>
         </div>
       </details>
+    </div>
+
+    <div class="sortRow">
+      <label id="rowSortLabel">Order rows by</label>
+      <div class="segmented" id="rowSortWrap" role="group" aria-labelledby="rowSortLabel">
+        <button type="button" class="bodyModeBtn" id="rowSortDate" data-row-sort="date">Date</button>
+        <button type="button" class="bodyModeBtn" id="rowSortSignificance" data-row-sort="significance">Significance</button>
+      </div>
     </div>
 
     <div class="statusRow">

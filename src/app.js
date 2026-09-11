@@ -10,9 +10,10 @@ import { loadInterpretations, onInterpretationsArrived } from "./data/interpreta
 import { el, setStatus, setTimelineState } from "./ui/dom.js";
 import { getCheckedAspects, wireAspectShortcuts } from "./ui/aspects.js";
 import { onBodiesChanged, wireBodyPicker } from "./ui/bodies.js";
-import { bootPresets, initCharts, readRuleOptions, renderPresetSection, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireViewBar } from "./ui/panels.js";
+import { bootPresets, initCharts, readRuleOptions, renderPresetSection, wireAdvancedUI, wireAutoUpdate, wireChartsUI, wireInstallHint, wireRangeNav, wireRowSort, wireViewBar } from "./ui/panels.js";
 import { clearRowFocus, renderRowFocus, wireRowFocus } from "./ui/rowfocus.js";
-import { clearTimeline, renderFromCache, updateShowMore, visibleRowIndexOf, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
+import { clearTimeline, hasVisibleRow, renderFromCache, ROW_CAP, ROW_PAGE, updateShowMore, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
+import { scoreRow } from "./core/significance.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
 
 export function maybeRefreshTimelineOnRefocus(){
@@ -61,7 +62,7 @@ export async function updateTimeline(){
 
     const ctx = currentChartContext();
 
-    state.currentMaxRows = 50;
+    state.currentMaxRows = ROW_CAP;
 
     const rangeStartLocal = parseLocalDateOnly(el.rangeStart.value);
     const rangeEndLocal = parseLocalDateOnly(el.rangeEnd.value);
@@ -111,17 +112,35 @@ export async function updateTimeline(){
 
     const firstHitByRule = eventsByRule.map(events => events[0].start);
 
+    // How much each row matters, scored here rather than in the worker: it is
+    // microseconds for a few hundred rows, the worker payload stays as it was,
+    // and retuning a weight never costs a rescan.
+    const scoreOpts = { mode: ctx.mode, orb: ruleOptions.orb, chartRuler: chartRulerKey };
+    const scoreByRule = rulesOut.map((r, i) => scoreRow(r, eventsByRule[i], scoreOpts));
+
+    // Chart order, then natal point: the tie-break every ordering here falls
+    // back on. Scores tie often - the Sun and the Moon carry the same natal
+    // weight, so two rows can be identical to the digit - and an unstable sort
+    // under a recompute reads as a bug.
+    const byChartOrder = (a, b) => {
+      const pa = (orderMap.get(rulesOut[a].transit) ?? 999) - (orderMap.get(rulesOut[b].transit) ?? 999);
+      if (pa !== 0) return pa;
+      return (orderMap.get(rulesOut[a].natal) ?? 999) - (orderMap.get(rulesOut[b].natal) ?? 999);
+    };
+
     const idxs = rulesOut.map((_, i) => i);
     idxs.sort((a,b) => {
       const da = firstHitByRule[a] - firstHitByRule[b];
       if (da !== 0) return da;
-      const pa = (orderMap.get(rulesOut[a].transit) ?? 999) - (orderMap.get(rulesOut[b].transit) ?? 999);
-      if (pa !== 0) return pa;
-      return (orderMap.get(rulesOut[a].natal) ?? 999) - (orderMap.get(rulesOut[b].natal) ?? 999);
+      return byChartOrder(a, b);
     });
 
+    // The cache stays in date order and carries the score alongside. Which
+    // rows survive the cap, and which order they are drawn in, are two separate
+    // decisions and both belong with the row limit in renderFromCache.
     const rulesSorted = idxs.map(i => rulesOut[i]);
     const eventsSorted = idxs.map(i => eventsByRule[i]);
+    const scoresSorted = idxs.map(i => scoreByRule[i]);
 
     // Cache full matches, then render up to the current maxRows
     state.cachedResults = {
@@ -131,6 +150,7 @@ export async function updateTimeline(){
       presetKey: state.activePresetKey,
       rules: rulesSorted,
       events: eventsSorted,
+      scores: scoresSorted,
       chartRuler: chartRulerKey
     };
 
@@ -141,7 +161,7 @@ export async function updateTimeline(){
     // switching charts, leaves nothing to point at. Nothing scrolls here - only
     // a search, which moves the range out from under the reader, has earned
     // that; a recompute they asked for should leave the page where it was.
-    if (state.focusRule && rulesSorted.length > 0 && visibleRowIndexOf(state.focusRule) < 0) clearRowFocus();
+    if (state.focusRule && rulesSorted.length > 0 && !hasVisibleRow(state.focusRule)) clearRowFocus();
 
     const nothingFound = rulesSorted.length === 0;
     setTimelineState(nothingFound ? "No transits match these settings in this range." : null,
@@ -190,7 +210,7 @@ async function boot(){
 
   if (el.showMoreBtn){
     el.showMoreBtn.addEventListener("click", () => {
-      state.currentMaxRows = state.currentMaxRows + 50;
+      state.currentMaxRows = state.currentMaxRows + ROW_PAGE;
       renderFromCache(state.currentMaxRows);
     });
   }
@@ -206,6 +226,7 @@ async function boot(){
   wireAxisScrollSync();
   wireTimelineResize();
   wireRangeNav();
+  wireRowSort();
   wireTooltipDismiss();
   wireStaleRefreshOnRefocus();
   wireInstallHint();

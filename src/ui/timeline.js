@@ -1,10 +1,11 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor, ruleKey } from "../data/bodies.js";
+import { aspectColors, aspectSymbol, mythKeyFor, orderMap, planetLabel, planetSymbols, returnColor, ruleKey } from "../data/bodies.js";
+import { tierFor } from "../data/weights.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
-import { formatExactPretty, formatRangePretty } from "./format.js";
+import { formatClosestPretty, formatExactPretty, formatRangePretty } from "./format.js";
 import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, getYearStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
 
@@ -17,13 +18,32 @@ let rowLabelHandler = null;
 // back the other way would close the loop.
 export function onRowLabelClick(fn){ rowLabelHandler = fn; }
 
+// How many rows are drawn before the reader has to ask for more, and how many
+// each ask adds.
+//
+// The cap bounds how much SVG one render builds; it is not there to curate,
+// which is now the significance score's job - the rows it keeps are the ones
+// that matter rather than the ones that happen to start first. Measured against
+// a 1988 chart: all bodies over a month is 115 rows, and the hundred kept cover
+// every row above the bottom tier; all bodies over a year is 353 rows, where a
+// cap of fifty showed one of the 163 rows in the middle tier and a hundred
+// shows fifty-one of them. The cost is about 850 SVG elements against 340, both
+// far below the ten thousand an uncapped year view would build.
+export const ROW_CAP = 100;
+export const ROW_PAGE = 50;
+
 export function updateShowMore(shown, total){
   const wrap = el.moreWrap;
   const btn = el.showMoreBtn;
   if (!wrap || !btn) return;
-  if (total >= 100 && total > shown){
+  // Any row past the cap needs a way back. This used to also require a hundred
+  // matches, which is redundant with the comparison beside it and left a real
+  // gap: 51 to 99 rows drew fifty and offered nothing, so the remainder could
+  // not be reached at all. Reachable by moving one slider - the Month preset at
+  // a 2 degree orb is 51 rows.
+  if (total > shown){
     wrap.style.display = "block";
-    btn.textContent = `Show 50 more (showing ${shown} of ${total})`;
+    btn.textContent = `Show ${ROW_PAGE} more (showing ${shown} of ${total})`;
   } else {
     wrap.style.display = "none";
   }
@@ -68,6 +88,49 @@ function visibleRows(){
   return idxs;
 }
 
+const scoreOf = (i) => state.cachedResults?.scores?.[i] ?? 0;
+
+// Chart order, then natal point: what every ordering here falls back on when
+// scores tie, which they do often - the Sun and the Moon carry the same natal
+// weight, so two rows can score identically to the digit.
+function byChartOrder(a, b){
+  const rules = state.cachedResults.rules;
+  const pa = (orderMap.get(rules[a].transit) ?? 999) - (orderMap.get(rules[b].transit) ?? 999);
+  if (pa !== 0) return pa;
+  return (orderMap.get(rules[a].natal) ?? 999) - (orderMap.get(rules[b].natal) ?? 999);
+}
+
+/**
+ * The rows actually drawn: the most significant `limit` of them, in the order
+ * the reader asked for.
+ *
+ * Selection and ordering are separate jobs and this is the one place both are
+ * decided. The cap exists to bound how much SVG a render builds, not to
+ * curate - so it takes the rows that matter rather than the ones that happen to
+ * start first, which is what a chronological slice was doing. The cache is held
+ * in date order, so that is what "date" costs here: nothing.
+ *
+ * @param {number} limit
+ * @returns {{shown:number[], total:number}}
+ */
+function rowsToDraw(limit){
+  const keep = visibleRows();
+  const total = keep.length;
+  const want = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
+  if (want >= total){
+    return { shown: state.rowSort === "significance" ? [...keep].sort(bySignificance) : keep, total };
+  }
+  const selected = [...keep].sort(bySignificance).slice(0, want);
+  if (state.rowSort === "significance") return { shown: selected, total };
+  // Back into date order, which is the order the cache is already in.
+  const chosen = new Set(selected);
+  return { shown: keep.filter(i => chosen.has(i)), total };
+}
+
+function bySignificance(a, b){
+  return (scoreOf(b) - scoreOf(a)) || byChartOrder(a, b);
+}
+
 export function renderFromCache(limit){
   if (!state.cachedResults){
     updateShowMore(0, 0);
@@ -77,11 +140,11 @@ export function renderFromCache(limit){
   state.currentLayout = layout;
   const threshold = Math.max(0, layout.labelWMax - layout.labelWMin);
   state.labelsUseSymbols = !!el.timelineScroll && el.timelineScroll.scrollLeft >= threshold;
-  const keep = visibleRows();
-  const total = keep.length;
-  const shown = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
-  const rules = keep.slice(0, shown).map(i => state.cachedResults.rules[i]);
-  const events = keep.slice(0, shown).map(i => state.cachedResults.events[i]);
+  const { shown: rowIdxs, total } = rowsToDraw(limit);
+  const shown = rowIdxs.length;
+  const rules = rowIdxs.map(i => state.cachedResults.rules[i]);
+  const events = rowIdxs.map(i => state.cachedResults.events[i]);
+  const scores = rowIdxs.map(i => scoreOf(i));
 
   const spanMs = state.cachedResults.endExclusive.getTime() - state.cachedResults.start.getTime();
   const showYear = (spanMs / (365.25 * 24 * 3600 * 1000)) >= 3;
@@ -108,6 +171,7 @@ export function renderFromCache(limit){
     endExclusive: state.cachedResults.endExclusive,
     rules,
     eventsByRule: events,
+    scores,
     showTime: state.cachedResults.showTime,
     presetKey: state.cachedResults.presetKey,
     chartRuler: state.cachedResults.chartRuler,
@@ -215,12 +279,10 @@ export function updateLabelsMode(){
   if (shouldUseSymbols === state.labelsUseSymbols) return;
   state.labelsUseSymbols = shouldUseSymbols;
 
-  const keep = visibleRows();
-  const total = keep.length;
-  const shown = Math.min(total, Math.max(0, Math.floor(Number(state.currentMaxRows || 0))));
+  const { shown: rowIdxs } = rowsToDraw(state.currentMaxRows);
   renderLabelsSVG({
     svg: el.aspectAxisSvg,
-    rules: keep.slice(0, shown).map(i => state.cachedResults.rules[i]),
+    rules: rowIdxs.map(i => state.cachedResults.rules[i]),
     chartRuler: state.cachedResults.chartRuler,
     layout: state.currentLayout,
     useSymbols: state.labelsUseSymbols
@@ -228,16 +290,38 @@ export function updateLabelsMode(){
 }
 
 /**
- * The index of a rule among the rows actually drawn, or -1. The row cap and the
- * stub filter both sit between the cache and the chart, so a rule's place in the
- * cache is not its place on screen.
+ * Whether this rule is one of the rows these results hold at all - which is a
+ * different question from whether it is on screen. A row can be a real match and
+ * still be behind the cap, and a focus that survived a recompute should not be
+ * dropped for that: the cap is a rendering budget, not a filter.
  */
-export function visibleRowIndexOf(rule){
+export function hasVisibleRow(rule){
+  if (!state.cachedResults || !rule) return false;
+  const key = ruleKey(rule);
+  return visibleRows().some(i => ruleKey(state.cachedResults.rules[i]) === key);
+}
+
+/**
+ * The index of a rule among the rows actually drawn, or -1. The row cap, the
+ * stub filter and the chosen sort all sit between the cache and the chart, so a
+ * rule's place in the cache is not its place on screen.
+ */
+export function drawnRowIndexOf(rule){
   if (!state.cachedResults || !rule) return -1;
   const key = ruleKey(rule);
-  const keep = visibleRows();
-  for (let i = 0; i < keep.length; i++){
-    if (ruleKey(state.cachedResults.rules[keep[i]]) === key) return i;
+  const { shown } = rowsToDraw(state.currentMaxRows);
+  for (let i = 0; i < shown.length; i++){
+    if (ruleKey(state.cachedResults.rules[shown[i]]) === key) return i;
+  }
+  return -1;
+}
+
+/** Where a rule sits in the significance ranking, ignoring the cap. */
+function significanceRankOf(rule){
+  const key = ruleKey(rule);
+  const ranked = [...visibleRows()].sort(bySignificance);
+  for (let i = 0; i < ranked.length; i++){
+    if (ruleKey(state.cachedResults.rules[ranked[i]]) === key) return i;
   }
   return -1;
 }
@@ -252,17 +336,24 @@ function stickyHeaderBottom(){
 
 /**
  * Brings the focused row onto the screen after a search has moved the range.
- * It may be past the row cap - the cap is fifty and the row can be the two
- * hundredth - so the cap is raised to reach it rather than the row being
- * reported as missing.
+ * It may be behind the row cap - the row the reader asked about can be the two
+ * hundredth by significance - so the cap is raised until the row is drawn
+ * rather than the row being reported as missing.
  */
 export function revealFocusRow(){
   if (!state.cachedResults || !state.focusRule) return false;
-  const idx = visibleRowIndexOf(state.focusRule);
-  if (idx < 0) return false;
-  if (idx >= state.currentMaxRows){
-    state.currentMaxRows = Math.ceil((idx + 1) / 50) * 50;
+  if (!hasVisibleRow(state.focusRule)) return false;
+  let idx = drawnRowIndexOf(state.focusRule);
+  if (idx < 0){
+    // Not drawn: it is behind the cap. Raise the cap to the page that holds its
+    // place in the ranking, then ask again - under a date sort its position on
+    // screen is not its rank, so the index has to be re-read after the render.
+    const rank = significanceRankOf(state.focusRule);
+    if (rank < 0) return false;
+    state.currentMaxRows = Math.ceil((rank + 1) / ROW_PAGE) * ROW_PAGE;
     renderFromCache(state.currentMaxRows);
+    idx = drawnRowIndexOf(state.focusRule);
+    if (idx < 0) return false;
   }
   const layout = state.currentLayout;
   const svg = el.timelineSvg;
@@ -596,6 +687,11 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 const minBarW = 3;
 const minHitW = 12;
 
+// A weighted-down bar still has to read as a bar. The hit target is the row
+// strip rather than the shape, so this is about legibility and not about
+// whether the bar can be tapped.
+const minBarH = 6;
+
 // A bar whose window runs past the edge of the timeline is cut square there and
 // left rounded at the end it really has, so the two read differently. The
 // radius follows the clamp SVG applies to rx - never more than half the height,
@@ -617,7 +713,25 @@ export function barPath(x, y, w, h, roundStart, roundEnd){
   return p.join(" ");
 }
 
-export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, showTime, presetKey, chartRuler, layout, showYear}){
+// How a tier is drawn. A compressed range on purpose: an absolute score is the
+// honest choice - normalising to the loudest thing on screen would redraw a
+// Mercury sextile as the biggest event of a quiet month, which is exactly the
+// lie the weighting exists to remove - but a quiet month genuinely holds
+// nothing major, and mapped naively it would draw as forty-five stunted, faint
+// bars. So the bottom tier is still clearly a bar: two thirds the height and
+// barely off full opacity.
+//
+// Height, not colour. Colour already carries the aspect, and is what a
+// red-green colourblind reader has instead of the glyph; asking it to carry a
+// second variable would cost that.
+const TIER_STYLE = {
+  major:   { height: 1.00, opacity: 1 },
+  strong:  { height: 0.88, opacity: 1 },
+  notable: { height: 0.76, opacity: 0.9 },
+  minor:   { height: 0.66, opacity: 0.78 }
+};
+
+export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, scores, showTime, presetKey, chartRuler, layout, showYear}){
   clearSvg(svg);
 
   const { totalW, timelineW, labelW, marginL, axisGutter = 0, rowH, rowGap, bottomPad, rowsY0 } = layout;
@@ -710,7 +824,12 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
 
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
       const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
-      const barH = rowH - 8;
+      // The row keeps its height whatever the bar does, so rows never jitter
+      // between recomputes and the hit target below is unaffected.
+      const fullH = rowH - 8;
+      const style = TIER_STYLE[tierFor(scores?.[idx] ?? 0)] ?? TIER_STYLE.minor;
+      const barH = Math.max(minBarH, Math.round(fullH * style.height));
+      const barY = y + 4 + Math.round((fullH - barH) / 2);
       // A window the scan found already open at the range start, or still open
       // at its end, does not really begin or end here - the timeline just stops
       // showing it. A rounded cap there would claim the transit closed inside
@@ -720,14 +839,15 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const shapeAttrs = (roundStart && roundEnd)
         // SVG clamps rx to half the width, so a one-day bar becomes a dot
         // rather than a rectangle with impossible corners.
-        ? { x: barX, y: y + 4, width: w, height: barH, rx: barH / 2 }
-        : { d: barPath(barX, y + 4, w, barH, roundStart, roundEnd) };
+        ? { x: barX, y: barY, width: w, height: barH, rx: barH / 2 }
+        : { d: barPath(barX, barY, w, barH, roundStart, roundEnd) };
       const rect = svgEl((roundStart && roundEnd) ? "rect" : "path", {
         ...shapeAttrs,
         fill: fillFor(barColor),
         // Two windows that meet in a row would otherwise read as one long bar.
         stroke: isHexColor(barColor) ? darken(barColor, 0.4) : "none",
         "stroke-width": "0.75",
+        ...(style.opacity < 1 ? { opacity: String(style.opacity) } : {}),
         class: "bar"
       });
 
@@ -745,6 +865,8 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       // Each formatted hit can carry its own comma, so they are separated by
       // something a date never contains.
       const exactLabel = exactDates.map(d => formatExactPretty(d, a, b, showYear)).join(" \u00b7 ");
+      // Only says anything when there was no exact hit; the popup decides.
+      const closestLabel = formatClosestPretty(event.peakOrb, event.peakAt, a, b, showYear);
       const buildCalendarData = () => ({
         title: calendarTitle,
         segmentStart: a,
@@ -752,11 +874,11 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         exactTime: exactDates[0] ?? null
       });
       const bindSegmentTooltipEvents = (target) => {
-        const openPopup = (e) => showTooltip(e, rowLabel, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData());
+        const openPopup = (e) => showTooltip(e, rowLabel, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData(), closestLabel);
         target.addEventListener("pointerenter", (e) => {
           if (isCoarsePointer()) return;
           if (tooltip.classList.contains("popup")) return;
-          showTooltip(e, rowLabel, descKey, rangeText, false, mythKey, exactLabel);
+          showTooltip(e, rowLabel, descKey, rangeText, false, mythKey, exactLabel, null, closestLabel);
         });
         target.addEventListener("pointermove", (e) => {
           if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){

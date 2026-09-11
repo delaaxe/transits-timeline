@@ -24,9 +24,20 @@ export const state = {
   focusRule: null,
   focusStatus: "",
   focusSearching: false,
+  // What decides the order rows are drawn in. Which rows are drawn at all is a
+  // separate question, always decided by significance - see rowsToDraw.
+  //
+  // Date is the default because this is a timeline: rows in date order make a
+  // cascade the eye can follow, and scrambling them costs more than the ranking
+  // gains. Significance is for the other question - what matters most in this
+  // window, whenever it happens.
+  /** @type {"date"|"significance"} */
+  rowSort: "date",
   // Last computation, so "Show more" can paginate without recomputing.
   cachedResults: null,
-  currentMaxRows: 50,
+  // Replaced with ROW_CAP on the first update; this is only what the app holds
+  // before anything has been computed.
+  currentMaxRows: 100,
   isComputing: false,
   cancelRequested: false,
   pendingUpdate: false,

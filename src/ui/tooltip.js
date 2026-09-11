@@ -163,15 +163,15 @@ let shownArgs = null;
 
 export function refreshTooltipContent(){
   if (tooltip.style.display !== "block" || !shownArgs) return;
-  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any]} */ (shownArgs)));
+  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,string]} */ (shownArgs)));
 }
 
 /**
  * `descKey` and `mythKey` are looked up here rather than passed as text, so a
  * redraw picks up prose that was not loaded when the bar was drawn.
  */
-export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData){
-  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData];
+export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, closestLabel){
+  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, closestLabel];
   // Two bodies meeting in the sky is not the same event as one of them crossing
   // a place in a birth chart, so world mode reads from its own file rather than
   // from natal prose written in the second person about "your natal Neptune".
@@ -190,11 +190,19 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     ? `<button type="button" class="mythToggle" aria-expanded="false">Mythologically →</button><div class="myth mythHidden" hidden><em>${safeMyth}</em></div>`
     : "";
   const exactHtml = exactLabel ? ` <span class="sub">(${escapeHtml("exact: " + exactLabel)})</span>` : "";
+  // A window that never goes exact draws identically to one whose exact hit
+  // falls outside the range, and the first of the two looks like a bug - which
+  // is how a real Pluto pass got reported as one. The scan has always known how
+  // close it came; nothing had ever printed it.
+  const closestHtml = (!exactLabel && closestLabel)
+    ? ` <span class="sub">(${escapeHtml("closest: " + closestLabel)})</span>`
+    : "";
   const closeBtn = popupMode ? `<button type="button" class="tooltipClose" aria-label="Close">✕</button>` : "";
   let calendarHtml = "";
   if (popupMode && calendarData){
     const titleText = String(calendarData.title || title || "Transit");
-    const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
+    const closestNote = (!exactLabel && closestLabel) ? ` (closest: ${closestLabel})` : "";
+    const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : closestNote}`.trim();
     const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
     const detailsText = [firstLine, desc || "", timing, mythLine].filter(Boolean).join("\n\n");
     const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
@@ -242,7 +250,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     }
   }
   tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(title)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
-    + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
+    + `<div class="sub">${escapeHtml(range)}${exactHtml}${closestHtml}</div>`
     + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
     + timingHtml
     + mythHtml
@@ -275,8 +283,8 @@ export function isCoarsePointer(){
   return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
-export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null){
-  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData);
+export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, closestLabel=""){
+  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, closestLabel);
   tooltip.style.display = "block";
   tooltip.style.visibility = "hidden";
   tooltip.classList.toggle("popup", !!popupMode);

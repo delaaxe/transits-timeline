@@ -11,6 +11,7 @@ import { $, debounce, el, escapeHTML, installHint, installHintText, setStatus } 
 import { getCheckedAspects, renderAspectChecks } from "./aspects.js";
 import { applyBodySets, renderBodyPicker, selectedBodies } from "./bodies.js";
 import { clearRowFocus } from "./rowfocus.js";
+import { renderFromCache, revealFocusRow } from "./timeline.js";
 import { fmtBirthPretty, fmtCoord } from "./format.js";
 import { wireChartReorder } from "./chart-drag.js";
 import { wireTransferUI } from "./transfer.js";
@@ -45,6 +46,41 @@ export function expandRange(direction){
   } else {
     setRangeDates(start, addDaysLocal(end, delta));
   }
+}
+
+/**
+ * Which order rows are drawn in.
+ *
+ * No recompute: the events and their scores are already cached, and only the
+ * order they are read out in changes, so this re-renders from the cache the way
+ * "Show more" does. It also leaves the preset chips lit - the sort is not part
+ * of the shape of the question, the way the bodies, aspects and orb are.
+ */
+export function wireRowSort(){
+  const wrap = el.rowSortWrap;
+  if (!wrap) return;
+  const buttons = /** @type {HTMLButtonElement[]} */ (Array.from(wrap.querySelectorAll("[data-row-sort]")));
+  const sync = () => {
+    for (const b of buttons){
+      const on = b.dataset.rowSort === state.rowSort;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  };
+  for (const b of buttons){
+    b.addEventListener("click", () => {
+      const next = b.dataset.rowSort === "significance" ? "significance" : "date";
+      if (next === state.rowSort) return;
+      state.rowSort = next;
+      sync();
+      // A row picked off the axis keeps its highlight, but the rows around it
+      // have moved, so bring it back into view rather than leaving the reader
+      // to find it again.
+      renderFromCache(state.currentMaxRows);
+      revealFocusRow();
+    });
+  }
+  sync();
 }
 
 export function wireRangeNav(){
