@@ -33,8 +33,9 @@ did not deploy.
 
 ## Checks
 
-`npm run check` is tests, typecheck and build. CI gates on `npm test` and
-`npm run build` only, but keep the typecheck clean — it is clean today.
+`npm run check` is tests, typecheck and build, and CI now gates on all three.
+The typecheck runs after the api-key.js step, because the one thing `tsc` cannot
+resolve without that file is that file.
 
 `npm run dev` serves the repo at :8931. `src/services/places.js` imports
 `api-key.js`, which is gitignored and therefore missing on a fresh clone: without
