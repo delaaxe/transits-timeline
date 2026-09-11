@@ -20,7 +20,7 @@ import { DAY_MS } from "../core/events.js";
 import { aspectSymbol, planetLabel, planetSymbols } from "../data/bodies.js";
 import { requestUpdate } from "../refresh.js";
 import { currentChartContext, natalLongitudes } from "../services/chart-context.js";
-import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow } from "../services/search.js";
+import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow, returnRange } from "../services/search.js";
 import { state } from "../state.js";
 import { renderAspectChecks } from "./aspects.js";
 import { setSelection } from "./bodies.js";
@@ -62,6 +62,7 @@ function rangeDays(){
 export function setFocusRule(rule){
   state.focusRule = rule ? { transit: rule.transit, aspect: rule.aspect, natal: rule.natal, orb: rule.orb } : null;
   state.focusStatus = "";
+  state.focusTrail = [];
   renderRowFocus();
   if (state.cachedResults) renderFromCache(state.currentMaxRows);
 }
@@ -71,6 +72,7 @@ export function clearRowFocus(){
   state.focusRule = null;
   state.focusStatus = "";
   state.focusSearching = false;
+  state.focusTrail = [];
   renderRowFocus();
   if (state.cachedResults) renderFromCache(state.currentMaxRows);
 }
@@ -134,6 +136,23 @@ export function jumpRangeFor(hit){
   return { start: addDaysLocal(centreDay, -half), end: addDaysLocal(centreDay, days - half - 1) };
 }
 
+/** The range as the inputs hold it, which is what the trail is written in. */
+function currentRange(){
+  return { start: el.rangeStart.value, end: el.rangeEnd.value };
+}
+
+/**
+ * Moves the range and waits for the chart, then scrolls the followed row back
+ * into view - the row the reader is asking about is rarely the first one.
+ * @param {{start:string, end:string}} range
+ */
+async function goToRange(range){
+  el.rangeStart.value = range.start;
+  el.rangeEnd.value = range.end;
+  await requestUpdate();
+  revealFocusRow();
+}
+
 /** @param {number} direction -1 for the last one, +1 for the next */
 async function stepOccurrence(direction){
   const rule = state.focusRule;
@@ -145,6 +164,7 @@ async function stepOccurrence(direction){
     ? parseLocalDateOnly(el.rangeStart.value).getTime()
     : addDaysLocal(parseLocalDateOnly(el.rangeEnd.value), 1).getTime();
   const word = direction < 0 ? "before" : "after";
+  const before = currentRange();
 
   state.focusSearching = true;
   renderRowFocus();
@@ -160,19 +180,29 @@ async function stepOccurrence(direction){
       onReach: (years) => setFocusStatus(`Looking ${years === 1 ? "a year" : `${years} years`} ${word} this range…`)
     });
     if (!hit){
-      setFocusStatus(`Nothing in the ${SEARCH_LIMIT_YEARS} years ${word} this range.`);
+      // Nothing to land on, but the step that brought the reader here is a place
+      // they have been, and getting back to it is the whole of what this press
+      // can honestly mean. Without that, a jump the reach cannot cover twice is
+      // one way.
+      const back = returnRange(state.focusTrail, before, direction);
+      if (!back){
+        setFocusStatus(`Nothing in the ${SEARCH_LIMIT_YEARS} years ${word} this range.`);
+        return;
+      }
+      state.focusTrail.pop();
+      setFocusStatus(`Nothing ${word} it for ${SEARCH_LIMIT_YEARS} years. Back where you were.`);
+      await goToRange(back);
       return;
     }
     const at = new Date(hit.at);
     const when = fmtDatePretty(at, true);
     const { start, end } = jumpRangeFor(hit);
-    el.rangeStart.value = fmtLocalYYYYMMDD(start);
-    el.rangeEnd.value = fmtLocalYYYYMMDD(end);
+    const to = { start: fmtLocalYYYYMMDD(start), end: fmtLocalYYYYMMDD(end) };
+    state.focusTrail.push({ from: before, to, direction });
     setFocusStatus(hit.exact
       ? `${direction < 0 ? "Last" : "Next"} exact ${when}`
       : `${direction < 0 ? "Last" : "Next"} pass around ${when}, never quite exact`);
-    await requestUpdate();
-    revealFocusRow();
+    await goToRange(to);
   } catch (err){
     setFocusStatus(String(err?.message || err));
   } finally {

@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DAY_MS } from "../src/core/events.js";
-import { SEARCH_LIMIT_YEARS, SEARCH_REACH_YEARS, occurrenceWindow, pickOccurrence, searchWindows } from "../src/services/search.js";
+import { SEARCH_LIMIT_YEARS, SEARCH_REACH_YEARS, occurrenceWindow, pickOccurrence, returnRange, searchWindows } from "../src/services/search.js";
 
 const YEAR_MS = 365.2425 * DAY_MS;
 const T0 = Date.UTC(2026, 0, 1);
@@ -101,4 +101,45 @@ test("the jump keeps the reader's own zoom unless the contact is longer than it"
 
   const enormous = { at: T0, event: { start: T0 - 20000 * DAY_MS, end: T0 + 20000 * DAY_MS } };
   assert.equal(occurrenceWindow(enormous, 30, 3650).days, 3650, "and the ceiling holds");
+});
+
+const range = (start, end) => ({ start, end });
+const jump = (from, to, direction) => ({ from, to, direction });
+
+const home = range("2026-01-01", "2026-03-31");
+const far = range("2270-05-01", "2270-07-29");
+
+test("a press the other way walks the jump that got here back", () => {
+  // The case the trail exists for: next reaches 2270, and the 243 years behind
+  // 2270 stop short of the year the reader left, so the search is honestly
+  // empty and the only way home is the way they came.
+  const trail = [jump(home, far, 1)];
+  assert.deepEqual(returnRange(trail, far, -1), home);
+
+  // And the same in reverse, for a reader who pressed "last time" into 1780.
+  assert.deepEqual(returnRange([jump(home, far, -1)], far, 1), home);
+});
+
+test("pressing on in the direction already travelled does not bounce back", () => {
+  // Two presses of "next time" mean the reader wants a third thing, not the
+  // second one again.
+  assert.equal(returnRange([jump(home, far, 1)], far, 1), null);
+});
+
+test("a range the reader moved themselves is not stepped off", () => {
+  // They have answered the question of where they want to be, and a button
+  // labelled "last time" should not overrule it.
+  const moved = range("2200-01-01", "2200-03-31");
+  assert.equal(returnRange([jump(home, far, 1)], moved, -1), null);
+  assert.equal(returnRange([], home, -1), null, "and nowhere to go back to is nothing to report");
+});
+
+test("only the step immediately behind is offered, and the trail keeps the rest", () => {
+  // Walking back is one step at a time: from the far end of two jumps the
+  // reader lands on the middle one, which is where the next press starts from.
+  const middle = range("2150-01-01", "2150-03-31");
+  const trail = [jump(home, middle, 1), jump(middle, far, 1)];
+  assert.deepEqual(returnRange(trail, far, -1), middle);
+  trail.pop();
+  assert.deepEqual(returnRange(trail, middle, -1), home, "and the step before it is still there");
 });

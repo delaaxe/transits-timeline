@@ -24,6 +24,11 @@ export const state = {
   focusRule: null,
   focusStatus: "",
   focusSearching: false,
+  // The jumps the previous/next search has made, newest last, so a press in the
+  // other direction can walk one back rather than stranding the reader in a
+  // century the search cannot see home from. See returnRange in services/search.
+  /** @type {import("./services/search.js").Jump[]} */
+  focusTrail: [],
   // Last computation, so "Show more" can paginate without recomputing.
   cachedResults: null,
   currentMaxRows: 50,

@@ -135,3 +135,38 @@ export async function findOccurrence({ rule, direction, fromMs, mode, observer, 
   }
   return null;
 }
+
+// Where the reader came from, so a jump can be walked back.
+//
+// The reach is finite and anchored on the range being read, which is fine until
+// a jump lands far enough out that the way home is longer than the reach: a
+// contact that recurs every five centuries sends the reader to 2270, and from
+// there the 243 years behind them stop short of the year they left. The search
+// is right that it found nothing; the reader is right that they are stuck.
+//
+// The way out is that a jump is a step and not a teleport. Each one remembers
+// the range it left, and a press in the other direction that finds nothing to
+// land on lands back there instead - which is a real occurrence anyway, since
+// the row was only tappable because it had one on screen.
+//
+// Only the step immediately behind counts, and only while the range is still
+// the one that step arrived at. A reader who moved the range themselves has
+// answered the question of where they want to be, and should not be pulled off
+// it by a button labelled "last time".
+
+/**
+ * @typedef {{start:string, end:string}} DateRange the two range inputs
+ * @typedef {{from:DateRange, to:DateRange, direction:number}} Jump
+ */
+
+/**
+ * The range to step back to, or null if there is nothing to step back to.
+ * @param {Jump[]} trail @param {DateRange} current @param {number} direction
+ * @returns {DateRange|null}
+ */
+export function returnRange(trail, current, direction){
+  const last = trail[trail.length - 1];
+  if (!last || last.direction !== -direction) return null;
+  if (last.to.start !== current.start || last.to.end !== current.end) return null;
+  return last.from;
+}
