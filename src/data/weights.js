@@ -118,8 +118,8 @@ export const RULER_BONUS = 1.25;
  * a Mercury sextile as the biggest thing in a quiet month simply because
  * nothing else was happening, which is exactly the lie the weighting exists to
  * remove. The cost is that a quiet month genuinely contains no major transits
- * and should look like it - so the visual range these drive is compressed
- * (see BAR_HEIGHT_SCALE in ui/timeline.js), not the full range of the row.
+ * and should look like it - so the opacity ramp these drive floors well above
+ * invisible (see TIER_STYLE in ui/timeline.js).
  *
  * Measured over a 1988 chart: a one-month view peaks at 0.24, a year at 0.57,
  * five years at 0.90. Four tiers put roughly a fifth of any view in the bottom

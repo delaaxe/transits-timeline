@@ -687,11 +687,6 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 const minBarW = 3;
 const minHitW = 12;
 
-// A weighted-down bar still has to read as a bar. The hit target is the row
-// strip rather than the shape, so this is about legibility and not about
-// whether the bar can be tapped.
-const minBarH = 6;
-
 // A bar whose window runs past the edge of the timeline is cut square there and
 // left rounded at the end it really has, so the two read differently. The
 // radius follows the clamp SVG applies to rx - never more than half the height,
@@ -713,22 +708,26 @@ export function barPath(x, y, w, h, roundStart, roundEnd){
   return p.join(" ");
 }
 
-// How a tier is drawn. A compressed range on purpose: an absolute score is the
-// honest choice - normalising to the loudest thing on screen would redraw a
-// Mercury sextile as the biggest event of a quiet month, which is exactly the
-// lie the weighting exists to remove - but a quiet month genuinely holds
-// nothing major, and mapped naively it would draw as forty-five stunted, faint
-// bars. So the bottom tier is still clearly a bar: two thirds the height and
-// barely off full opacity.
+// How a tier is drawn: opacity, and nothing else.
 //
-// Height, not colour. Colour already carries the aspect, and is what a
-// red-green colourblind reader has instead of the glyph; asking it to carry a
-// second variable would cost that.
+// Height was tried first and varying it left the rows ragged - a chart of bars
+// at four different thicknesses reads as a rendering fault before it reads as a
+// ranking. Every bar is the same size now and weight is carried by how present
+// it is, which is the one channel here that changes nothing about the shape.
+//
+// Not colour, either: colour already carries the aspect, and is what a
+// red-green colourblind reader has in place of the glyph.
+//
+// Four even steps, because opacity is now doing all of the work on its own -
+// the previous ramp gave the top two tiers the same value and could not tell
+// them apart at all. The floor stays high enough that a minor transit is still
+// plainly a bar on the panel behind it: an absolute scale means a quiet month
+// is genuinely all middle and bottom tier, and it still has to be readable.
 const TIER_STYLE = {
-  major:   { height: 1.00, opacity: 1 },
-  strong:  { height: 0.88, opacity: 1 },
-  notable: { height: 0.76, opacity: 0.9 },
-  minor:   { height: 0.66, opacity: 0.78 }
+  major:   { opacity: 1 },
+  strong:  { opacity: 0.8 },
+  notable: { opacity: 0.62 },
+  minor:   { opacity: 0.46 }
 };
 
 export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule, scores, showTime, presetKey, chartRuler, layout, showYear}){
@@ -824,12 +823,9 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
 
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
       const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
-      // The row keeps its height whatever the bar does, so rows never jitter
-      // between recomputes and the hit target below is unaffected.
-      const fullH = rowH - 8;
+      const barH = rowH - 8;
+      const barY = y + 4;
       const style = TIER_STYLE[tierFor(scores?.[idx] ?? 0)] ?? TIER_STYLE.minor;
-      const barH = Math.max(minBarH, Math.round(fullH * style.height));
-      const barY = y + 4 + Math.round((fullH - barH) / 2);
       // A window the scan found already open at the range start, or still open
       // at its end, does not really begin or end here - the timeline just stops
       // showing it. A rounded cap there would claim the transit closed inside
@@ -925,6 +921,10 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         // A hard point. The ring this replaced was a 1.6px stroke and a 1.9px
         // core over a gradient, and at the size it is actually drawn those
         // three edges antialias into each other and read as a smudge.
+        //
+        // It fades with its bar. Weight is carried by opacity alone now, and a
+        // full-strength marker on a faded bar would be the loudest thing in a
+        // quiet row - the exact hit of a minor transit is still minor.
         svg.appendChild(svgEl("circle", {
           cx: xExact,
           cy,
@@ -932,6 +932,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           fill: "var(--ink)",
           stroke: isHexColor(barColor) ? darken(barColor, 0.45) : "none",
           "stroke-width": "1",
+          ...(style.opacity < 1 ? { opacity: String(style.opacity) } : {}),
           "pointer-events": "none"
         }));
       }
