@@ -40,40 +40,117 @@ export function parseCharts(text){
   return charts;
 }
 
-// What makes two records the same chart to a human: same person, same moment,
-// same place. Ids don't survive a round trip through two devices.
+// What makes two records the same chart is the name it is filed under: a
+// person is one chart here, and re-importing them is meant to bring their
+// details up to date rather than leave a second Ada Lovelace on the list. Ids
+// don't survive a round trip through two devices, and the birth data is the
+// very thing an import is likely to be correcting, so neither can be the key.
 function identityOf(p){
-  return [
-    (p.name || "").trim().toLowerCase(),
-    p.birthDate, p.birthTime,
-    (+p.lon).toFixed(4), (+p.lat).toFixed(4)
-  ].join("|");
+  return (p.name || "").trim().toLowerCase();
 }
 
-// Merge is additive and never edits an existing chart: a chart already here
-// wins, and anything genuinely new arrives with an id that can't collide.
+// The fields an overwrite can actually change, in the order a reader reads
+// them.
+const chartFields = ["name", "birthDate", "birthTime", "placeLabel", "lat", "lon", "tzName", "tzOffset"];
+
+const numericFields = new Set(["lat", "lon", "tzOffset"]);
+
+// AAF states coordinates in whole arc seconds, so a chart that has been out to
+// a file and back sits up to half a second off where it started - thirty
+// metres, which is the same place by any standard a birth chart works to.
+// Calling that a change would show a diff on every chart of every round trip.
+const coordTolerance = 1 / 3600;
+
+// A place is written out as one comma-separated line and AAF has no way to keep
+// a comma inside a field, so a label comes back with its commas spaced out
+// instead. Same place, same words, re-punctuated by the format.
+function placeKey(value){
+  return String(value ?? "").replace(/[\s,]+/g, " ").trim().toLowerCase();
+}
+
+function sameValue(key, a, b){
+  if (numericFields.has(key)) return Math.abs((+a || 0) - (+b || 0)) < coordTolerance;
+  if (key === "placeLabel") return placeKey(a) === placeKey(b);
+  return String(a ?? "").trim() === String(b ?? "").trim();
+}
+
+// Field by field, what importing `after` over `before` would change. An empty
+// list means the two records say the same thing, whatever their ids.
+/** @param {any} before @param {any} after @returns {{ key: string, from: any, to: any }[]} */
+export function diffChart(before, after){
+  // A zone given by name carries its own offset with it - a file states that
+  // offset outright, this app looks it up - so the stored number is only the
+  // record's own word where there is no name to speak for it.
+  const named = !!(String(before.tzName ?? "").trim() || String(after.tzName ?? "").trim());
+  const changes = [];
+  for (const key of chartFields){
+    if (key === "tzOffset" && named) continue;
+    if (!sameValue(key, before[key], after[key])) changes.push({ key, from: before[key], to: after[key] });
+  }
+  return changes;
+}
+
+// The seeded sample is a placeholder, not a chart of the reader's: a real
+// import replaces it rather than merging with it.
+function importBase(existing){
+  return (existing.length === 1 && isDefaultChart(existing[0])) ? [] : existing.slice();
+}
+
 /**
+ * What an import would do, chart by chart, so the dialog can show it before
+ * anything is written: a chart is new, it overwrites the chart already filed
+ * under that name, or it says exactly what that chart already says.
  * @param {any[]} existing @param {any[]} incoming
- * @returns {{ list: any[], added: any[], duplicates: any[] }}
+ * @returns {{ chart: any, before: any, changes: { key: string, from: any, to: any }[], status: "new" | "overwrite" | "same" }[]}
  */
-export function mergeCharts(existing, incoming){
-  // The seeded sample is a placeholder; a real import replaces it.
-  const base = (existing.length === 1 && isDefaultChart(existing[0])) ? [] : existing.slice();
-  const seen = new Set(base.map(identityOf));
-  const ids = new Set(base.map((p) => p.id));
-  const added = [];
-  const duplicates = [];
+export function planImport(existing, incoming){
+  const byName = new Map(importBase(existing).map((p) => [identityOf(p), p]));
+  /** @type {{ chart: any, before: any, changes: { key: string, from: any, to: any }[], status: "new" | "overwrite" | "same" }[]} */
+  const plan = [];
   for (const chart of incoming){
     const key = identityOf(chart);
-    if (seen.has(key)){
-      duplicates.push(chart);
+    const before = byName.get(key) || null;
+    const changes = before ? diffChart(before, chart) : [];
+    plan.push({ chart, before, changes, status: !before ? "new" : (changes.length ? "overwrite" : "same") });
+    // A file naming the same person twice reads like an import onto an import:
+    // the last record wins, the same way it would over two separate imports.
+    byName.set(key, chart);
+  }
+  return plan;
+}
+
+// Merging follows that plan. An overwritten chart keeps its id and its place in
+// the list, because it is the same chart to everything else here - the chip on
+// screen, the chart last opened, whichever side of a synastry it is on.
+/**
+ * @param {any[]} existing @param {any[]} incoming
+ * @returns {{ list: any[], added: any[], overwritten: { before: any, after: any, changes: { key: string, from: any, to: any }[] }[], unchanged: any[] }}
+ */
+export function mergeCharts(existing, incoming){
+  const list = importBase(existing);
+  const index = new Map(list.map((p, i) => [identityOf(p), i]));
+  const ids = new Set(list.map((p) => p.id));
+  const added = [];
+  const overwritten = [];
+  const unchanged = [];
+  for (const { chart, changes, status } of planImport(list, incoming)){
+    const at = index.get(identityOf(chart));
+    if (status === "same"){
+      unchanged.push(chart);
       continue;
     }
-    seen.add(key);
-    const c = { ...chart, id: ids.has(chart.id) ? newId() : chart.id };
+    if (status === "overwrite" && at !== undefined){
+      const before = list[at];
+      const after = { ...chart, id: before.id, isDefault: false };
+      list[at] = after;
+      overwritten.push({ before, after, changes });
+      continue;
+    }
+    const c = { ...chart, id: ids.has(chart.id) ? newId() : chart.id, isDefault: false };
     ids.add(c.id);
-    base.push(c);
+    index.set(identityOf(c), list.length);
+    list.push(c);
     added.push(c);
   }
-  return { list: base, added, duplicates };
+  return { list, added, overwritten, unchanged };
 }

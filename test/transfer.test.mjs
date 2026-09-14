@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildPayload, mergeCharts, parseCharts } from "../src/storage/transfer.js";
+import { buildPayload, diffChart, mergeCharts, parseCharts, planImport } from "../src/storage/transfer.js";
 import { parseBirthUTCFor } from "../src/core/time.js";
 
 const ada = {
@@ -131,12 +131,13 @@ test("junk is refused with a message rather than imported", () => {
   assert.throws(() => parseCharts(`{"format":"something/else","charts":[{"birthDate":"1990-01-01"}]}`), /different app/);
 });
 
-test("merging adds what is new, skips what is already here, and never collides ids", () => {
+test("merging adds what is new and never collides ids", () => {
   const existing = [{ ...ada }];
 
   const same = mergeCharts(existing, [ada, alan]);
   assert.deepEqual(same.added.map(p => p.name), ["Alan Turing"]);
-  assert.deepEqual(same.duplicates.map(p => p.name), ["Ada Lovelace"]);
+  assert.deepEqual(same.unchanged.map(p => p.name), ["Ada Lovelace"]);
+  assert.deepEqual(same.overwritten, []);
   assert.equal(same.list.length, 2);
 
   // Same id, different person: the incoming chart is rehomed, not dropped.
@@ -145,8 +146,110 @@ test("merging adds what is new, skips what is already here, and never collides i
   assert.notEqual(clash.list[1].id, "c_ada");
 });
 
+// The name is the key, so a corrected birth time arrives as a correction to the
+// chart already here rather than as a second chart of the same person.
+test("a chart with a name already here overwrites it in place", () => {
+  const existing = [{ ...alan }, { ...ada }];
+  const corrected = { ...ada, id: "c_elsewhere", birthTime: "13:15", placeLabel: "Paris, France" };
+
+  const { list, added, overwritten, unchanged } = mergeCharts(existing, [corrected]);
+  assert.deepEqual(added, []);
+  assert.deepEqual(unchanged, []);
+  assert.equal(overwritten.length, 1);
+  assert.equal(list.length, 2);
+
+  // Kept where it was, and still the same chart to everything else here.
+  const [, after] = list;
+  assert.equal(after.id, "c_ada");
+  assert.equal(after.birthTime, "13:15");
+  assert.equal(after.placeLabel, "Paris, France");
+  assert.equal(after.birthDate, ada.birthDate);
+  assert.equal(overwritten[0].before.birthTime, "12:00");
+  assert.equal(overwritten[0].after, after);
+});
+
+test("the name is matched past case and surrounding space", () => {
+  const { list, overwritten } = mergeCharts([{ ...ada }], [{ ...ada, name: "  ADA LOVELACE ", birthTime: "05:00" }]);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].birthTime, "05:00");
+  assert.deepEqual(overwritten[0].changes.map(c => c.key), ["name", "birthTime"]);
+});
+
+test("a diff names every field an import would change, and nothing else", () => {
+  assert.deepEqual(diffChart(ada, { ...ada }), []);
+  assert.deepEqual(
+    diffChart(ada, { ...ada, lat: 48.8566, lon: 2.3522, placeLabel: "Paris, France", tzName: "Europe/Paris" }).map(c => c.key),
+    ["placeLabel", "lat", "lon", "tzName"]
+  );
+  const [change] = diffChart(ada, { ...ada, birthTime: "13:15" });
+  assert.deepEqual(change, { key: "birthTime", from: "12:00", to: "13:15" });
+});
+
+test("a zone is compared by name where a record has one, by offset where it doesn't", () => {
+  // Nothing but the number to go on: the number is the zone.
+  const bare = { ...ada, tzName: "", tzOffset: 0 };
+  assert.deepEqual(diffChart(bare, { ...bare, tzOffset: 5.5 }).map(c => c.key), ["tzOffset"]);
+  // With a name on the record the offset follows from it, and a file states it
+  // in its own terms - the app's included, which is to say not at all.
+  assert.deepEqual(diffChart(ada, { ...ada, tzOffset: 5.5 }), []);
+  assert.deepEqual(diffChart(ada, { ...ada, tzName: "Europe/Paris" }).map(c => c.key), ["tzName"]);
+});
+
+// A chart sent to another device and brought back is the same chart: the dialog
+// must not offer to overwrite it with a worse-spelled copy of itself. AAF
+// rounds coordinates to arc seconds and has nowhere to put the commas in a
+// place label, and neither of those is a change to the chart.
+test("a chart that has been out through a file and back reads as unchanged", () => {
+  const here = {
+    ...ada, name: "Frida Kahlo", birthDate: "1907-07-06", birthTime: "08:30",
+    placeLabel: "Coyoacán, Mexico City, Mexico", lon: -99.1618, lat: 19.3467,
+    tzName: "America/Mexico_City"
+  };
+  const [back] = parseCharts(buildPayload([here]));
+  assert.notEqual(back.placeLabel, here.placeLabel);
+  assert.notEqual(back.lat, here.lat);
+  assert.deepEqual(diffChart(here, back), []);
+
+  const { added, overwritten, unchanged, list } = mergeCharts([here], [back]);
+  assert.deepEqual([added.length, overwritten.length, unchanged.length], [0, 0, 1]);
+  assert.deepEqual(list, [here]);
+});
+
+// The dialog marks every row before anything is written, and has to mark it the
+// way the merge will act.
+test("the plan says what each incoming chart would do", () => {
+  const plan = planImport([{ ...ada }], [
+    { ...ada, birthTime: "13:15" },
+    { ...ada, name: "Ada Lovelace", id: "c_third" },
+    alan
+  ]);
+  assert.deepEqual(plan.map(e => e.status), ["overwrite", "overwrite", "new"]);
+  assert.deepEqual(plan[0].changes.map(c => c.key), ["birthTime"]);
+  assert.equal(plan[0].before.id, "c_ada");
+  // A file naming the same person twice reads as an import onto an import, so
+  // the second record is measured against the first, not against what is here.
+  assert.deepEqual(plan[1].changes.map(c => c.key), ["birthTime"]);
+  assert.equal(plan[2].before, null);
+  assert.deepEqual(plan[2].changes, []);
+});
+
+test("a record that says what is already here changes nothing", () => {
+  const { list, added, overwritten, unchanged } = mergeCharts([{ ...ada }], [{ ...ada, id: "c_elsewhere" }]);
+  assert.deepEqual(added, []);
+  assert.deepEqual(overwritten, []);
+  assert.equal(unchanged.length, 1);
+  assert.deepEqual(list, [ada]);
+});
+
 test("an import over the seeded sample replaces it", () => {
   const seeded = [{ ...ada, name: "Elon Musk", isDefault: true }];
   const { list } = mergeCharts(seeded, [alan]);
   assert.deepEqual(list.map(p => p.name), ["Alan Turing"]);
+
+  // Even a chart of the same name as the sample arrives as a chart of one's
+  // own rather than as an edit to the app's placeholder.
+  const over = mergeCharts(seeded, [{ ...ada, name: "Elon Musk", birthTime: "07:30" }]);
+  assert.deepEqual(over.added.map(p => p.name), ["Elon Musk"]);
+  assert.equal(over.list.length, 1);
+  assert.equal(over.list[0].isDefault, false);
 });

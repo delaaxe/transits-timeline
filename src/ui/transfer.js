@@ -3,13 +3,16 @@
 // clipboard; importing reads AAF back from either. One dialog serves both ends,
 // because both ask the same question: which of these charts?
 import { chartsState, isDefaultChart, saveCharts } from "../storage/charts.js";
-import { buildPayload, mergeCharts, parseCharts, transferFileName, transferMimeType } from "../storage/transfer.js";
+import { buildPayload, mergeCharts, parseCharts, planImport, transferFileName, transferMimeType } from "../storage/transfer.js";
 import { el, setStatus } from "./dom.js";
 import { fmtBirthPretty } from "./format.js";
 
 // Three modes: the charts here (export), somewhere to paste or a file to open
-// (import), and the charts that turned out to hold (receive).
-const view = { mode: "export", charts: [], chosen: new Set() };
+// (import), and the charts that turned out to hold (receive). While receiving,
+// `plan` says what each of those charts would do to what is already here,
+// keyed by the chart's id.
+/** @type {{ mode: string, charts: any[], chosen: Set<string>, plan: Map<string, any> }} */
+const view = { mode: "export", charts: [], chosen: new Set(), plan: new Map() };
 
 // A birthplace is written out in full - district, city, region, country - which
 // is more than a line in a list can carry. The ends are what identify it.
@@ -20,6 +23,59 @@ function placeFor(p){
 }
 
 function subtitleFor(p){ return `${fmtBirthPretty(p.birthDate, p.birthTime)} · ${placeFor(p)}`; }
+
+const fieldLabels = {
+  name: "Name", birthDate: "Date", birthTime: "Time", placeLabel: "Place",
+  lat: "Latitude", lon: "Longitude", tzName: "Time zone", tzOffset: "UTC offset"
+};
+
+// A zone stated as a bare number: what AAF gives when a file names no zone.
+function fmtOffset(hours){
+  const total = Math.round(Math.abs(+hours || 0) * 60);
+  const sign = (+hours || 0) < 0 ? "-" : "+";
+  return `UTC${sign}${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function fieldText(key, value){
+  const n = +value;
+  switch (key){
+    case "birthDate": return fmtBirthPretty(value, "");
+    case "lat": return Number.isFinite(n) ? `${Math.abs(n).toFixed(4)}°${n < 0 ? "S" : "N"}` : "—";
+    case "lon": return Number.isFinite(n) ? `${Math.abs(n).toFixed(4)}°${n < 0 ? "W" : "E"}` : "—";
+    case "tzOffset": return fmtOffset(value);
+    default: return String(value ?? "").trim() || "—";
+  }
+}
+
+const badges = { new: "New", overwrite: "Overwrites", same: "Already here" };
+
+// An overwrite is the one thing here that destroys something, so it has to be
+// readable before it happens: every field that would change, old value beside
+// new. The rest of the record is untouched and is left off the row.
+function renderDiff(changes){
+  const box = document.createElement("div");
+  box.className = "transferDiff";
+  for (const { key, from, to } of changes){
+    const row = document.createElement("div");
+    row.className = "transferDiffRow";
+    const label = document.createElement("span");
+    label.className = "transferDiffField";
+    label.textContent = fieldLabels[key] || key;
+    const before = document.createElement("span");
+    before.className = "transferDiffFrom";
+    before.textContent = fieldText(key, from);
+    const arrow = document.createElement("span");
+    arrow.className = "transferDiffArrow";
+    arrow.textContent = "→";
+    arrow.setAttribute("aria-label", "becomes");
+    const after = document.createElement("span");
+    after.className = "transferDiffTo";
+    after.textContent = fieldText(key, to);
+    row.append(label, before, arrow, after);
+    box.appendChild(row);
+  }
+  return box;
+}
 
 function renderList(){
   const list = el.transferList;
@@ -39,10 +95,21 @@ function renderList(){
     const name = document.createElement("div");
     name.className = "transferItemName";
     name.textContent = p.name;
+    const entry = view.plan.get(p.id);
+    if (entry){
+      const badge = document.createElement("span");
+      badge.className = `transferBadge is-${entry.status}`;
+      badge.textContent = badges[entry.status];
+      name.append(" ", badge);
+    }
     const sub = document.createElement("div");
     sub.className = "transferItemSub";
     sub.textContent = subtitleFor(p);
     text.append(name, sub);
+    if (entry?.status === "overwrite"){
+      row.classList.add("hasDiff");
+      text.appendChild(renderDiff(entry.changes));
+    }
     row.append(box, text);
     list.appendChild(row);
   }
@@ -66,6 +133,22 @@ function exportable(){
   return chartsState.list.filter((chart) => !isDefaultChart(chart));
 }
 
+// What was found, and what it would do. The counts come from the same plan the
+// rows are marked from, so the summary and the list can't disagree.
+function receiveHint(){
+  const found = view.charts.length;
+  const counts = { new: 0, overwrite: 0, same: 0 };
+  for (const p of view.charts) counts[view.plan.get(p.id)?.status || "new"]++;
+  const parts = [];
+  if (counts.new) parts.push(`${counts.new} new`);
+  if (counts.overwrite) parts.push(`${counts.overwrite} overwriting a chart already here`);
+  if (counts.same) parts.push(`${counts.same} unchanged`);
+  const tail = counts.overwrite
+    ? " A chart is matched by name; an overwrite lists what it would change."
+    : "";
+  return `${found} chart${found === 1 ? "" : "s"} found: ${parts.join(", ")}.${tail}`;
+}
+
 function renderActions(){
   const n = view.chosen.size;
   const mode = view.mode;
@@ -76,7 +159,7 @@ function renderActions(){
     ? "Choose the charts to save as an AAF file, or to copy and paste somewhere else."
     : mode === "import"
       ? "Paste AAF data, or open an .aaf file - from here or from another astrology app."
-      : `${view.charts.length} chart${view.charts.length === 1 ? "" : "s"} found. Charts already here are skipped.`;
+      : receiveHint();
 
   el.transferConfirmBtn.textContent = mode === "export"
     ? `Download ${n} chart${plural}`
@@ -96,10 +179,13 @@ function renderActions(){
   el.transferModeBtn.hidden = mode === "receive" || (mode === "import" && exportable().length === 0);
 }
 
-function show(mode, charts){
+function show(mode, charts, plan){
   view.mode = mode;
   view.charts = charts;
-  view.chosen = new Set(charts.map((p) => p.id));
+  view.plan = new Map((plan || []).map((entry) => [entry.chart.id, entry]));
+  // Everything is ticked to begin with except the charts that would change
+  // nothing: importing those is work with no result, so they start off.
+  view.chosen = new Set(charts.filter((p) => view.plan.get(p.id)?.status !== "same").map((p) => p.id));
   resetCopyLabel();
   renderList();
   if (!el.transferDialog.open) el.transferDialog.showModal();
@@ -109,6 +195,7 @@ function showImport(){
   view.mode = "import";
   view.charts = [];
   view.chosen = new Set();
+  view.plan = new Map();
   el.transferPaste.value = "";
   el.transferFile.value = "";
   resetCopyLabel();
@@ -127,7 +214,10 @@ export function openTransferDialog(){
 }
 
 function readData(text){
-  try { show("receive", parseCharts(text)); }
+  try {
+    const charts = parseCharts(text);
+    show("receive", charts, planImport(chartsState.list, charts));
+  }
   catch (err){ el.transferHint.textContent = err?.message || "That data couldn't be read."; }
 }
 
@@ -158,13 +248,17 @@ async function copyData(){
 
 function doReceive(onChanged){
   const chosen = view.charts.filter((p) => view.chosen.has(p.id));
-  const { list, added, duplicates } = mergeCharts(chartsState.list, chosen);
+  const { list, added, overwritten, unchanged } = mergeCharts(chartsState.list, chosen);
   chartsState.list = list;
   saveCharts(list);
   el.transferDialog.close();
-  const skipped = duplicates.length ? `, ${duplicates.length} already here` : "";
-  setStatus(`Imported ${added.length} chart${added.length === 1 ? "" : "s"}${skipped}.`);
-  onChanged(added[0]?.id || "");
+  const parts = [`Imported ${added.length} chart${added.length === 1 ? "" : "s"}`];
+  if (overwritten.length) parts.push(`${overwritten.length} overwritten`);
+  if (unchanged.length) parts.push(`${unchanged.length} unchanged`);
+  setStatus(`${parts.join(", ")}.`);
+  // Whatever the import actually did, land on it: a chart brought up to date is
+  // as much the point of the import as one that is new.
+  onChanged(added[0]?.id || overwritten[0]?.after.id || "");
 }
 
 export function wireTransferUI(onChanged){

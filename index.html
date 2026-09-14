@@ -660,6 +660,44 @@
     .transferItemText{ min-width: 0; }
     .transferItemName{ font-size: 14px; }
     .transferItemSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* What an import would do to the chart already filed under this name. A
+       row carrying a diff is taller than a line, so its checkbox sits with the
+       name rather than floating in the middle of the changes. */
+    .transferItem.hasDiff{ align-items: flex-start; }
+    .transferItem.hasDiff input{ margin-top: 3px; }
+    .transferBadge{
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--hairline);
+      font-size: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      vertical-align: 1px;
+      white-space: nowrap;
+    }
+    .transferBadge.is-new{ color: var(--accent); border-color: rgba(242,228,190,.42); }
+    .transferBadge.is-overwrite{ color: var(--danger); border-color: rgba(255,107,94,.45); }
+    .transferDiff{ margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .transferDiffRow{
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) 12px minmax(0, 1fr);
+      align-items: baseline;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .transferDiffField{ color: var(--ink-faint); }
+    .transferDiffFrom{ color: var(--muted); text-decoration: line-through; overflow-wrap: anywhere; }
+    .transferDiffArrow{ color: var(--ink-faint); }
+    .transferDiffTo{ color: var(--ink-soft); overflow-wrap: anywhere; }
+    /* Narrow enough that four columns would leave a word per line, so the
+       change runs as a sentence instead and wraps where it must. */
+    @media (max-width: 460px){
+      .transferDiffRow{ display: block; }
+      .transferDiffRow > * + *{ margin-left: 6px; }
+    }
     .transferPaste{
       width: 100%;
       max-width: 100%;
