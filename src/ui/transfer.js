@@ -80,6 +80,10 @@ function renderDiff(changes){
 function renderList(){
   const list = el.transferList;
   list.innerHTML = "";
+  // An ordinary import brings in charts nobody here has, and marking every one
+  // of them New marks nothing out. The badges say which row is which, so they
+  // are worth the ink only where the rows differ.
+  const mixed = view.charts.some((p) => view.plan.get(p.id)?.status !== "new");
   for (const p of view.charts){
     const row = document.createElement("label");
     row.className = "transferItem";
@@ -96,7 +100,7 @@ function renderList(){
     name.className = "transferItemName";
     name.textContent = p.name;
     const entry = view.plan.get(p.id);
-    if (entry){
+    if (entry && mixed){
       const badge = document.createElement("span");
       badge.className = `transferBadge is-${entry.status}`;
       badge.textContent = badges[entry.status];
@@ -139,6 +143,9 @@ function receiveHint(){
   const found = view.charts.length;
   const counts = { new: 0, overwrite: 0, same: 0 };
   for (const p of view.charts) counts[view.plan.get(p.id)?.status || "new"]++;
+  const label = `${found} chart${found === 1 ? "" : "s"} found`;
+  // Nothing here to touch: how many there are is the whole of the news.
+  if (counts.new === found) return `${label}.`;
   const parts = [];
   if (counts.new) parts.push(`${counts.new} new`);
   if (counts.overwrite) parts.push(`${counts.overwrite} overwriting a chart already here`);
@@ -146,7 +153,7 @@ function receiveHint(){
   const tail = counts.overwrite
     ? " A chart is matched by name; an overwrite lists what it would change."
     : "";
-  return `${found} chart${found === 1 ? "" : "s"} found: ${parts.join(", ")}.${tail}`;
+  return `${label}: ${parts.join(", ")}.${tail}`;
 }
 
 function renderActions(){
