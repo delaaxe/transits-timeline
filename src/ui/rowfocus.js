@@ -27,6 +27,7 @@ import { setSelection } from "./bodies.js";
 import { el } from "./dom.js";
 import { fmtDatePretty } from "./format.js";
 import { onRowLabelClick, renderFromCache, revealFocusRow } from "./timeline.js";
+import { errorMessage } from "../core/errors.js";
 
 // A range wide enough to hold the whole of one contact, and no wider: a ten
 // degree orb on Pluto is a window measured in decades, and centring the view on
@@ -221,7 +222,7 @@ async function stepOccurrence(direction){
       : `${direction < 0 ? "Last" : "Next"} pass around ${when}, never quite exact`);
     await goToRange(to);
   } catch (err){
-    setFocusStatus(String(err?.message || err));
+    setFocusStatus(errorMessage(err));
   } finally {
     state.focusSearching = false;
     renderRowFocus();

@@ -17,6 +17,7 @@ import { fmtBirthPretty, fmtCoord } from "./format.js";
 import { wireChartReorder } from "./chart-drag.js";
 import { wireTransferUI } from "./transfer.js";
 import { isIOSLike } from "./tooltip.js";
+import { errorMessage } from "../core/errors.js";
 
 export function rangeSpanDays(){
   const start = parseLocalDateOnly(el.rangeStart.value);
@@ -481,7 +482,7 @@ export async function selectSuggestion(it){
     el.placeSearch.dataset.tzName = tzName;
     setStatus("Place set.");
   } catch (err){
-    setStatus(String(err?.message || err), true);
+    setStatus(errorMessage(err), true);
   }
 }
 
@@ -667,7 +668,7 @@ export function wireChartsUI(){
 
   $("saveChartBtn").addEventListener("click", () => {
     try { addChartFromForm(); }
-    catch (err){ setStatus(String(err?.message || err), true); }
+    catch (err){ setStatus(errorMessage(err), true); }
   });
 
   $("cancelAddBtn").addEventListener("click", () => {

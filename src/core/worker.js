@@ -3,6 +3,7 @@
 // only the wire between that and the main thread.
 
 import { computeTransitEvents } from "./job.js";
+import { errorMessage } from "./errors.js";
 
 // The DOM lib has no type for a worker's global scope, and it cannot be loaded
 // alongside one that does, so this is the one place the checker is told to
@@ -19,6 +20,6 @@ ctx.onmessage = (e) => {
     });
     ctx.postMessage({ id, type: "done", ...result });
   } catch (err){
-    ctx.postMessage({ id, type: "error", message: String(err?.message || err) });
+    ctx.postMessage({ id, type: "error", message: errorMessage(err) });
   }
 };

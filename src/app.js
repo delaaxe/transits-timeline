@@ -14,6 +14,7 @@ import { bootPresets, initCharts, readRuleOptions, renderPresetSection, wireAdva
 import { clearRowFocus, renderRowFocus, wireRowFocus } from "./ui/rowfocus.js";
 import { clearTimeline, renderFromCache, updateShowMore, visibleRowIndexOf, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
+import { errorMessage } from "./core/errors.js";
 
 export function maybeRefreshTimelineOnRefocus(){
   if (document.visibilityState === "hidden") return;
@@ -188,7 +189,7 @@ export async function updateTimeline(){
     setStatus(`Done • ${orbLabel} orb • ${totalMatches} matches`);
 
   } catch (err){
-    if (state.cancelRequested && String(err?.message || err) === "Cancelled"){
+    if (state.cancelRequested && errorMessage(err) === "Cancelled"){
       setStatus("Cancelled.");
       state.cachedResults = null;
       clearTimeline();
@@ -197,10 +198,10 @@ export async function updateTimeline(){
       return;
     }
     console.error(err);
-    setStatus(String(err?.message || err), true);
+    setStatus(errorMessage(err), true);
     state.cachedResults = null;
     clearTimeline();
-    setTimelineState(String(err?.message || err), "error");
+    setTimelineState(errorMessage(err), "error");
     updateShowMore(0, 0);
   } finally {
     state.isComputing = false;

@@ -225,7 +225,7 @@ function readData(text){
     const charts = parseCharts(text);
     show("receive", charts, planImport(chartsState.list, charts));
   }
-  catch (err){ el.transferHint.textContent = err?.message || "That data couldn't be read."; }
+  catch (err){ el.transferHint.textContent = (err instanceof Error && err.message) || "That data couldn't be read."; }
 }
 
 function selectedPayload(){
