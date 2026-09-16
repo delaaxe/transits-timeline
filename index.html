@@ -277,7 +277,7 @@
        it read as off was that it had no box: an underline hanging below the
        label and a caret sitting at its own height, next to four pills. It gets
        the chips' band and their padding instead, and the caret gets a gap. */
-    .viewBar > .viewBarToggle{
+    .viewBar .viewBarToggle{
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -289,10 +289,21 @@
       padding: 6px 8px;
       border-radius: 8px;
     }
-    .viewBar > .viewBarToggle:hover{ color: var(--ink); background: var(--hover); }
+    .viewBar .viewBarToggle:hover{ color: var(--ink); background: var(--hover); }
     /* Open reads as pressed: the chips' own active band, so the bar has one
        vocabulary rather than two. */
-    .viewBar > .viewBarToggle.active{ color: var(--ink); background: var(--hover); }
+    .viewBar .viewBarToggle.active{ color: var(--ink); background: var(--hover); }
+    /* The two switches travel together at the end of the bar. Tighter than the
+       bar's own gap, because they are a pair rather than two more items in the
+       row - and grouped rather than loose, or space-between would hand each of
+       them a share of the gap and leave one adrift in the middle. */
+    .viewBarTools{
+      display: flex;
+      align-items: center;
+      flex: none;
+      gap: 2px;
+      margin-left: auto;
+    }
     .optionsDrawer{
       display: flex;
       flex-direction: column;
@@ -759,7 +770,7 @@
          checkbox row's height rather than the chips'. */
       .bodyPresetBtn{ min-height: 30px; }
       .bodyModeBtn{ min-height: 34px; }
-      .viewBar > .viewBarToggle{ min-height: 40px; padding: 6px 8px; }
+      .viewBar .viewBarToggle{ min-height: 40px; padding: 6px 8px; }
       .linkBtn{ padding: 8px 0; }
       .checks label{ min-height: 32px; }
       /* Safari zooms the page in whenever it focuses a field set below 16px,
@@ -777,7 +788,7 @@
       body.scrolled{ --viewbar-min: 28px; }
       body.scrolled .viewBar{ padding-block: 2px; }
       body.scrolled .presetBtn{ padding-block: 4px; }
-      body.scrolled .viewBar > .viewBarToggle{ padding-block: 4px; }
+      body.scrolled .viewBar .viewBarToggle{ padding-block: 4px; }
     }
 
     /* A phone in landscape is under 400px tall: every row of chrome above the
@@ -794,7 +805,7 @@
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 36px; }
-      .viewBar > .viewBarToggle{ min-height: 36px; padding: 6px 8px; }
+      .viewBar .viewBarToggle{ min-height: 36px; padding: 6px 8px; }
       .linkBtn{ padding: 4px 0; }
       .optionsDrawer{ padding: var(--sp-2) var(--sp-3); gap: var(--sp-1); }
       .installHint{ display: none; }
@@ -1412,22 +1423,27 @@
 <div id="mainContent">
   <div class="viewBar" id="viewBar">
     <div id="presetButtons" class="presetButtons" role="listbox" aria-label="Preset"></div>
-    <!-- The range arrows have their own switch. Moving the window is a reading
-         gesture, not a setting, and it had been living behind the same button
-         as the orb and the body chooser - so getting to next week meant opening
-         a drawer full of things you did not come to change. -->
-    <button id="timelineNavToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Move the range" aria-label="Move the range">
-      <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M4 12h16M9 7l-5 5 5 5M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </button>
-    <button id="advancedToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Options" aria-label="Options">
-      <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M4 8h10M18 8h2M4 16h4M12 16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        <circle cx="16" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
-        <circle cx="10" cy="16" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
-      </svg>
-    </button>
+    <!-- Both switches in one group, so the bar's space-between has two things
+         to push apart rather than three to strand across it. They are a pair -
+         two icon buttons that open something - and they read as one. -->
+    <div class="viewBarTools">
+      <!-- The range arrows have their own switch. Moving the window is a
+           reading gesture, not a setting, and it had been living behind the
+           same button as the orb and the body chooser - so getting to next week
+           meant opening a drawer full of things you did not come to change. -->
+      <button id="timelineNavToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Move the range" aria-label="Move the range">
+        <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 12h16M9 7l-5 5 5 5M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button id="advancedToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Options" aria-label="Options">
+        <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 8h10M18 8h2M4 16h4M12 16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          <circle cx="16" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <circle cx="10" cy="16" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+        </svg>
+      </button>
+    </div>
     <div class="rowFocus" id="rowFocus" role="status" aria-live="polite" hidden>
       <div class="rowFocusMain">
         <span class="rowFocusTitle symbolGlyphText" id="rowFocusTitle"></span>
