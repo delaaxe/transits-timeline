@@ -85,9 +85,17 @@
          --viewbar-h is the measured result the date axis sticks below. Driving
          both from one value makes the ResizeObserver feed its own input, and a
          browser that coalesces that loop leaves the offset a few pixels short -
-         which shows as a strip of rows sliding under the bar. */
+         which shows as a strip of rows sliding under the bar.
+         The measurement is written inline on this element, so it beats the
+         declaration here; this is only what holds until it lands, and on a
+         phone that is long enough to be the page you see. Derived from the
+         parts rather than typed, because a typed number that is smaller than
+         the bar can ever be sits the axis over the bar's last few pixels and
+         cuts the preset chips in half. The touch value used to be 60px against
+         a bar that is never under 73. */
       --viewbar-min: 38px;
-      --viewbar-h: 52px;
+      --viewbar-pad: var(--sp-1);
+      --viewbar-h: calc(var(--viewbar-min) + 2 * var(--viewbar-pad) + 1px);
 
       --chart-pad: 8px;
       /* Sides only: this has to equal --chart-pad or the axis ticks stop
@@ -254,6 +262,14 @@
        elements that have to read as one plate: same surface, one border drawn
        around the outside of the set. The bar is sticky above the axis, which
        is why --viewbar-h exists - the axis sticks to the bottom edge of it. */
+    /* Where the view bar starts, marked so something can watch it. One pixel
+       tall and pulled straight back out of the flow, so it costs the layout
+       nothing and only exists to be observed. Created by wireViewBar. */
+    .viewBarSentinel{
+      height: 1px;
+      margin-bottom: -1px;
+      pointer-events: none;
+    }
     .viewBar{
       position: sticky;
       top: 0;
@@ -265,8 +281,10 @@
       gap: var(--sp-1) var(--sp-2);
       min-height: var(--viewbar-min);
       /* No box-sizing reset in this file, so this padding and the border are
-         added to --viewbar-min rather than contained by it. */
-      padding: var(--sp-1) var(--sp-2);
+         added to --viewbar-min rather than contained by it - which is the sum
+         --viewbar-h has to match, so the block padding is a token the two
+         share rather than a number written twice. */
+      padding: var(--viewbar-pad) var(--sp-2);
       background: var(--surface-solid);
       border: 1px solid var(--hairline);
       border-bottom: 0;
@@ -757,7 +775,6 @@
       :root{
         --timeline-nav-h: 44px;
         --viewbar-min: 60px;
-        --viewbar-h: 60px;
       }
       .timelineNavBtn{ min-width: 44px; min-height: 44px; }
       .presetBtn,
@@ -785,8 +802,7 @@
        bar gives back what it can. Fine pointers only: 44px targets are not
        negotiable on touch, and this is the case the desktop asked about. */
     @media (hover: hover) and (pointer: fine){
-      body.scrolled{ --viewbar-min: 28px; }
-      body.scrolled .viewBar{ padding-block: 2px; }
+      body.scrolled{ --viewbar-min: 28px; --viewbar-pad: 2px; }
       body.scrolled .presetBtn{ padding-block: 4px; }
       body.scrolled .viewBar .viewBarToggle{ padding-block: 4px; }
     }
@@ -796,12 +812,13 @@
        36px here, below the 44 this file uses everywhere else - a deliberate
        trade in the one orientation where height is the scarce thing. */
     @media (max-height: 520px){
-      :root{ --viewbar-min: 46px; }
+      :root{ --viewbar-min: 46px; --viewbar-pad: 2px; }
       .appBar{ padding: max(4px, env(safe-area-inset-top)) 0 4px; }
       .wordmark{ font-size: 13px; }
       .wordmark svg{ width: 17px; height: 17px; }
       .panel{ padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); }
-      .viewBar{ min-height: 46px; padding-block: 2px; }
+      /* min-height and the block padding both come from the tokens above, so
+         --viewbar-h follows this breakpoint without being told. */
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 36px; }

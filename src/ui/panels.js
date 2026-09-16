@@ -700,19 +700,65 @@ export function wireViewBar(){
   // Scrolled, the bar sheds a few pixels. The class flips once at the
   // threshold rather than on every frame, and the ResizeObserver above turns
   // the new height into the date axis's sticky offset by itself.
+  //
+  // The threshold is the bar reaching the top, not a distance down the page.
+  // Twenty-four pixels of scroll was the old test, and the bar does not start
+  // at the top: on a desktop it opens about a hundred and seventy pixels down,
+  // under the header and the chart panel. So a small scroll shrank it where it
+  // stood, in the middle of the page, with everything above it untouched - and
+  // it stayed shrunk for the whole hundred and fifty pixels before it had
+  // anything to be a header for.
+  //
+  // Asking the bar where it is cannot answer this. Stuck, its top reads zero
+  // however far past it the page has gone, so a one-pixel marker in the flow
+  // just above it carries the number instead. Everything that moves when the
+  // bar resizes is below the marker, so the marker itself never does.
+  //
+  // The two thresholds are not the same line, and that is the point. Compacting
+  // sheds eighteen pixels, the document loses the same eighteen, and at the end
+  // of a short page the browser claws the scroll position back by that much -
+  // which lifts the marker back over a single shared threshold and un-compacts,
+  // which gives the eighteen pixels back, which compacts again. Measured, with
+  // one threshold: on at a top of 0, off at 2, on at 0, the scroll position
+  // walking backwards each time. Putting the release further away than the bar
+  // can ever shed leaves the loop nothing to close through.
+  const SHED_MARGIN_PX = 24;
   let compact = false;
-  const syncCompact = () => {
-    const shouldCompact = window.scrollY > 24;
-    if (shouldCompact === compact) return;
-    compact = shouldCompact;
+  const setCompact = (next) => {
+    if (next === compact) return;
+    compact = next;
     document.body.classList.toggle("scrolled", compact);
     sync();
+  };
+
+  const sentinel = document.createElement("div");
+  sentinel.className = "viewBarSentinel";
+  sentinel.setAttribute("aria-hidden", "true");
+  bar.parentNode?.insertBefore(sentinel, bar);
+
+  const syncCompact = () => {
+    const top = sentinel.getBoundingClientRect().top;
+    if (!compact && top < -SHED_MARGIN_PX) setCompact(true);
+    else if (compact && top > 0) setCompact(false);
+  };
+
+  // One read per frame rather than one per scroll event: this measures, and a
+  // scroll fires far more often than the screen is drawn.
+  let queued = false;
+  const onScroll = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      syncCompact();
+    });
   };
 
   sync();
   syncCompact();
   window.addEventListener("resize", sync, { passive: true });
-  window.addEventListener("scroll", syncCompact, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+  window.addEventListener("scroll", onScroll, { passive: true });
   if ("ResizeObserver" in window) new ResizeObserver(sync).observe(bar);
 }
 
