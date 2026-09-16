@@ -10,6 +10,7 @@ import { computeTransitEvents } from "./job.js";
 /** @type {any} */
 const ctx = self;
 
+/** @param {MessageEvent} e */
 ctx.onmessage = (e) => {
   const { id, job } = e.data ?? {};
   try {

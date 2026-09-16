@@ -4,6 +4,7 @@ import { julianDay } from "./time.js";
 
 export const ephemerisAstronomy = ephNS.default ?? ephNS;
 
+/** @param {any} allPlanets the vendor ephemeris' own result object @param {string} planetKey */
 export function getPlanetLonFromAll(allPlanets, planetKey){
   const obs = allPlanets?.observed?.[planetKey];
   if (!obs || typeof obs.apparentLongitudeDd !== "number"){
@@ -12,6 +13,7 @@ export function getPlanetLonFromAll(allPlanets, planetKey){
   return wrap360(obs.apparentLongitudeDd);
 }
 
+/** @param {Date} dateObj */
 export function calcMeanNodeDeg(dateObj){
   const t = (julianDay(dateObj) - 2451545.0) / 36525.0;
   return wrap360(
@@ -23,6 +25,7 @@ export function calcMeanNodeDeg(dateObj){
   );
 }
 
+/** @param {any} allPlanets @param {string} planetKey @param {Date} dateObj */
 export function getBodyLonFromAll(allPlanets, planetKey, dateObj){
   if (planetKey === "node") return calcMeanNodeDeg(dateObj);
   return getPlanetLonFromAll(allPlanets, planetKey);
@@ -31,6 +34,7 @@ export function getBodyLonFromAll(allPlanets, planetKey, dateObj){
 // One body at one time. getAllPlanets computes every body whether or not the
 // caller wants it; the event scan asks for a single longitude many thousands of
 // times, and this returns the identical number for a fraction of the work.
+/** @param {string} planetKey @param {Date} dateObj @param {{lon:number, lat:number, height:number}} observer */
 export function getBodyLonAt(planetKey, dateObj, observer){
   if (planetKey === "node") return calcMeanNodeDeg(dateObj);
   const one = ephemerisAstronomy.getPlanet(planetKey, dateObj, observer.lon, observer.lat, observer.height);

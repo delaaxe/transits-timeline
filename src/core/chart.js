@@ -3,7 +3,10 @@ import { ephemerisAstronomy, getBodyLonFromAll } from "./ephemeris.js";
 import { gmstDeg, julianDay, meanObliquityDeg, parseBirthUTCFor } from "./time.js";
 import { order } from "../data/bodies.js";
 
+/** @typedef {import("./time.js").BirthMoment & {lon: number, lat: number}} BirthChart */
+
 // Mean sidereal time + mean obliquity.
+/** @param {Date} birthUTC @param {number} lonDeg east-positive */
 export function calcNatalMCDeg(birthUTC, lonDeg){
   const jd = julianDay(birthUTC);
   const t = (jd - 2451545.0) / 36525.0;
@@ -13,6 +16,7 @@ export function calcNatalMCDeg(birthUTC, lonDeg){
   return wrap360(radToDeg(lam));
 }
 
+/** @param {Date} birthUTC @param {number} lonDeg east-positive @param {number} latDeg */
 export function calcNatalAscDeg(birthUTC, lonDeg, latDeg){
   const jd = julianDay(birthUTC);
   const t = (jd - 2451545.0) / 36525.0;
@@ -29,17 +33,20 @@ export function calcNatalAscDeg(birthUTC, lonDeg, latDeg){
   return wrap360(radToDeg(ascRad));
 }
 
+/** @param {number} ascDeg @returns {string|null} */
 export function chartRulerFromAsc(ascDeg){
   const sign = Math.floor(wrap360(ascDeg) / 30); // 0=Aries..11=Pisces
   const rulers = ["mars","venus","mercury","moon","sun","mercury","venus","mars","jupiter","saturn","saturn","jupiter"]; // traditional
   return rulers[sign] || null;
 }
 
+/** @param {BirthChart} pA @param {BirthChart} pB */
 export function computeCompositeChart(pA, pB){
   const birthUTCA = parseBirthUTCFor(pA);
   const birthUTCB = parseBirthUTCFor(pB);
   const allA = ephemerisAstronomy.getAllPlanets(birthUTCA, pA.lon, pA.lat, 0);
   const allB = ephemerisAstronomy.getAllPlanets(birthUTCB, pB.lon, pB.lat, 0);
+  /** @type {Record<string, number>} */
   const lon = {};
   for (const k of order){
     // The angles are not in the ephemeris: they are computed from the birth

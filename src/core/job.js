@@ -40,9 +40,11 @@ function scopeOf(rule, jobMode){
 // wholesale rather than evicted an entry at a time.
 const CACHE_LIMIT = 200000;
 
+/** @param {{lon:number, lat:number, height:number}} observer */
 function makeLonReader(observer){
   const cache = new Map();
   let calls = 0;
+  /** @param {string} body @param {number} ms */
   const read = (body, ms) => {
     const key = `${body}|${ms}`;
     const hit = cache.get(key);
@@ -107,6 +109,7 @@ export function groupRules(rules, mode, natalLon){
   return [...groups.values()];
 }
 
+/** @param {string} scope @param {string} transit @param {string} natal */
 function speedCeiling(scope, transit, natal){
   const t = maxSpeedDegPerDay[transit] ?? 25;
   if (scope !== "world") return t;
@@ -130,8 +133,8 @@ export function computeTransitEvents(job, onProgress){
   for (let gi = 0; gi < groups.length; gi++){
     const g = groups[gi];
     const baseAt = (g.scope === "world")
-      ? (ms) => wrap180(lon.read(g.transit, ms) - lon.read(g.natal, ms))
-      : (ms) => lon.read(g.transit, ms);
+      ? (/** @type {number} */ ms) => wrap180(lon.read(g.transit, ms) - lon.read(g.natal, ms))
+      : (/** @type {number} */ ms) => lon.read(g.transit, ms);
 
     const perOffset = scanAspectWindows({
       offsets: g.offsets,

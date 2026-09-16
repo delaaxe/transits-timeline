@@ -26,7 +26,7 @@
 
 export const DAY_MS = 86400000;
 
-/** Signed angle in (-180, 180]. */
+/** Signed angle in (-180, 180]. @param {number} deg */
 export function wrap180(deg){
   const x = ((deg + 180) % 360 + 360) % 360;
   return x === 0 ? 180 : x - 180;
@@ -35,6 +35,7 @@ export function wrap180(deg){
 // A sextile is exact at +60 and at -60, and they are separate events. A
 // conjunction and an opposition each have only one target: wrap180(sep - 180)
 // and wrap180(sep + 180) are the same function.
+/** @param {number} angleDeg @returns {number[]} */
 export function aspectTargets(angleDeg){
   if (angleDeg === 0 || angleDeg === 180) return [angleDeg];
   return [angleDeg, -angleDeg];
@@ -170,6 +171,7 @@ export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, max
   // inside, and the exact hit always falls between two consecutive samples.
   const bandStepMs = Math.max(1000, (orb / speed) * DAY_MS);
 
+  /** @param {number} base @param {number} i */
   const fAt = (base, i) => wrap180(base - offsets[i]);
 
   let prevT = startMs;
@@ -213,7 +215,9 @@ export function scanAspectWindows({ offsets, orbDeg, startMs, endMs, baseAt, max
       const f = fAt(base, i);
       const before = prevF[i];
       const offset = offsets[i];
+      /** @param {number} x */
       const fOfT = (x) => wrap180(baseAt(x) - offset);
+      /** @param {number} x */
       const gOfT = (x) => Math.abs(wrap180(baseAt(x) - offset)) - orb;
       const inside = Math.abs(f) <= orb;
       const win = open[i];

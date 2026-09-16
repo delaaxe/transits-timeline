@@ -66,7 +66,11 @@ export function natalLongitudes(ctx, targets){
     }
     return out;
   }
+  // Neither branch above left, so this is a personal chart that is not a
+  // composite - the one case that has a birth moment. Saying so out loud beats
+  // a null reaching the ephemeris and failing several frames further down.
   const birthUTC = ctx.birthUTC;
+  if (!birthUTC) throw new Error("That chart has no birth moment to read.");
   const birthAllPlanets = ephemerisAstronomy.getAllPlanets(birthUTC, ctx.observer.lon, ctx.observer.lat, ctx.observer.height);
   for (const k of targets){
     if (k === "mc"){
@@ -87,5 +91,6 @@ export function natalLongitudes(ctx, targets){
 export function chartRulerKeyFor(ctx){
   if (ctx.mode === "world") return null;
   if (ctx.composite) return chartRulerFromAsc(ctx.composite.asc);
+  if (!ctx.birthUTC) return null;
   return chartRulerFromAsc(calcNatalAscDeg(ctx.birthUTC, ctx.observer.lon, ctx.observer.lat));
 }

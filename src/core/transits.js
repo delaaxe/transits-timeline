@@ -38,7 +38,7 @@ export function buildCandidateRules({ mode = "directed", transitBodies, natalBod
   return rules;
 }
 
-/** @returns {[string, string][]} */
+/** @param {string[]|undefined} transitBodies @param {string[]|undefined} natalBodies @returns {[string, string][]} */
 function directedPairs(transitBodies, natalBodies){
   // An angle is a place rather than a body: nothing is there to move, so it can
   // be aspected and never aspects.
@@ -55,6 +55,7 @@ function directedPairs(transitBodies, natalBodies){
  * appears on both sides - transiting Mars over the chart, and everything in the
  * chart over natal Mars - which between them is what "involving Mars" means.
  *
+ * @param {string[]|undefined} involvingBodies
  * @returns {[string, string][]}
  */
 function involvingPairs(involvingBodies){
@@ -62,6 +63,7 @@ function involvingPairs(involvingBodies){
   /** @type {[string, string][]} */
   const pairs = [];
   const seen = new Set();
+  /** @param {string} tp @param {string} np */
   const add = (tp, np) => {
     if (isAngle(tp)) return;
     const key = `${tp}|${np}`;

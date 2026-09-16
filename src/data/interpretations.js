@@ -1,7 +1,12 @@
+// Keyed by the rule key the tooltip asks with; a miss is an empty string, not
+// an error, because the prose may simply not have landed yet.
+/** @type {Record<string, string>} */
 export let aspectDescriptions = {};
 
+/** @type {Record<string, string>} */
 export let mythDescriptions = {};
 
+/** @type {Record<string, string>} */
 export let worldDescriptions = {};
 
 // Batches of prose that have landed. The files are independent, so none waits
@@ -30,16 +35,20 @@ export function loadInterpretations(){
   return loading;
 }
 
-/** Runs `fn` as each batch lands, and once straight away if any already has. */
+/** Runs `fn` as each batch lands, and once straight away if any already has.
+ * @param {() => void} fn */
 export function onInterpretationsArrived(fn){
   listeners.push(fn);
   if (arrived > 0) fn();
 }
 
+/** @param {string} key */
 export function aspectDescription(key){ return aspectDescriptions[key] || ""; }
 
+/** @param {string} key */
 export function mythDescription(key){ return mythDescriptions[key] || ""; }
 
+/** @param {string} key */
 export function worldDescription(key){ return worldDescriptions[key] || ""; }
 
 /**
@@ -47,6 +56,7 @@ export function worldDescription(key){ return worldDescriptions[key] || ""; }
  * resolves empty rather than rejecting: the tooltip then shows no prose instead
  * of no tooltip.
  * @param {string} name @param {string} label
+ * @returns {Promise<Record<string, string>>}
  */
 async function loadJson(name, label){
   try{

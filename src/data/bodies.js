@@ -39,6 +39,7 @@ export const planetSymbols = {
 // re-measures a sample of them so a wrong one fails rather than quietly losing
 // transits. This library's longitudes are geocentric, so none of it depends on
 // where the observer is.
+/** @type {Record<string, number>} */
 export const maxSpeedDegPerDay = {
   sun: 1.05,      // 1.020
   moon: 15.6,     // 15.389
@@ -109,10 +110,11 @@ export const maxSeparationDeg = {
   "mercury-venus": 76
 };
 
-/** The widest these two can get apart in the sky, or Infinity if unbounded. */
+/** The widest these two can get apart in the sky, or Infinity if unbounded.
+ * @param {string} a @param {string} b @returns {number} */
 export function maxSeparation(a, b){
   const key = (orderMap.get(a) ?? 0) <= (orderMap.get(b) ?? 0) ? `${a}-${b}` : `${b}-${a}`;
-  return maxSeparationDeg[key] ?? Infinity;
+  return (/** @type {Record<string, number>} */ (maxSeparationDeg))[key] ?? Infinity;
 }
 
 /** @type {[string, string, number][]} */
@@ -150,15 +152,18 @@ export const transitingKeys = order.filter(k => !angleKeys.includes(k));
 
 export const natalKeys = [...order];
 
+/** @param {string} key */
 export function isAngle(key){ return angleKeys.includes(key); }
 
-/** A body list in chart order, with repeats and unknown keys dropped. */
+/** A body list in chart order, with repeats and unknown keys dropped.
+ * @param {string[]|undefined|null} list @returns {string[]} */
 export function normalizeBodies(list){
   const wanted = new Set(list ?? []);
   return order.filter(k => wanted.has(k));
 }
 
-/** Whether two lists name the same bodies, in whatever order they were given. */
+/** Whether two lists name the same bodies, in whatever order they were given.
+ * @param {string[]|undefined|null} a @param {string[]|undefined|null} b */
 export function sameBodies(a, b){
   const x = normalizeBodies(a);
   const y = normalizeBodies(b);
@@ -182,12 +187,16 @@ export const bodyPresets = [
   ["all",       "All",       [...order]]
 ];
 
+/** @param {string} key */
 export function planetLabel(key){ return planets.find(p => p[0] === key)?.[1] ?? key; }
 
+/** @param {string} key @returns {number} */
 export function aspectAngle(key){ return aspects.find(a => a[0] === key)?.[2] ?? 0; }
 
+/** @param {string} key */
 export function aspectSymbol(key){ return aspects.find(a => a[0] === key)?.[1]?.split(" ")[0] ?? "•"; }
 
+/** @param {string} a @param {string} b */
 export function mythKeyFor(a, b){
   const pa = String(a || "");
   const pb = String(b || "");
@@ -207,11 +216,13 @@ export const summaryTailOrder = ["asc","mc","node"];
 
 export const summaryPointSymbols = { asc: "Ac", mc: "Mc" };
 
+/** @param {number} deg */
 export function zodiacSignSymbol(deg){
   const idx = Math.floor(wrap360(deg) / 30) % 12;
   return signSymbols[idx] || "";
 }
 
+/** @param {number} deg */
 export function zodiacSign(deg){
   const signs = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
   const idx = Math.floor(wrap360(deg) / 30) % 12;
@@ -230,6 +241,7 @@ export function zodiacSign(deg){
  * Not the key the prose is filed under - that is the pairing alone, and each
  * scope has its own file to look it up in.
  */
+/** @param {{scope?: string, transit: string, aspect: string, natal: string}|null|undefined} rule */
 export function ruleKey(rule){
   return rule ? `${rule.scope ?? "personal"}-${rule.transit}-${rule.aspect}-${rule.natal}` : "";
 }

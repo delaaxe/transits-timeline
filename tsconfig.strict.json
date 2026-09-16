@@ -1,0 +1,13 @@
+{
+  // The ratchet. noImplicitAny is on for the directories listed here and off
+  // everywhere else, so the parts of the app that are fully typed stay that way
+  // without having to type src/ui in one go. Moving a directory into this list
+  // is the unit of work; the list only ever grows.
+  //
+  // Files these import are checked too, whether or not they are listed - which
+  // is why src/ui/svg.js and src/ui/dom.js have to come along with src/state.js
+  // when it joins.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noImplicitAny": true },
+  "include": ["src/core/**/*.js", "src/data/**/*.js"]
+}
