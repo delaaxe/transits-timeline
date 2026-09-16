@@ -11,6 +11,7 @@ import { $, debounce, el, escapeHTML, installHint, installHintText, setStatus } 
 import { getCheckedAspects, renderAspectChecks } from "./aspects.js";
 import { applyBodySets, renderBodyPicker, selectedBodies } from "./bodies.js";
 import { clearRowFocus } from "./rowfocus.js";
+import { slide } from "./slide.js";
 import { renderFromCache } from "./timeline.js";
 import { fmtBirthPretty, fmtCoord } from "./format.js";
 import { wireChartReorder } from "./chart-drag.js";
@@ -58,23 +59,39 @@ export function expandRange(direction){
  * gives the row a taller value on a touch screen, and a number written here
  * would overwrite that.
  *
- * @param {boolean} isVisible
+ * The corner block's height is set at the open end of the slide and cleared at
+ * the closed end, so it is never briefly too short - which would let the label
+ * column show through the axis. Briefly too tall costs nothing: the axis block
+ * around it clips.
+ *
+ * @param {boolean} isVisible @param {{animate?:boolean}} [opts]
  */
-export function setRangeNavVisible(isVisible){
+export function setRangeNavVisible(isVisible, { animate = true } = {}){
   setShowRangeNav(isVisible);
   const on = state.showRangeNav;
-  if (el.timelineNav) el.timelineNav.hidden = !on;
   if (on) document.documentElement.style.removeProperty("--timeline-nav-total");
-  else document.documentElement.style.setProperty("--timeline-nav-total", "0px");
   if (el.timelineNavToggle){
     el.timelineNavToggle.setAttribute("aria-expanded", on ? "true" : "false");
     // The same band the preset chips take when they are on, which is how the
     // options button beside it says the same thing.
     el.timelineNavToggle.classList.toggle("active", on);
   }
-  // The arrows sit inside the sticky axis block, so showing them changes how
-  // tall it is and how far the chart has to travel under it.
-  if (state.cachedResults) renderFromCache(state.currentMaxRows);
+
+  // The first call of the session is the stored setting being applied rather
+  // than a button being pressed, and a panel sliding out of a page that has not
+  // finished arriving is a different thing from one answering a tap.
+  const settle = () => {
+    if (!on) document.documentElement.style.setProperty("--timeline-nav-total", "0px");
+    // The arrows sit inside the sticky axis block, so showing them changes how
+    // tall it is and how far the chart has to travel under it.
+    if (state.cachedResults) renderFromCache(state.currentMaxRows);
+  };
+  if (!animate){
+    if (el.timelineNav) el.timelineNav.hidden = !on;
+    settle();
+    return Promise.resolve();
+  }
+  return slide(el.timelineNav, on).then(settle);
 }
 
 export function wireRangeNav(){
@@ -82,7 +99,7 @@ export function wireRangeNav(){
   if (el.rangeShiftForward) el.rangeShiftForward.addEventListener("click", () => shiftRange(1));
   if (el.rangeExpandBack) el.rangeExpandBack.addEventListener("click", () => expandRange(-1));
   if (el.rangeExpandForward) el.rangeExpandForward.addEventListener("click", () => expandRange(1));
-  setRangeNavVisible(state.showRangeNav);
+  setRangeNavVisible(state.showRangeNav, { animate: false });
   if (el.timelineNavToggle){
     el.timelineNavToggle.addEventListener("click", () => setRangeNavVisible(!state.showRangeNav));
   }
@@ -103,10 +120,17 @@ export function readRuleOptions(){
 
 export let advancedVisible = false;
 
-export function setAdvancedVisible(isVisible){
+/** @param {boolean} isVisible @param {{animate?:boolean}} [opts] */
+export function setAdvancedVisible(isVisible, { animate = true } = {}){
   advancedVisible = !!isVisible;
   const nodes = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-advanced]"));
-  for (const n of nodes) n.hidden = !advancedVisible;
+  // The drawer slides out from under the button that opened it. Everything here
+  // is a panel of its own, so they each get their own slide rather than a
+  // wrapper being animated around them.
+  for (const n of nodes){
+    if (animate) slide(n, advancedVisible);
+    else n.hidden = !advancedVisible;
+  }
   if (el.advancedToggle){
     el.advancedToggle.setAttribute("aria-expanded", advancedVisible ? "true" : "false");
     // Sliders rather than a word: this sits in the view bar beside four preset
@@ -693,7 +717,7 @@ export function wireViewBar(){
 }
 
 export function wireAdvancedUI(){
-  setAdvancedVisible(false);
+  setAdvancedVisible(false, { animate: false });
   el.advancedToggle.addEventListener("click", () => {
     setAdvancedVisible(!advancedVisible);
   });
