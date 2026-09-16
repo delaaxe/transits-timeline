@@ -13,6 +13,11 @@ import { aspectAngle, isAngle, maxSkySeparation, natalKeys, normalizeBodies, tra
  * the chart, so asking for it would be asking for a field whose only sensible
  * answer is "all of it".
  *
+ * Every rule is stamped with the scope it was built for, because a chart can
+ * now hold both kinds at once: the sky rows sit among the natal ones, and by
+ * the time a rule reaches the scan there is nothing else about it that says
+ * which of the two questions it came from.
+ *
  * @param {{mode?:"directed"|"involving", transitBodies?:string[],
  *          natalBodies?:string[], involvingBodies?:string[],
  *          aspects:string[], orb:number}} opts
@@ -22,11 +27,12 @@ export function buildCandidateRules({ mode = "directed", transitBodies, natalBod
     ? involvingPairs(involvingBodies)
     : directedPairs(transitBodies, natalBodies);
 
+  /** @type {import("./job.js").Rule[]} */
   const rules = [];
   for (const [tp, np] of pairs){
     for (const asp of aspects){
       if (tp === "node" && asp !== "conjunction") continue;
-      rules.push({ transit: tp, natal: np, aspect: asp, orb });
+      rules.push({ transit: tp, natal: np, aspect: asp, orb, scope: "personal" });
     }
   }
   return rules;
@@ -75,10 +81,15 @@ function involvingPairs(involvingBodies){
  * ends move, so a pair has no direction and each is generated once, in chart
  * order.
  *
+ * These carry scope "world", which is what tells the scan to read both ends as
+ * moving and the chart to read the row as a meeting in the sky rather than a
+ * contact with a birth chart.
+ *
  * @param {{bodies:string[], aspects:string[], orb:number}} opts
  */
 export function buildSkyRules({ bodies, aspects, orb }){
   const sky = normalizeBodies(bodies).filter(k => !isAngle(k));
+  /** @type {import("./job.js").Rule[]} */
   const rules = [];
   for (let i=0; i<sky.length; i++){
     for (let j=i+1; j<sky.length; j++){
@@ -87,7 +98,7 @@ export function buildSkyRules({ bodies, aspects, orb }){
         // An aspect the pair can never reach is not a transit that never fires,
         // it is a scan of the whole range looking for nothing.
         if (aspectAngle(asp) - orb > maxSkySeparation(sky[i], sky[j])) continue;
-        rules.push({ transit: sky[i], aspect: asp, natal: sky[j], orb });
+        rules.push({ transit: sky[i], aspect: asp, natal: sky[j], orb, scope: "world" });
       }
     }
   }

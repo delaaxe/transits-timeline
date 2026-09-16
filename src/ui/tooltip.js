@@ -1,6 +1,5 @@
 import { transitTimingFor } from "../data/bodies.js";
 import { aspectDescription, mythDescription, worldDescription } from "../data/interpretations.js";
-import { state } from "../state.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
 
@@ -163,23 +162,27 @@ let shownArgs = null;
 
 export function refreshTooltipContent(){
   if (tooltip.style.display !== "block" || !shownArgs) return;
-  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any]} */ (shownArgs)));
+  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,"personal"|"world"]} */ (shownArgs)));
 }
 
 /**
  * `descKey` and `mythKey` are looked up here rather than passed as text, so a
  * redraw picks up prose that was not loaded when the bar was drawn.
+ *
+ * `scope` comes from the row rather than from the mode the app is in, because a
+ * personal chart carries both kinds of row at once: the bar above this one can
+ * be a natal contact and this one a meeting in the sky.
  */
-export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData){
-  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData];
+export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope="personal"){
+  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope];
   // Two bodies meeting in the sky is not the same event as one of them crossing
-  // a place in a birth chart, so world mode reads from its own file rather than
+  // a place in a birth chart, so a sky row reads from its own file rather than
   // from natal prose written in the second person about "your natal Neptune".
-  const isWorld = state.appMode === "world";
+  const isWorld = scope === "world";
   const desc = isWorld ? worldDescription(descKey) : aspectDescription(descKey);
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There
-  // is no timing note in world mode: the figure that matters there is how often
+  // is no timing note on a sky row: the figure that matters there is how often
   // the pair meets, which is per-pair rather than per-body, and each world entry
   // carries it in its own words.
   const timing = isWorld ? "" : transitTimingFor(String(descKey).split("-")[0]);
@@ -275,8 +278,8 @@ export function isCoarsePointer(){
   return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
-export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null){
-  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData);
+export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, scope="personal"){
+  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope);
   tooltip.style.display = "block";
   tooltip.style.visibility = "hidden";
   tooltip.classList.toggle("popup", !!popupMode);

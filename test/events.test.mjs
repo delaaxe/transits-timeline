@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DAY_MS, aspectTargets, brentRoot, isLeadingStub, scanAspectWindows, wrap180 } from "../src/core/events.js";
-import { computeTransitEvents } from "../src/core/job.js";
+import { computeTransitEvents, groupRules } from "../src/core/job.js";
 import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
 import { ephemerisAstronomy, getBodyLonAt, getBodyLonFromAll } from "../src/core/ephemeris.js";
@@ -297,6 +297,59 @@ test("world mode scans both ends of the pair", async () => {
     }
   }
   assert.ok(checked > 5, `expected several exact sky aspects, got ${checked}`);
+});
+
+// The scope lives on the rule rather than on the job, which is what lets a
+// personal chart carry the sky in the same scan. The property that has to hold
+// is that folding them together changes nothing about either: one mixed job
+// answers exactly what two separate jobs answer.
+test("a job carrying both scopes answers the same as the two jobs apart", async () => {
+  const shared = ["mars","jupiter","saturn"];
+  const natalLon = natalLonFor(new Date("1985-07-13T16:45:00Z"));
+  const aspects = ["conjunction","square","opposition"];
+  // Deliberately overlapping bodies: a natal contact on transiting Mars and a
+  // Mars/Saturn meeting in the sky are the pair that would collide if the
+  // groups were still keyed on the bodies alone.
+  const personalRules = buildCandidateRules({
+    transitBodies: shared, natalBodies: [...shared, "sun","venus"], aspects, orb: 1
+  });
+  const skyRules = buildSkyRules({ bodies: [...shared, "sun","venus"], aspects, orb: 1 });
+  const range = { startMs: Date.UTC(2026, 0, 1), endMs: Date.UTC(2026, 6, 1), observer: OBSERVER };
+
+  const personalAlone = computeTransitEvents({ ...range, natalLon, rules: personalRules });
+  const skyAlone = computeTransitEvents({ ...range, natalLon: null, rules: skyRules });
+  const together = computeTransitEvents({ ...range, natalLon, rules: [...personalRules, ...skyRules] });
+
+  assert.ok(personalAlone.rules.length > 0 && skyAlone.rules.length > 0, "both halves should find something");
+  assert.deepEqual(
+    together.rules,
+    [...personalAlone.rules, ...skyAlone.rules],
+    "the mixed job should keep every rule the two jobs kept, and keep them in the order they were given"
+  );
+  assert.deepEqual(together.events, [...personalAlone.events, ...skyAlone.events]);
+});
+
+// Two scans, not one: a sky rule reads a separation and a natal rule reads a
+// longitude, so the pair that shares three words shares nothing else.
+test("a sky pair and a natal contact on the same bodies stay separate scans", async () => {
+  const natalLon = { saturn: 0 };
+  const rules = [
+    { transit: "mars", natal: "saturn", aspect: "conjunction", orb: 1, scope: "personal" },
+    { transit: "mars", natal: "saturn", aspect: "conjunction", orb: 1, scope: "world" }
+  ];
+  const groups = groupRules(rules, undefined, natalLon);
+  assert.equal(groups.length, 2, "one group each, keyed by scope as well as by bodies");
+  assert.deepEqual(groups.map(g => g.scope).sort(), ["personal","world"]);
+  for (const g of groups) assert.equal(g.members.length, 1, "neither rule should have joined the other's group");
+});
+
+// The old shape: rules with no stamp take the job's mode, which is what the
+// occurrence search still sends and what the tests above are written in.
+test("an unstamped rule falls back to the job's mode", async () => {
+  const bare = [{ transit: "mars", natal: "saturn", aspect: "conjunction", orb: 1 }];
+  assert.equal(groupRules(bare, "world", null)[0].scope, "world");
+  assert.equal(groupRules(bare, "personal", { saturn: 0 })[0].scope, "personal");
+  assert.equal(groupRules(bare, undefined, { saturn: 0 })[0].scope, "personal", "and personal when the job says nothing either");
 });
 
 test("the scan reaches exact times for a fraction of what sampling to them costs", async () => {

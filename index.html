@@ -48,6 +48,14 @@
          colour saying "this is the one you asked about" - the same band the
          chips take when they are on. */
       --focus-band: rgba(242,228,190,.13);
+      /* A row of the sky rather than a row of the chart, banded in the label
+         column only. Cool where the focus band is warm, so the two never read
+         as the same thing, and faint enough that five of them among thirteen
+         are a texture rather than a second chart. A band because the column is
+         a fixed width with the long pairings already overrunning it: a marker
+         made of text would push them further out, and one drawn at the edge
+         would sit under the very labels it is there to sort. */
+      --sky-band: rgba(150,196,255,.085);
 
       /* Spacing: 6 / 10 / 16 / 24, replacing a mix of six ad-hoc values. */
       --sp-1: 6px;
@@ -994,6 +1002,31 @@
       overflow: hidden;
     }
     .bodyPicker.oneList .bodyPane{ grid-column: 1 / -1; }
+    /* The sky is a third question rather than a third end, so it sits under the
+       pair on its own line with a rule above it, instead of taking a column
+       beside them and implying it is one of the two sides of a transit. */
+    .bodyPicker .skyPane{
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--hairline);
+      padding-top: var(--sp-3);
+    }
+    /* A heading that is also a switch. The checkbox sits on the baseline of the
+       small caps rather than towering over them, which is the whole reason this
+       is not just a .checks label. */
+    .skyPaneTitle{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .skyPaneTitle input[type="checkbox"]{
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--star);
+    }
+    .skyPaneTitle:hover{ color: var(--ink-soft); }
     .bodyModeBtn{
       padding: 4px 10px;
       border: 0;
@@ -1425,6 +1458,20 @@
         <div class="bodyPaneTitle">Natal points</div>
         <div class="bodyPresets" id="natalBodyPresets"></div>
         <div class="bodyChips" id="natalBodyChips" role="group" aria-label="Natal points"></div>
+      </div>
+      <!-- The sky, folded into a personal chart. The switch is the heading
+           rather than a checkbox somewhere else in the drawer: what it turns on
+           is the list under it, and a control sitting on top of its own effect
+           needs no label explaining what it does. -->
+      <div class="bodyPane skyPane" id="skyPane">
+        <label class="bodyPaneTitle skyPaneTitle" for="showWorldRows">
+          <input id="showWorldRows" type="checkbox" checked />
+          <span>Also in the sky</span>
+        </label>
+        <div id="skyPaneBody">
+          <div class="bodyPresets" id="skyBodyPresets"></div>
+          <div class="bodyChips" id="skyBodyChips" role="group" aria-label="Bodies in the sky"></div>
+        </div>
       </div>
     </div>
 

@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { angleKeys, bodyPresets, natalKeys, normalizeBodies, order, sameBodies, transitingKeys } from "../src/data/bodies.js";
+import { angleKeys, bodyPresets, natalKeys, normalizeBodies, order, ruleKey, sameBodies, transitingKeys } from "../src/data/bodies.js";
 import { presets } from "../src/data/presets.js";
 import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
 
@@ -122,4 +122,35 @@ test("every preset names bodies that exist, on ends that can hold them", () => {
     assert.ok(p.world.bodies.length >= 2, `"${p.label}" cannot make a sky aspect out of one body`);
     assert.ok(p.transit.length > 0 && p.natal.length > 0, `"${p.label}" would draw nothing`);
   }
+});
+
+// A chart can now hold both kinds of row at once, so which question a rule came
+// from has to travel on the rule: by the time one reaches the scan there is
+// nothing else about it that says.
+test("a rule carries the question it was built for", () => {
+  const opts = { aspects: ["square"], orb: 1 };
+  const personal = buildCandidateRules({ transitBodies: ["mars"], natalBodies: ["saturn"], ...opts });
+  const involving = buildCandidateRules({ mode: "involving", involvingBodies: ["mars"], ...opts });
+  const sky = buildSkyRules({ bodies: ["mars", "saturn"], ...opts });
+
+  assert.ok(personal.length > 0 && involving.length > 0 && sky.length > 0);
+  assert.ok(personal.every(r => r.scope === "personal"), "a natal contact is personal");
+  assert.ok(involving.every(r => r.scope === "personal"), "and so is one asked about the other way round");
+  assert.ok(sky.every(r => r.scope === "world"), "a meeting in the sky is not");
+});
+
+// The two rules below are the same three words. The row key is what keeps the
+// followed one from lighting both.
+test("the same pairing in the sky and in a chart are different rows", () => {
+  const sky = buildSkyRules({ bodies: ["mars", "saturn"], aspects: ["square"], orb: 1 })[0];
+  const natal = buildCandidateRules({
+    transitBodies: ["mars"], natalBodies: ["saturn"], aspects: ["square"], orb: 1
+  })[0];
+
+  assert.equal(`${sky.transit}-${sky.aspect}-${sky.natal}`, `${natal.transit}-${natal.aspect}-${natal.natal}`,
+    "the pairing the prose is filed under is the same for both");
+  assert.notEqual(ruleKey(sky), ruleKey(natal), "but the row they name is not");
+  assert.equal(ruleKey({ ...natal, scope: undefined }), ruleKey(natal),
+    "an unstamped rule is a personal one, so a followed row survives the change");
+  assert.equal(ruleKey(null), "");
 });

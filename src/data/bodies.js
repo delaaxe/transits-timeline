@@ -218,7 +218,18 @@ export function zodiacSign(deg){
   return signs[idx] || "";
 }
 
-/** The key a rule is known by everywhere prose is looked up. */
+/**
+ * The key a row is known by, which is how the followed row is told from the
+ * other fifty-nine.
+ *
+ * The scope is part of it because a chart can hold both kinds at once: Mars
+ * square Saturn in the sky and transiting Mars square a natal Saturn are the
+ * same three words and two different rows, and without the scope following one
+ * of them would light both.
+ *
+ * Not the key the prose is filed under - that is the pairing alone, and each
+ * scope has its own file to look it up in.
+ */
 export function ruleKey(rule){
-  return rule ? `${rule.transit}-${rule.aspect}-${rule.natal}` : "";
+  return rule ? `${rule.scope ?? "personal"}-${rule.transit}-${rule.aspect}-${rule.natal}` : "";
 }

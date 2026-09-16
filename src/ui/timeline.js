@@ -525,15 +525,39 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 
   const labelX = labelW - 8;
   const focusKey = ruleKey(state.focusRule);
+  // The band tells a sky row from a natal one, so it is worth drawing only
+  // where the chart holds both. World mode is every row the same, and so is a
+  // personal chart narrowed until nothing but the sky is left: banding all of
+  // them says nothing and costs the column its quiet.
+  const mixedScopes = rules.some(r => r.scope === "world") && rules.some(r => r.scope !== "world");
 
   for (let idx=0; idx<rules.length; idx++){
     const r = rules[idx];
     const y = rowsY0 + idx*(rowH+rowGap);
     const isFocused = focusKey && ruleKey(r) === focusKey;
+    const isWorldRow = r.scope === "world";
     if (isFocused){
       svg.appendChild(svgEl("rect", {
         x: 0, y, width: labelW, height: rowH,
         fill: "var(--focus-band)", "pointer-events": "none"
+      }));
+    }
+    // Which sky a row belongs to, said in no characters at all.
+    //
+    // A leading glyph was the obvious marker and the wrong one: the column is a
+    // fixed 130px on a phone, nothing measures or truncates, and "Neptune △
+    // Neptune" already overruns it - so a marker made of text would push the
+    // longest pairings further out of their own column, and one drawn at its
+    // edge would sit under them. The band is behind everything and spans the
+    // whole column, so it reads the same whatever the label is doing, and it
+    // survives the narrowing into glyphs that a sideways scroll puts the column
+    // through. A focused sky row keeps the focus band instead: it is being
+    // followed first and a sky row second.
+    const bandSky = isWorldRow && mixedScopes && !isFocused;
+    if (bandSky){
+      svg.appendChild(svgEl("rect", {
+        x: 0, y, width: labelW, height: rowH,
+        fill: "var(--sky-band)", "pointer-events": "none"
       }));
     }
     const t = svgEl("text", {
@@ -543,7 +567,10 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
       // Colour rather than weight: these labels are already as wide as the
       // column allows, and bold costs a character off the front of the long
       // ones. The band behind it is doing most of the work anyway.
-      fill: isFocused ? "var(--accent)" : "var(--text)",
+      // A banded row is dimmed with it, so the two say one thing together. On a
+      // chart that is all sky there is nothing to contrast with, and the rows
+      // take the ordinary colour.
+      fill: isFocused ? "var(--accent)" : (bandSky ? "var(--muted)" : "var(--text)"),
       "text-anchor":"end"
     });
 
@@ -552,7 +579,10 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
     const parts = [
       { text: transitLabel + " " },
       { text: aspectSymbol(r.aspect) + " " },
-      { text: natalLabel, underline: (!useSymbols && chartRuler && r.natal === chartRuler) }
+      // The underline says "this is your chart's ruler", which a body in the
+      // sky is not - it is only the far end of a pair that happens to share a
+      // name with it.
+      { text: natalLabel, underline: (!useSymbols && !isWorldRow && chartRuler && r.natal === chartRuler) }
     ];
 
     for (const p of parts){
@@ -574,7 +604,9 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
       class: "rowLabelHit"
     });
     const title = document.createElementNS(svgNs, "title");
-    title.textContent = `Follow ${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}: when it last happened, and when it happens next`;
+    const pairing = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
+      + (isWorldRow ? " in the sky" : "");
+    title.textContent = `Follow ${pairing}: when it last happened, and when it happens next`;
     hit.appendChild(title);
     // A tap, not a drag. The column sits over a chart that scrolls sideways, so
     // a finger that started here and travelled was panning; the browser still
@@ -692,7 +724,12 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       "pointer-events": "none"
     }));
 
-    const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`;
+    const isWorldRow = r.scope === "world";
+    // A sky row says so in its own title: a card headed "Mars □ Saturn" over a
+    // personal chart would otherwise read as a contact with the birth chart,
+    // which is the one thing it is not.
+    const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
+      + (isWorldRow ? " in the sky" : "");
 
     const events = eventsByRule[idx] ?? [];
     for (const event of events){
@@ -737,7 +774,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const descKey = `${r.transit}-${r.aspect}-${r.natal}`;
       const mythKey = mythKeyFor(r.transit, r.natal);
       const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
-      const calendarTitle = (state.appMode === "world") ? `${glyphTitleCore} world` : glyphTitleCore;
+      const calendarTitle = isWorldRow ? `${glyphTitleCore} world` : glyphTitleCore;
 
       // The scan already found these to the second; a retrograde pass that
       // stays within orb throughout hits more than once.
@@ -751,12 +788,13 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         segmentEnd: b,
         exactTime: exactDates[0] ?? null
       });
+      const scope = isWorldRow ? "world" : "personal";
       const bindSegmentTooltipEvents = (target) => {
-        const openPopup = (e) => showTooltip(e, rowLabel, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData());
+        const openPopup = (e) => showTooltip(e, rowLabel, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData(), scope);
         target.addEventListener("pointerenter", (e) => {
           if (isCoarsePointer()) return;
           if (tooltip.classList.contains("popup")) return;
-          showTooltip(e, rowLabel, descKey, rangeText, false, mythKey, exactLabel);
+          showTooltip(e, rowLabel, descKey, rangeText, false, mythKey, exactLabel, null, scope);
         });
         target.addEventListener("pointermove", (e) => {
           if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){

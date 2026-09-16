@@ -36,6 +36,45 @@ export function wireStaleRefreshOnRefocus(){
   });
 }
 
+/**
+ * Every rule the chart is about to draw, in the order the rows start out in.
+ *
+ * World mode is the sky alone, as it always was. A personal chart is the natal
+ * contacts, and - unless the reader has turned it off - the sky folded in after
+ * them, so one scan answers both and the rows sort together by first hit.
+ *
+ * The sky half is never the reason a chart fails to draw. A selection too thin
+ * to make a sky aspect contributes nothing rather than throwing: the reader was
+ * asking about their chart, and a setting they left on months ago should not be
+ * able to take that away from them.
+ *
+ * @param {import("./services/chart-context.js").ChartContext} ctx
+ * @param {ReturnType<typeof readRuleOptions>} opts
+ */
+function buildRules(ctx, opts){
+  const sky = ({ bodies }) => (bodies.length >= 2)
+    ? buildSkyRules({ bodies, aspects: opts.aspects, orb: opts.orb })
+    : [];
+
+  if (ctx.mode === "world"){
+    if (opts.skyBodies.length < 2) throw new Error("Pick at least two bodies: a sky aspect needs both ends.");
+    return sky({ bodies: opts.skyBodies });
+  }
+
+  const worldRules = state.showWorldRows ? sky({ bodies: opts.skyBodies }) : [];
+  // With the sky on screen the chart is not empty, so an empty personal
+  // selection is a narrowing rather than a mistake, and saying so would be
+  // telling the reader to fix something that is not broken.
+  const demand = (message) => { if (worldRules.length === 0) throw new Error(message); };
+  if (opts.mode === "involving"){
+    if (opts.involvingBodies.length === 0) demand("Pick at least one body to look for.");
+  } else {
+    if (opts.transitBodies.length === 0) demand("Pick at least one transiting body.");
+    if (opts.natalBodies.length === 0) demand("Pick at least one natal point.");
+  }
+  return [...buildCandidateRules(opts), ...worldRules];
+}
+
 export async function updateTimeline(){
   if (state.isComputing){
     state.cancelRequested = true;
@@ -71,29 +110,25 @@ export async function updateTimeline(){
     const ruleOptions = readRuleOptions();
     const aspectsChecked = getCheckedAspects();
     if (aspectsChecked.length === 0) throw new Error("Select at least one aspect.");
-    if (ctx.mode === "world"){
-      if (ruleOptions.skyBodies.length < 2) throw new Error("Pick at least two bodies: a sky aspect needs both ends.");
-    } else if (ruleOptions.mode === "involving"){
-      if (ruleOptions.involvingBodies.length === 0) throw new Error("Pick at least one body to look for.");
-    } else {
-      if (ruleOptions.transitBodies.length === 0) throw new Error("Pick at least one transiting body.");
-      if (ruleOptions.natalBodies.length === 0) throw new Error("Pick at least one natal point.");
-    }
-    const candidateRules = (ctx.mode === "world")
-      ? buildSkyRules({ bodies: ruleOptions.skyBodies, aspects: ruleOptions.aspects, orb: ruleOptions.orb })
-      : buildCandidateRules(ruleOptions);
+    const candidateRules = buildRules(ctx, ruleOptions);
 
     const spanDays = (endExclusive.getTime() - rangeStartLocal.getTime()) / (24 * 3600 * 1000);
     // Windows now carry real times, so this only decides whether showing them
     // helps: on a multi-year view a date is what the eye wants.
     const showTime = spanDays <= 60;
 
-    const natalTargets = Array.from(new Set(candidateRules.map(r => r.natal)));
+    // The personal rules only: the far end of a sky rule is a body in the sky,
+    // and asking a birth chart where it sits would be answering a question
+    // nothing asked.
+    const natalTargets = Array.from(new Set(
+      candidateRules.filter(r => r.scope !== "world").map(r => r.natal)
+    ));
     const natalLon = natalLongitudes(ctx, natalTargets);
     const chartRulerKey = chartRulerKeyFor(ctx);
 
+    // No mode on the job: every rule carries its own scope, and a chart that
+    // holds both kinds has no single one to name.
     const { rules: rulesOut, events: eventsByRule } = await computeEvents({
-      mode: ctx.mode,
       startMs: rangeStartLocal.getTime(),
       endMs: endExclusive.getTime(),
       observer: ctx.observer,

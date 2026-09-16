@@ -8,17 +8,32 @@ import { getBodyLonAt } from "./ephemeris.js";
 import { aspectAngle, maxSpeedDegPerDay } from "../data/bodies.js";
 
 /**
- * @typedef {{transit: string, natal: string, aspect: string, orb: number|string}} Rule
+ * @typedef {{transit: string, natal: string, aspect: string, orb: number|string,
+ *            scope?: "personal"|"world"}} Rule
  * @typedef {import("./events.js").AspectEvent} AspectEvent
  *
  * @typedef {Object} TransitJob
- * @property {"personal"|"world"} mode
+ * @property {"personal"|"world"} [mode] the scope of any rule that carries none
  * @property {number} startMs
  * @property {number} endMs exclusive
  * @property {{lon:number, lat:number, height:number}} observer
- * @property {Record<string, number>|null} natalLon fixed natal longitudes; world mode has none
+ * @property {Record<string, number>|null} natalLon fixed natal longitudes; sky rules need none
  * @property {Rule[]} rules
  */
+
+/**
+ * Which question a rule asks. It is a property of the rule rather than of the
+ * job, because one job now carries both: a personal chart with the sky folded
+ * into it scans natal contacts and sky meetings in the same pass, over one
+ * cache of longitudes. The job's mode is the fallback for a rule that predates
+ * the stamp - the occurrence search builds one by hand, and the tests pass
+ * plain literals.
+ *
+ * @param {Rule} rule @param {"personal"|"world"|undefined} jobMode
+ */
+function scopeOf(rule, jobMode){
+  return (rule.scope ?? jobMode) === "world" ? "world" : "personal";
+}
 
 // Longitudes are read at times the scan chooses, so repeats are incidental
 // rather than systematic; this makes them free when they happen, and is dropped
@@ -44,31 +59,36 @@ function makeLonReader(observer){
 /**
  * Rules that share one moving angle share one scan. Against a natal chart that
  * is every rule with the same transiting body, whatever it aspects: the natal
- * points are fixed, so they are offsets on the same longitude. In world mode
+ * points are fixed, so they are offsets on the same longitude. For a sky rule
  * both ends move, so the shared angle is the separation and a scan covers one
  * pair of bodies.
  *
+ * The two kinds can arrive in the same list, so the scope is part of the group
+ * key: "mars|saturn|1" as a sky pair and a natal contact on transiting Mars are
+ * different scans and must not land in the same bucket.
+ *
  * @param {Rule[]} rules
- * @param {"personal"|"world"} mode
+ * @param {"personal"|"world"|undefined} mode the scope of rules that carry none
  * @param {Record<string, number>|null} natalLon
  */
 export function groupRules(rules, mode, natalLon){
-  const isWorld = mode === "world";
-  /** @type {Map<string, {transit:string, natal:string, orb:number, offsets:number[], members:{ruleIndex:number, slots:number[]}[]}>} */
+  /** @type {Map<string, {scope:"personal"|"world", transit:string, natal:string, orb:number, offsets:number[], members:{ruleIndex:number, slots:number[]}[]}>} */
   const groups = new Map();
 
   for (let i = 0; i < rules.length; i++){
     const r = rules[i];
+    const scope = scopeOf(r, mode);
+    const isWorld = scope === "world";
     const orb = Number(r.orb) || 0;
     const natalDeg = isWorld ? 0 : Number(natalLon?.[r.natal]);
     // A natal point this chart does not carry is not an error, it just has no
     // transits.
     if (!isWorld && !Number.isFinite(natalDeg)) continue;
 
-    const key = isWorld ? `${r.transit}|${r.natal}|${orb}` : `${r.transit}|${orb}`;
+    const key = isWorld ? `world|${r.transit}|${r.natal}|${orb}` : `personal|${r.transit}|${orb}`;
     let g = groups.get(key);
     if (!g){
-      g = { transit: r.transit, natal: r.natal, orb, offsets: [], members: [] };
+      g = { scope, transit: r.transit, natal: r.natal, orb, offsets: [], members: [] };
       groups.set(key, g);
     }
 
@@ -87,9 +107,9 @@ export function groupRules(rules, mode, natalLon){
   return [...groups.values()];
 }
 
-function speedCeiling(mode, transit, natal){
+function speedCeiling(scope, transit, natal){
   const t = maxSpeedDegPerDay[transit] ?? 25;
-  if (mode !== "world") return t;
+  if (scope !== "world") return t;
   return t + (maxSpeedDegPerDay[natal] ?? 25);
 }
 
@@ -109,7 +129,7 @@ export function computeTransitEvents(job, onProgress){
 
   for (let gi = 0; gi < groups.length; gi++){
     const g = groups[gi];
-    const baseAt = (mode === "world")
+    const baseAt = (g.scope === "world")
       ? (ms) => wrap180(lon.read(g.transit, ms) - lon.read(g.natal, ms))
       : (ms) => lon.read(g.transit, ms);
 
@@ -119,7 +139,7 @@ export function computeTransitEvents(job, onProgress){
       startMs,
       endMs,
       baseAt,
-      maxSpeedDegPerDay: speedCeiling(mode, g.transit, g.natal),
+      maxSpeedDegPerDay: speedCeiling(g.scope, g.transit, g.natal),
       // Groups are wildly uneven - a Saturn scan is a few dozen steps and a
       // lunar one is tens of thousands - so done advances through a group as
       // well as between groups, and is fractional.

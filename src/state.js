@@ -9,6 +9,12 @@ export const state = {
   activePresetKey: defaultPresetKey,
   chartSummaryVisible: false,
   appMode: "personal",
+  // Whether a personal chart also carries the sky. On by default: what the
+  // planets are doing to each other is the weather every chart is read in, and
+  // a reader who has never found the World view has never been offered it.
+  // World mode is unaffected - it is the sky alone, and there is nothing to
+  // fold in.
+  showWorldRows: loadShowWorldRows(),
   // The body chooser's selection. Three lists rather than two: world mode asks
   // about one set of bodies in the sky, and losing a personal selection because
   // the sky was glanced at would be its own small annoyance.
@@ -20,7 +26,9 @@ export const state = {
   bodyMode: "directed",
   // The row picked off the aspect axis, if any: {transit, aspect, natal}. It is
   // highlighted in the chart and is what the previous/next search steps through.
-  /** @type {{transit:string, aspect:string, natal:string, orb?:number}|null} */
+  // The scope comes with it because a chart can hold both a natal contact and a
+  // sky meeting on the same three bodies, and they are different rows.
+  /** @type {{transit:string, aspect:string, natal:string, orb?:number, scope:"personal"|"world"}|null} */
   focusRule: null,
   focusStatus: "",
   focusSearching: false,
@@ -40,3 +48,28 @@ export const state = {
   labelsUseSymbols: false,
   currentLayout: null
 };
+
+export const showWorldRowsKey = "tt_show_world_rows";
+
+// Remembered between visits, and defaulting to on. Guarded because this module
+// is imported by tests in Node, where there is no localStorage, and because a
+// browser with storage blocked should still get a working page rather than a
+// blank one.
+function loadShowWorldRows(){
+  try {
+    return localStorage.getItem(showWorldRowsKey) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/** @param {boolean} on */
+export function setShowWorldRows(on){
+  state.showWorldRows = !!on;
+  try {
+    localStorage.setItem(showWorldRowsKey, on ? "1" : "0");
+  } catch {
+    // A reader with storage blocked keeps the setting for this visit only,
+    // which is better than the toggle refusing to move.
+  }
+}

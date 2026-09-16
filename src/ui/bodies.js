@@ -10,7 +10,7 @@
 // selection is a set that can be anything.
 
 import { requestUpdate } from "../refresh.js";
-import { state } from "../state.js";
+import { setShowWorldRows, state } from "../state.js";
 import { bodyPresets, isAngle, natalKeys, normalizeBodies, planetLabel, planetSymbols, sameBodies, transitingKeys } from "../data/bodies.js";
 import { el } from "./dom.js";
 
@@ -24,6 +24,11 @@ export function onBodiesChanged(fn){ changedHandler = fn; }
  * The panes on screen and the list each one edits. World mode has one: both
  * ends of a sky aspect move, so there is no transiting side to tell from a
  * natal one.
+ *
+ * A personal chart can have a third. It edits the same sky list world mode
+ * does, from its own pane under the pair rather than in place of them - the
+ * sky folded into a chart is another question being asked alongside the first,
+ * not one of the two ends of it.
  */
 export function activePanes(){
   if (state.appMode === "world"){
@@ -34,28 +39,37 @@ export function activePanes(){
   }
   // One list, and every point on it: an angle can be involved in a transit -
   // "everything crossing my Ascendant" - it just cannot be the end that moves.
-  if (state.bodyMode === "involving"){
-    return [{
-      field: "involving", title: "Involving", keys: natalKeys,
-      chips: el.transitBodyChips, presets: el.transitBodyPresets
-    }];
-  }
-  return [
-    { field: "transit", title: "Transiting", keys: transitingKeys,
-      chips: el.transitBodyChips, presets: el.transitBodyPresets },
-    { field: "natal", title: "Natal points", keys: natalKeys,
-      chips: el.natalBodyChips, presets: el.natalBodyPresets }
-  ];
+  const personal = (state.bodyMode === "involving")
+    ? [{
+        field: "involving", title: "Involving", keys: natalKeys,
+        chips: el.transitBodyChips, presets: el.transitBodyPresets
+      }]
+    : [
+        { field: "transit", title: "Transiting", keys: transitingKeys,
+          chips: el.transitBodyChips, presets: el.transitBodyPresets },
+        { field: "natal", title: "Natal points", keys: natalKeys,
+          chips: el.natalBodyChips, presets: el.natalBodyPresets }
+      ];
+  if (!state.showWorldRows) return personal;
+  return [...personal, {
+    field: "sky", title: "Also in the sky", keys: transitingKeys,
+    chips: el.skyBodyChips, presets: el.skyBodyPresets
+  }];
 }
 
 /** @param {"transit"|"natal"|"sky"|"involving"} field */
 export function getBodies(field){ return normalizeBodies(state.bodies[field]); }
 
-/** The bodies a scan will actually use, whichever mode is showing. */
+/**
+ * The bodies a scan will actually use, whichever mode is showing. A personal
+ * chart hands back the sky list too when it is carrying the sky; app.js decides
+ * what a list too thin to make an aspect means.
+ */
 export function selectedBodies(){
   if (state.appMode === "world") return { sky: getBodies("sky") };
-  if (state.bodyMode === "involving") return { involving: getBodies("involving") };
-  return { transit: getBodies("transit"), natal: getBodies("natal") };
+  const sky = state.showWorldRows ? getBodies("sky") : [];
+  if (state.bodyMode === "involving") return { involving: getBodies("involving"), sky };
+  return { transit: getBodies("transit"), natal: getBodies("natal"), sky };
 }
 
 /**
@@ -208,8 +222,20 @@ function renderModeChips(){
 
 export function renderBodyPicker(){
   const panes = activePanes();
-  if (el.natalPane) el.natalPane.hidden = panes.length === 1;
-  if (el.bodyPicker) el.bodyPicker.classList.toggle("oneList", panes.length === 1);
+  const showing = new Set(panes.map(p => p.field));
+  // Whether the pair is on screen, rather than how many panes there are: the
+  // sky pane below them is a third pane and not a second column, so counting
+  // would have "involving plus the sky" laying itself out as a pair.
+  const hasNatalPane = showing.has("natal");
+  if (el.natalPane) el.natalPane.hidden = !hasNatalPane;
+  if (el.bodyPicker) el.bodyPicker.classList.toggle("oneList", !hasNatalPane);
+  // The pane exists whenever a chart does, so there is always something to
+  // switch the sky back on with. World mode is the sky already, and has
+  // nothing to fold into itself.
+  const personal = state.appMode === "personal";
+  if (el.skyPane) el.skyPane.hidden = !personal;
+  if (el.skyPaneBody) el.skyPaneBody.hidden = !state.showWorldRows;
+  if (el.showWorldRows) el.showWorldRows.checked = !!state.showWorldRows;
   if (el.transitPaneTitle) el.transitPaneTitle.textContent = panes[0].title;
   for (const pane of panes){
     renderPresetChips(pane);
@@ -219,6 +245,19 @@ export function renderBodyPicker(){
 }
 
 export function wireBodyPicker(){
+  if (el.showWorldRows){
+    el.showWorldRows.addEventListener("change", () => {
+      setShowWorldRows(el.showWorldRows.checked);
+      // Not an edit to the selection: the preset still describes the chart, it
+      // just describes less of it. So the lit chip stays lit, and this does not
+      // go through edited().
+      renderBodyPicker();
+      // A followed row that the sky took with it is dropped by the recompute,
+      // which already clears a focus the chart no longer has a line for.
+      requestUpdate();
+    });
+  }
+
   const picker = el.bodyPicker;
   if (!picker) return;
   picker.addEventListener("click", (e) => {

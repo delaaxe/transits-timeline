@@ -33,9 +33,12 @@ import { onRowLabelClick, renderFromCache, revealFocusRow } from "./timeline.js"
 // all of it would put the reader back where they started.
 const MAX_JUMP_DAYS = 3650;
 
-/** @param {{transit:string, aspect:string, natal:string}} rule */
+/** @param {{transit:string, aspect:string, natal:string, scope?:string}} rule */
 function ruleTitle(rule){
-  return `${planetLabel(rule.transit)} ${aspectSymbol(rule.aspect)} ${planetLabel(rule.natal)}`;
+  const pairing = `${planetLabel(rule.transit)} ${aspectSymbol(rule.aspect)} ${planetLabel(rule.natal)}`;
+  // The bar is the one place with room for the words, and on a chart holding
+  // both kinds it is the only thing naming which of the two is being followed.
+  return rule.scope === "world" ? `${pairing} in the sky` : pairing;
 }
 
 /**
@@ -45,11 +48,14 @@ function ruleTitle(rule){
  * the natal end, and "Neptune △ Nep…" is exactly the half nobody can guess.
  * Glyphs lose no half, and are the same width whatever the pairing.
  *
- * @param {{transit:string, aspect:string, natal:string}} rule
+ * @param {{transit:string, aspect:string, natal:string, scope?:string}} rule
  */
 function ruleGlyphs(rule){
   const glyph = (k) => planetSymbols[k] || planetLabel(k);
-  return `${glyph(rule.transit)} ${aspectSymbol(rule.aspect)} ${glyph(rule.natal)}`;
+  const pairing = `${glyph(rule.transit)} ${aspectSymbol(rule.aspect)} ${glyph(rule.natal)}`;
+  // Two more characters where seventeen did not fit. A row the words could not
+  // name still has to say which sky it is in, and the glyphs leave room for it.
+  return rule.scope === "world" ? `${pairing} · sky` : pairing;
 }
 
 function rangeDays(){
@@ -58,9 +64,15 @@ function rangeDays(){
   return Math.max(1, Math.round((addDaysLocal(end, 1).getTime() - start.getTime()) / DAY_MS));
 }
 
-/** @param {{transit:string, aspect:string, natal:string, orb?:number}|null} rule */
+/** @param {{transit:string, aspect:string, natal:string, orb?:number, scope?:string}|null} rule */
 export function setFocusRule(rule){
-  state.focusRule = rule ? { transit: rule.transit, aspect: rule.aspect, natal: rule.natal, orb: rule.orb } : null;
+  state.focusRule = rule
+    ? { transit: rule.transit, aspect: rule.aspect, natal: rule.natal, orb: rule.orb,
+        // Carried, not derived: it is half of what tells this row from the one
+        // with the same three words, and the search needs it to know whether
+        // the far end is a place in a chart or a body that moves.
+        scope: rule.scope === "world" ? "world" : "personal" }
+    : null;
   state.focusStatus = "";
   state.focusTrail = [];
   renderRowFocus();
@@ -159,7 +171,8 @@ async function stepOccurrence(direction){
   if (!rule || state.focusSearching) return;
 
   const orb = Number(el.orb.value || 1);
-  const searchRule = { transit: rule.transit, natal: rule.natal, aspect: rule.aspect, orb };
+  const isWorldRow = rule.scope === "world";
+  const searchRule = { transit: rule.transit, natal: rule.natal, aspect: rule.aspect, orb, scope: rule.scope };
   const fromMs = direction < 0
     ? parseLocalDateOnly(el.rangeStart.value).getTime()
     : addDaysLocal(parseLocalDateOnly(el.rangeEnd.value), 1).getTime();
@@ -174,9 +187,13 @@ async function stepOccurrence(direction){
       rule: searchRule,
       direction,
       fromMs,
-      mode: ctx.mode,
+      // The row's own scope, not the app's: a sky row followed out of a
+      // personal chart is still a pair of moving bodies, and asking the birth
+      // chart where its far end sits would send the search after a fixed
+      // longitude that nothing in the row is standing at.
+      mode: isWorldRow ? "world" : ctx.mode,
       observer: ctx.observer,
-      natalLon: natalLongitudes(ctx, [rule.natal]),
+      natalLon: isWorldRow ? null : natalLongitudes(ctx, [rule.natal]),
       onReach: (years) => setFocusStatus(`Looking ${years === 1 ? "a year" : `${years} years`} ${word} this range…`)
     });
     if (!hit){
@@ -211,13 +228,26 @@ async function stepOccurrence(direction){
   }
 }
 
-/** Narrows the chooser to the focused row: this pairing, this aspect, alone. */
+/**
+ * Narrows the chooser to the focused row: this pairing, this aspect, alone.
+ *
+ * Alone means alone. On a personal chart carrying the sky, narrowing to one
+ * natal contact has to empty the sky list too, and narrowing to one sky pair
+ * has to empty both personal ends - otherwise "Only this" leaves the row the
+ * reader asked for sitting in a chart of sixty others, which is the thing they
+ * pressed it to get away from.
+ */
 function showOnlyFocused(){
   const rule = state.focusRule;
   if (!rule) return;
   renderAspectChecks([rule.aspect]);
-  if (state.appMode === "world") setSelection({ sky: [rule.transit, rule.natal] });
-  else setSelection({ mode: "directed", transit: [rule.transit], natal: [rule.natal] });
+  const sky = [rule.transit, rule.natal];
+  // World mode shows nothing but the sky, so the personal lists are out of
+  // sight and stay untouched: glancing at the sky has never been a way to lose
+  // a selection, and pressing a button there should not become one.
+  if (state.appMode === "world") setSelection({ sky });
+  else if (rule.scope === "world") setSelection({ sky, transit: [], natal: [], involving: [] });
+  else setSelection({ mode: "directed", transit: [rule.transit], natal: [rule.natal], sky: [] });
 }
 
 export function wireRowFocus(){
