@@ -2,12 +2,22 @@ import { el } from "./dom.js";
 
 export const svgNs = "http://www.w3.org/2000/svg";
 
+/**
+ * Callers build these by spreading one of two shapes, so a key can arrive
+ * holding undefined; it is left off rather than written out as the string
+ * "undefined", which is what setAttribute would otherwise have made of it.
+ * @param {string} name @param {Record<string, string|number|undefined>} [attrs]
+ */
 export function svgEl(name, attrs={}){
   const el = document.createElementNS(svgNs, name);
-  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  for (const [k,v] of Object.entries(attrs)){
+    if (v === undefined) continue;
+    el.setAttribute(k, String(v));
+  }
   return el;
 }
 
+/** @param {Element} svg */
 export function clearSvg(svg){
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 }
@@ -41,12 +51,14 @@ function isCoarsePointer(){
     && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
+/** @param {number} containerW @returns {"phone"|"tablet"|"desktop"} */
 export function tierFor(containerW){
   if (containerW < 520) return "phone";
   if (containerW < 1024) return "tablet";
   return "desktop";
 }
 
+/** @param {Element|null} svg */
 export function computeTimelineLayout(svg){
   const parent = svg ? svg.parentElement : null;
   // The scroller's padding is 8px at desktop and 0 on a phone, so measuring it
@@ -103,6 +115,7 @@ export function computeTimelineLayout(svg){
   };
 }
 
+/** @param {number} totalUnits @param {number} timelineW @param {number} minBoxPx @param {number[]} niceSteps */
 export function pickStep(totalUnits, timelineW, minBoxPx, niceSteps){
   const idealCount = Math.max(1, Math.floor(timelineW / minBoxPx));
   const rawStep = Math.max(1, Math.ceil(totalUnits / idealCount));
@@ -112,6 +125,7 @@ export function pickStep(totalUnits, timelineW, minBoxPx, niceSteps){
   return niceSteps[niceSteps.length - 1];
 }
 
+/** @param {Date} start @param {Date} endExclusive @param {number} [stepMonths] @returns {Date[]} */
 export function getMonthStartsLocal(start, endExclusive, stepMonths=1){
   const out = [];
   const d = new Date(start.getFullYear(), start.getMonth(), 1, 0, 0, 0, 0);
@@ -123,6 +137,7 @@ export function getMonthStartsLocal(start, endExclusive, stepMonths=1){
   return out;
 }
 
+/** @param {Date} start @param {Date} endExclusive @param {number} [stepDays] @returns {Date[]} */
 export function getDayStartsLocal(start, endExclusive, stepDays=1){
   const out = [];
   const d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
@@ -134,6 +149,7 @@ export function getDayStartsLocal(start, endExclusive, stepDays=1){
   return out;
 }
 
+/** @param {Date} start @param {Date} endExclusive @param {number} [stepYears] @returns {Date[]} */
 export function getYearStartsLocal(start, endExclusive, stepYears=1){
   const out = [];
   const d = new Date(start.getFullYear(), 0, 1, 0, 0, 0, 0);
@@ -151,6 +167,7 @@ export function getYearStartsLocal(start, endExclusive, stepYears=1){
   return out;
 }
 
+/** @param {Date} start @param {Date} endExclusive @param {number} [stepHours] @returns {Date[]} */
 export function getHourStartsLocal(start, endExclusive, stepHours=1){
   const out = [];
   const d = new Date(start.getTime());

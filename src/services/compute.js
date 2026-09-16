@@ -18,6 +18,7 @@ let pending = null;
 let nextId = 1;
 let workerUnavailable = typeof Worker === "undefined";
 
+/** @param {{id:number, resolve:Function, reject:Function, job:TransitJob, onProgress?:Function}} entry */
 function runHere(entry){
   const current = entry;
   pending = null;

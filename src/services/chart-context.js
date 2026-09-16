@@ -27,13 +27,16 @@ export function currentChartContext(){
   const isPersonal = state.appMode === "personal";
   const isComposite = isPersonal && chartsState.mode === "composite";
   if (isPersonal && !chartA) throw new Error("Pick a chart first.");
-  if (isComposite && !chartB) throw new Error("Pick two charts for composite.");
 
   let lon = Number(chartA?.lon || 0);
   let lat = Number(chartA?.lat || 0);
   /** @type {any} */
   let composite = null;
   if (isComposite){
+    // Both ends are checked here rather than above, where the composite half of
+    // the pair was checked and the other half was left to the line that reads
+    // it. The message is the one that line would have wanted anyway.
+    if (!chartA || !chartB) throw new Error("Pick two charts for composite.");
     composite = computeCompositeChart(chartA, chartB);
     lon = composite.location.lon;
     lat = composite.location.lat;

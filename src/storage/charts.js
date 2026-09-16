@@ -1,5 +1,20 @@
+/**
+ * @typedef {Object} Chart
+ * @property {string} id
+ * @property {string} name
+ * @property {string} birthDate
+ * @property {string} birthTime
+ * @property {string} placeLabel
+ * @property {string} placeId
+ * @property {number} lon
+ * @property {number} lat
+ * @property {string} tzName
+ * @property {number} tzOffset
+ * @property {boolean} isDefault
+ */
+
 export const chartsState = {
-  /** @type {any[]} */
+  /** @type {Chart[]} */
   list: [],
   activeIdA: "",
   activeIdB: "",
@@ -25,6 +40,7 @@ export const chartsKey = "tt_charts";
 
 export const lastChartKey = "tt_last_chart";
 
+/** @param {string} s @param {any} fallback @returns {any} */
 export function safeJSONParse(s, fallback){
   try { return JSON.parse(s); } catch { return fallback; }
 }
@@ -44,10 +60,13 @@ export const defaultChartData = {
   isDefault: true
 };
 
+/** @param {{isDefault?: boolean}|null|undefined} p */
 export function isDefaultChart(p){
   return !!p?.isDefault;
 }
 
+/** Whatever came out of storage or an import file, as a chart.
+ * @param {any} p @returns {Chart} */
 export function normalizeChart(p){
   // Accept both old and new shapes
   return {
@@ -98,6 +117,7 @@ export function loadCharts(){
   return [];
 }
 
+/** @param {Chart[]} charts */
 export function saveCharts(charts){
   localStorage.setItem(chartsKey, JSON.stringify(charts));
 }
@@ -105,6 +125,7 @@ export function saveCharts(charts){
 // Reordering. The list's order is the order the chips are shown in, so moving a
 // chip is moving the chart: pure here, so the drag code only has to say which
 // chart landed where.
+/** @param {Chart[]} list @param {string} id @param {number} toIndex @returns {Chart[]} */
 export function moveChart(list, id, toIndex){
   const from = list.findIndex(p => p.id === id);
   if (from < 0) return list.slice();
@@ -119,8 +140,10 @@ export function moveChart(list, id, toIndex){
 // from a drop is the order they ended up in. Ids the list does not know are
 // ignored, and charts the ids leave out keep their old relative order at the
 // end, so a partial or stale list can never drop a chart.
+/** @param {Chart[]} list @param {string[]} ids @returns {Chart[]} */
 export function reorderChartsByIds(list, ids){
   const seen = new Set();
+  /** @type {Chart[]} */
   const ordered = [];
   for (const id of ids){
     const p = list.find(x => x.id === id);

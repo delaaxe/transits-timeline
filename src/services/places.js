@@ -4,6 +4,7 @@ export const awsRegion = "us-east-1";
 
 export const awsPlacesBase = `https://places.geo.${awsRegion}.amazonaws.com/v2`;
 
+/** @param {string} query */
 export async function awsAutocomplete(query){
   const url = `${awsPlacesBase}/autocomplete?key=${encodeURIComponent(awsApiKey)}`;
   const body = {
@@ -24,6 +25,7 @@ export async function awsAutocomplete(query){
   return await res.json();
 }
 
+/** @param {string} placeId */
 export async function awsGetPlace(placeId){
   const url = `${awsPlacesBase}/place/${encodeURIComponent(placeId)}?key=${encodeURIComponent(awsApiKey)}&additional-features=TimeZone`;
   const res = await fetch(url, { method: "GET" });
@@ -34,6 +36,7 @@ export async function awsGetPlace(placeId){
   return await res.json();
 }
 
+/** @param {any} getPlaceJson the Places API's own response @returns {number[]|null} */
 export function extractPosition(getPlaceJson){
   const pos = getPlaceJson?.Position
     || getPlaceJson?.MainAddress?.AccessPoints?.[0]?.Position

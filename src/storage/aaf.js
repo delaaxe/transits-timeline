@@ -14,10 +14,12 @@ const SIGNLESS = "*";
 // a flag for the daylight hour on top. The offset in force at birth is the sum,
 // and the standard offset is the smallest the zone reaches over that year, so
 // what is left over is the daylight part.
+/** @param {{tzName?: string, tzOffset?: number|string, birthDate: string, birthTime?: string}} chart
+ * @param {number} year */
 export function zoneOffsetsAt(chart, year){
   const tzName = chart.tzName;
-  if (!tzName) return { standard: +chart.tzOffset * 60 || 0, dst: 0 };
-  const at = (month) => tzOffsetMinutesAt(new Date(Date.UTC(year, month, 15, 12)), tzName);
+  if (!tzName) return { standard: +(chart.tzOffset ?? 0) * 60 || 0, dst: 0 };
+  const at = (/** @type {number} */ month) => tzOffsetMinutesAt(new Date(Date.UTC(year, month, 15, 12)), tzName);
   let standard = Infinity;
   for (let month = 0; month < 12; month++) standard = Math.min(standard, at(month));
   const [y, m, d] = String(chart.birthDate).split("-").map(Number);
@@ -31,6 +33,7 @@ export function zoneOffsetsAt(chart, year){
 }
 
 // `0` plain, `1` the usual daylight hour, `2` a double one, `h` a half hour.
+/** @param {number} dstMinutes */
 function timeTypeFor(dstMinutes){
   if (dstMinutes >= 120) return "2";
   if (dstMinutes >= 60) return "1";
@@ -38,6 +41,7 @@ function timeTypeFor(dstMinutes){
   return "0";
 }
 
+/** @param {string|undefined} timeType @returns {number} */
 function dstMinutesFor(timeType){
   const t = String(timeType || "0").trim();
   if (t === "1" || t.toLowerCase() === "w") return 60;
@@ -46,10 +50,12 @@ function dstMinutesFor(timeType){
   return 0;
 }
 
+/** @param {number} n */
 function pad(n){ return String(Math.trunc(Math.abs(n))).padStart(2, "0"); }
 
 // Degrees as AAF writes them: whole degrees, then the hemisphere letter in
 // place of a separator, then arc minutes and seconds.
+/** @param {number} value @param {string} positive @param {string} negative */
 function formatDegrees(value, positive, negative){
   const sign = value < 0 ? negative : positive;
   const total = Math.round(Math.abs(value) * 3600);
@@ -59,6 +65,7 @@ function formatDegrees(value, positive, negative){
   return `${deg}${sign}${pad(min)}:${pad(sec)}`;
 }
 
+/** @param {string|undefined} text @param {string} positive @param {string} negative @returns {number|null} */
 function parseDegrees(text, positive, negative){
   const m = /^\s*(\d+)\s*([a-z])\s*(\d+)(?::(\d+(?:\.\d+)?))?\s*$/i.exec(text || "");
   if (!m) return null;
@@ -70,6 +77,7 @@ function parseDegrees(text, positive, negative){
 
 // The zone offset field wears its sign as `he`/`hw` rather than a hemisphere
 // letter, so it gets its own pair.
+/** @param {number} minutes */
 function formatOffset(minutes){
   const sign = minutes < 0 ? "hw" : "he";
   const total = Math.round(Math.abs(minutes) * 60);
@@ -79,6 +87,7 @@ function formatOffset(minutes){
   return ss ? `${hh}${sign}${pad(mm)}:${pad(ss)}` : `${hh}${sign}${pad(mm)}`;
 }
 
+/** @param {string|undefined} text @returns {number|null} */
 function parseOffset(text){
   const m = /^\s*(-?\d+)\s*(he|hw|h)\s*(\d+)?(?::(\d+))?\s*$/i.exec(text || "");
   if (!m) return null;
@@ -89,14 +98,16 @@ function parseOffset(text){
 // AAF splits a person into last name and first names. Nothing here knows which
 // part of a name is which, so the last word goes in the surname field, which is
 // the convention that survives a round trip through Astro-Seek unharmed.
+/** @param {string|undefined} name @returns {{last: string, first: string}} */
 function splitName(name){
   const clean = String(name || "").replace(/,/g, " ").replace(/\s+/g, " ").trim();
   if (!clean) return { last: "(unnamed)", first: "" };
   const parts = clean.split(" ");
   if (parts.length === 1) return { last: parts[0], first: "" };
-  return { last: parts.at(-1), first: parts.slice(0, -1).join(" ") };
+  return { last: parts[parts.length - 1], first: parts.slice(0, -1).join(" ") };
 }
 
+/** @param {string|undefined} last @param {string|undefined} first */
 function joinName(last, first){
   const l = clean(last), f = clean(first);
   const name = [f, l].filter(Boolean).join(" ").trim();
@@ -105,24 +116,28 @@ function joinName(last, first){
 
 // A birthplace is held here as one written line, "district, city, country";
 // AAF keeps the country apart from the rest and forbids commas in either.
+/** @param {string|undefined} placeLabel @returns {{place: string, country: string}} */
 function splitPlace(placeLabel){
   const parts = String(placeLabel || "").split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length === 0) return { place: "", country: "" };
   if (parts.length === 1) return { place: parts[0], country: "" };
-  return { place: parts.slice(0, -1).join(" "), country: parts.at(-1) };
+  return { place: parts.slice(0, -1).join(" "), country: parts[parts.length - 1] };
 }
 
+/** @param {unknown} field @returns {string} */
 function clean(field){
   const value = String(field ?? "").trim();
   return value === SIGNLESS || value === "^" ? "" : value;
 }
 
+/** @param {string|undefined} birthDate */
 function formatDate(birthDate){
   const [y, m, d] = String(birthDate || "").split("-").map(Number);
   if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return SIGNLESS;
   return `${d}.${m}.${y}`;
 }
 
+/** @param {string|undefined} text @returns {string} */
 function parseDate(text){
   const m = /^\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(-?\d{1,6})\s*[gj]?\s*$/i.exec(text || "");
   if (!m) return "";
@@ -133,12 +148,14 @@ function parseDate(text){
 
 // Hours may be separated from minutes by `:` or `h`, and both minutes and
 // seconds are optional. Seconds are dropped: nothing here keeps them.
+/** @param {string|undefined} text @returns {string} */
 function parseTime(text){
   const m = /^\s*(\d{1,2})\s*(?::|h)?\s*(\d{1,2})?\s*(?::\s*(\d{1,2}))?\s*$/i.exec(text || "");
   if (!m) return "";
   return `${pad(+m[1])}:${pad(+(m[2] || 0))}`;
 }
 
+/** @param {any} chart */
 function julianDayOf(chart){
   try { return julianDay(parseBirthUTCFor(chart)).toFixed(6); }
   catch { return SIGNLESS; }
@@ -172,11 +189,13 @@ export function formatRecord(chart){
  * A whole file: a comment chunk naming the writer, then a record per chart.
  * @param {any[]} charts @returns {string}
  */
+/** @param {any[]} charts @returns {string} */
 export function formatAAF(charts){
   const head = "#: Transits Timeline - AAF (Astrological Exchange Format)";
   return [head, ...charts.map(formatRecord), ""].join("\n");
 }
 
+/** @param {string} line @returns {{id: string, body: string}|null} */
 function chunkOf(line){
   // `#:` is the invisible chunk, which carries no id and no meaning.
   const m = /^#([A-Za-z0-9_]*):(.*)$/.exec(line);
@@ -184,6 +203,7 @@ function chunkOf(line){
   return { id: m[1].toUpperCase(), body: m[2] };
 }
 
+/** @param {{a93: string[], b93: string[]|null, znam: string}} record */
 function recordToChart(record){
   const a = record.a93;
   const b = record.b93 || [];
@@ -215,6 +235,7 @@ function recordToChart(record){
  * @param {string} text @returns {any[]}
  */
 export function parseAAF(text){
+  /** @type {any[]} */
   const charts = [];
   /** @type {{a93: string[], b93: string[]|null, znam: string}|null} */
   let record = null;
@@ -244,6 +265,7 @@ export function parseAAF(text){
   return charts;
 }
 
+/** @param {string} text */
 export function looksLikeAAF(text){
   return /^\s*#[A-Za-z0-9_]*:/m.test(String(text));
 }

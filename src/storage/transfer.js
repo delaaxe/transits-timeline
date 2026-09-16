@@ -11,10 +11,12 @@ export const transferFileName = "transits-timeline-charts.aaf";
 export const transferMimeType = "text/plain";
 
 /** @param {any[]} charts @returns {string} */
+/** @param {any[]} charts @returns {string} */
 export function buildPayload(charts){
   return formatAAF(charts.map((p) => normalizeChart(p)));
 }
 
+/** @param {string} text @returns {any[]|null} */
 function fromJSON(text){
   const data = safeJSONParse(text, null);
   if (!data) return null;
@@ -44,6 +46,7 @@ export function parseCharts(text){
 // details up to date rather than leave a second Ada Lovelace on the list. Ids
 // don't survive a round trip through two devices, and the birth data is the
 // very thing an import is likely to be correcting, so neither can be the key.
+/** @param {{name?: string}} p */
 function identityOf(p){
   return (p.name || "").trim().toLowerCase();
 }
@@ -63,10 +66,13 @@ const coordTolerance = 1 / 3600;
 // A place is written out as one comma-separated line and AAF has no way to keep
 // a comma inside a field, so a label comes back with its commas spaced out
 // instead. Same place, same words, re-punctuated by the format.
+/** @param {unknown} value */
 function placeKey(value){
   return String(value ?? "").replace(/[\s,]+/g, " ").trim().toLowerCase();
 }
 
+/** Two values off the same field of two charts, straight from parsed JSON.
+ * @param {string} key @param {any} a @param {any} b */
 function sameValue(key, a, b){
   if (numericFields.has(key)) return Math.abs((+a || 0) - (+b || 0)) < coordTolerance;
   if (key === "placeLabel") return placeKey(a) === placeKey(b);
@@ -91,6 +97,7 @@ export function diffChart(before, after){
 
 // The seeded sample is a placeholder, not a chart of the reader's: a real
 // import replaces it rather than merging with it.
+/** @param {any[]} existing @returns {any[]} */
 function importBase(existing){
   return (existing.length === 1 && isDefaultChart(existing[0])) ? [] : existing.slice();
 }

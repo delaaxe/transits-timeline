@@ -98,6 +98,7 @@ export const installHint = $("installHint");
 
 export const installHintText = $("installHintText");
 
+/** @param {string} msg @param {boolean} [isError] */
 export function setStatus(msg, isError=false){
   el.status.textContent = msg;
   el.status.className = "status" + (isError ? " error" : "");
@@ -130,22 +131,27 @@ export function setTimelineState(text, kind=null){
   if (frame) frame.classList.add("hasState");
 }
 
+/** @param {unknown} s */
 export function escapeHTML(s){
-  return String(s || "").replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s || "").replace(/[&<>"']/g, (c) => (/** @type {Record<string, string>} */ ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}))[c]);
 }
 
+/** @param {(...args: any[]) => void} fn @param {number} ms */
 export function debounce(fn, ms){
-  let t = null;
-  return (...args) => {
+  /** @type {ReturnType<typeof setTimeout>|undefined} */
+  let t = undefined;
+  return (/** @type {any[]} */ ...args) => {
     clearTimeout(t);
     t = setTimeout(() => fn(...args), ms);
   };
 }
 
+/** @param {unknown} s */
 export function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  return String(s).replace(/[&<>"']/g, c => (/** @type {Record<string, string>} */ ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}))[c]);
 }
 
+/** @param {string} text */
 export async function copyTextToClipboard(text){
   if (!text) return;
   if (navigator.clipboard && window.isSecureContext){

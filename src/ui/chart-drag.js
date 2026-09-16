@@ -154,7 +154,12 @@ export function wireChartReorder(wrap, onReordered){
     // The chip is still under the finger, so the browser sends a click next.
     // That click means "drop here", not "switch to this chart".
     suppressClick = true;
-    const ids = chipsOf(wrap).map(c => c.dataset.chartId);
+    // A chip without an id cannot name a chart, and reorderChartsByIds ignores
+    // ids no chart answers to anyway - so dropping them here changes nothing
+    // except that the list it gets is the list it says it takes.
+    /** @type {string[]} */
+    const ids = [];
+    for (const chip of chipsOf(wrap)) if (chip.dataset.chartId) ids.push(chip.dataset.chartId);
     chartsState.list = reorderChartsByIds(chartsState.list, ids);
     saveCharts(chartsState.list);
     onReordered?.();

@@ -5,9 +5,9 @@
   // is the unit of work; the list only ever grows.
   //
   // Files these import are checked too, whether or not they are listed - which
-  // is why src/ui/svg.js and src/ui/dom.js have to come along with src/state.js
-  // when it joins.
+  // is how src/state.js, src/ui/svg.js and src/ui/dom.js are already through it
+  // on services' coat-tails. What is left is the rest of src/ui.
   "extends": "./tsconfig.json",
   "compilerOptions": { "noImplicitAny": true },
-  "include": ["src/core/**/*.js", "src/data/**/*.js"]
+  "include": ["src/core/**/*.js", "src/data/**/*.js", "src/storage/**/*.js", "src/services/**/*.js"]
 }
