@@ -278,6 +278,10 @@ export function isCoarsePointer(){
   return window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
+/**
+ * @param {{title: string, segmentStart: Date, segmentEnd: Date, exactTime: Date|null}|null} [calendarData]
+ *   what an "Add to calendar" link would carry; a hover has none, only a popup does
+ */
 export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, scope="personal"){
   setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope);
   tooltip.style.display = "block";

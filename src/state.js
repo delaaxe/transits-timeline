@@ -11,6 +11,22 @@ export const showWorldRowsKey = "tt_show_world_rows";
 
 export const showRangeNavKey = "tt_show_range_nav";
 
+/**
+ * The last completed computation, kept so "Show more" can paginate without
+ * recomputing. It is the shape the whole chart is drawn from - timeline.js
+ * reads it in a dozen places - so it is written down here rather than inferred
+ * from the one assignment in app.js, where `null` was all the checker ever saw.
+ *
+ * @typedef {Object} CachedResults
+ * @property {Date} start            first day of the range, local midnight
+ * @property {Date} endExclusive     one day past the last, local midnight
+ * @property {boolean} showTime      windows carry a time, not just a date
+ * @property {string|null} presetKey the preset the query came from, if any
+ * @property {import("./core/job.js").Rule[]} rules        one per row, sorted
+ * @property {import("./core/events.js").AspectEvent[][]} events  per rule, sorted
+ * @property {string|null} chartRuler the sign ruler of the chart's Ascendant
+ */
+
 export const state = {
   // Null once the reader edits the query the preset filled: no chip is lit,
   // because none of them describes what is on screen any more.
@@ -47,6 +63,7 @@ export const state = {
   /** @type {import("./services/search.js").Jump[]} */
   focusTrail: [],
   // Last computation, so "Show more" can paginate without recomputing.
+  /** @type {CachedResults|null} */
   cachedResults: null,
   currentMaxRows: 50,
   isComputing: false,
@@ -55,6 +72,10 @@ export const state = {
   lastTimelineRefreshAt: 0,
   lastRefocusCheckAt: 0,
   labelsUseSymbols: false,
+  // Derived from the function that produces it rather than copied: a field
+  // added to the layout is then typed here without a second edit, and the two
+  // cannot drift.
+  /** @type {ReturnType<typeof import("./ui/svg.js").computeTimelineLayout>|null} */
   currentLayout: null,
   // Whether the arrows that move the range are on screen. Off to start with,
   // which is where they were: they used to come up with the options drawer, and

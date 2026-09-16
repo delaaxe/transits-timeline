@@ -56,8 +56,8 @@ const STUB_FRACTION = 0.05;
 // The rows worth drawing, as indices into the cache. Kept as a list rather than
 // a slice because the row cap and the label column both have to agree with the
 // chart about which lines exist.
-function visibleRows(){
-  const cache = state.cachedResults;
+/** @param {import("../state.js").CachedResults} cache */
+function visibleRows(cache){
   const startMs = cache.start.getTime();
   const endMs = cache.endExclusive.getTime();
   const idxs = [];
@@ -69,7 +69,8 @@ function visibleRows(){
 }
 
 export function renderFromCache(limit){
-  if (!state.cachedResults){
+  const cache = state.cachedResults;
+  if (!cache){
     updateShowMore(0, 0);
     return;
   }
@@ -77,40 +78,40 @@ export function renderFromCache(limit){
   state.currentLayout = layout;
   const threshold = Math.max(0, layout.labelWMax - layout.labelWMin);
   state.labelsUseSymbols = !!el.timelineScroll && el.timelineScroll.scrollLeft >= threshold;
-  const keep = visibleRows();
+  const keep = visibleRows(cache);
   const total = keep.length;
   const shown = Math.min(total, Math.max(0, Math.floor(Number(limit || 0))));
-  const rules = keep.slice(0, shown).map(i => state.cachedResults.rules[i]);
-  const events = keep.slice(0, shown).map(i => state.cachedResults.events[i]);
+  const rules = keep.slice(0, shown).map(i => cache.rules[i]);
+  const events = keep.slice(0, shown).map(i => cache.events[i]);
 
-  const spanMs = state.cachedResults.endExclusive.getTime() - state.cachedResults.start.getTime();
+  const spanMs = cache.endExclusive.getTime() - cache.start.getTime();
   const showYear = (spanMs / (365.25 * 24 * 3600 * 1000)) >= 3;
 
   renderAxisSVG({
     svg: el.dateAxisSvg,
-    start: state.cachedResults.start,
-    endExclusive: state.cachedResults.endExclusive,
-    showTime: state.cachedResults.showTime,
+    start: cache.start,
+    endExclusive: cache.endExclusive,
+    showTime: cache.showTime,
     layout
   });
 
   renderLabelsSVG({
     svg: el.aspectAxisSvg,
     rules,
-    chartRuler: state.cachedResults.chartRuler,
+    chartRuler: cache.chartRuler,
     layout,
     useSymbols: state.labelsUseSymbols
   });
 
   renderTimelineSVG({
     svg: el.timelineSvg,
-    start: state.cachedResults.start,
-    endExclusive: state.cachedResults.endExclusive,
+    start: cache.start,
+    endExclusive: cache.endExclusive,
     rules,
     eventsByRule: events,
-    showTime: state.cachedResults.showTime,
-    presetKey: state.cachedResults.presetKey,
-    chartRuler: state.cachedResults.chartRuler,
+    showTime: cache.showTime,
+    presetKey: cache.presetKey,
+    chartRuler: cache.chartRuler,
     layout,
     showYear
   });
@@ -210,18 +211,19 @@ export function symbolsThreshold(){
 // comparison is all that runs until the crossing, and the crossing redraws only
 // the label column, not the timeline and date axis with it.
 export function updateLabelsMode(){
-  if (!state.cachedResults || !el.timelineScroll || !state.currentLayout) return;
+  const cache = state.cachedResults;
+  if (!cache || !el.timelineScroll || !state.currentLayout) return;
   const shouldUseSymbols = el.timelineScroll.scrollLeft >= symbolsThreshold();
   if (shouldUseSymbols === state.labelsUseSymbols) return;
   state.labelsUseSymbols = shouldUseSymbols;
 
-  const keep = visibleRows();
+  const keep = visibleRows(cache);
   const total = keep.length;
   const shown = Math.min(total, Math.max(0, Math.floor(Number(state.currentMaxRows || 0))));
   renderLabelsSVG({
     svg: el.aspectAxisSvg,
-    rules: keep.slice(0, shown).map(i => state.cachedResults.rules[i]),
-    chartRuler: state.cachedResults.chartRuler,
+    rules: keep.slice(0, shown).map(i => cache.rules[i]),
+    chartRuler: cache.chartRuler,
     layout: state.currentLayout,
     useSymbols: state.labelsUseSymbols
   });
@@ -233,11 +235,12 @@ export function updateLabelsMode(){
  * cache is not its place on screen.
  */
 export function visibleRowIndexOf(rule){
-  if (!state.cachedResults || !rule) return -1;
+  const cache = state.cachedResults;
+  if (!cache || !rule) return -1;
   const key = ruleKey(rule);
-  const keep = visibleRows();
+  const keep = visibleRows(cache);
   for (let i = 0; i < keep.length; i++){
-    if (ruleKey(state.cachedResults.rules[keep[i]]) === key) return i;
+    if (ruleKey(cache.rules[keep[i]]) === key) return i;
   }
   return -1;
 }

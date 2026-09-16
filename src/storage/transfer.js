@@ -31,9 +31,8 @@ export function parseCharts(text){
   const raw = looksLikeAAF(text) ? parseAAF(text) : fromJSON(text);
   if (!raw) throw new Error("That data is damaged.");
   const charts = raw.map((p) => {
-    const c = normalizeChart(p);
     // isDefault marks the seeded sample, which is a local fact, not a chart.
-    delete c.isDefault;
+    const { isDefault, ...c } = normalizeChart(p);
     return c;
   });
   if (charts.length === 0) throw new Error("That data has no charts in it.");

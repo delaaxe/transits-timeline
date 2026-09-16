@@ -216,6 +216,7 @@ function recordToChart(record){
  */
 export function parseAAF(text){
   const charts = [];
+  /** @type {{a93: string[], b93: string[]|null, znam: string}|null} */
   let record = null;
   let skipping = false;
   const finish = () => {

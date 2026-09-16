@@ -191,8 +191,8 @@ export function aspectSymbol(key){ return aspects.find(a => a[0] === key)?.[1]?.
 export function mythKeyFor(a, b){
   const pa = String(a || "");
   const pb = String(b || "");
-  const ia = orderMap.has(pa) ? orderMap.get(pa) : Number.MAX_SAFE_INTEGER;
-  const ib = orderMap.has(pb) ? orderMap.get(pb) : Number.MAX_SAFE_INTEGER;
+  const ia = orderMap.get(pa) ?? Number.MAX_SAFE_INTEGER;
+  const ib = orderMap.get(pb) ?? Number.MAX_SAFE_INTEGER;
   const [first, second] = (ia === ib) ? [pa, pb] : (ia < ib ? [pa, pb] : [pb, pa]);
   return `${first}-aspect-${second}`;
 }

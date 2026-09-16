@@ -141,6 +141,11 @@ export function setAdvancedVisible(isVisible, { animate = true } = {}){
   }
 }
 
+/**
+ * @param {HTMLElement|null} wrap
+ * @param {string|null} activeId
+ * @param {{allowAdd?: boolean, disableId?: string|null}} [opts]
+ */
 export function renderChartButtonsFor(wrap, activeId, { allowAdd=true, disableId=null } = {}){
   if (!wrap) return;
   wrap.innerHTML = "";
