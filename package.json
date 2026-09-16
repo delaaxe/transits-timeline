@@ -9,7 +9,7 @@
     "dev": "python3 -m http.server 8931",
     "test": "node --test \"test/*.test.mjs\"",
     "typecheck": "tsc -p tsconfig.json",
-    "check": "npm test && npm run typecheck && npm run build"
+    "check": "npm test && npm run typecheck && ALLOW_MISSING_API_KEY=1 npm run build"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
