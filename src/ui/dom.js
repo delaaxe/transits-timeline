@@ -72,6 +72,8 @@ export const el = {
   aspectsAllBtn: $("aspectsAllBtn"),
   aspectsNoneBtn: $("aspectsNoneBtn"),
   advancedToggle: $("advancedToggle"),
+  timelineNav: $("timelineNav"),
+  timelineNavToggle: $("timelineNavToggle"),
   updateBtn: $("updateBtn"),
   status: $("status"),
   rangeShiftBack: $("rangeShiftBack"),

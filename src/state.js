@@ -2,6 +2,15 @@
 // each module still owns the state only it touches.
 import { defaultPresetKey } from "./data/presets.js";
 
+// Above the state they seed, and not below it. The loaders run while the object
+// literal is being built, so a key declared after it is still in its temporal
+// dead zone when one reads it - and the try/catch that is there for a browser
+// with storage blocked would swallow the ReferenceError and hand back the
+// default, every time, for ever. Which is exactly what it did.
+export const showWorldRowsKey = "tt_show_world_rows";
+
+export const showRangeNavKey = "tt_show_range_nav";
+
 export const state = {
   // Null once the reader edits the query the preset filled: no chip is lit,
   // because none of them describes what is on screen any more.
@@ -46,10 +55,13 @@ export const state = {
   lastTimelineRefreshAt: 0,
   lastRefocusCheckAt: 0,
   labelsUseSymbols: false,
-  currentLayout: null
+  currentLayout: null,
+  // Whether the arrows that move the range are on screen. Off to start with,
+  // which is where they were: they used to come up with the options drawer, and
+  // that drawer starts closed. Remembered, so a reader who wants them has them
+  // from then on.
+  showRangeNav: loadShowRangeNav()
 };
-
-export const showWorldRowsKey = "tt_show_world_rows";
 
 // Remembered between visits, and defaulting to on. Guarded because this module
 // is imported by tests in Node, where there is no localStorage, and because a
@@ -66,8 +78,29 @@ function loadShowWorldRows(){
 /** @param {boolean} on */
 export function setShowWorldRows(on){
   state.showWorldRows = !!on;
+  remember(showWorldRowsKey, on);
+}
+
+// The other way round from the one above: absent means off, because the arrows
+// were not on screen before this switch existed either.
+function loadShowRangeNav(){
   try {
-    localStorage.setItem(showWorldRowsKey, on ? "1" : "0");
+    return localStorage.getItem(showRangeNavKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** @param {boolean} on */
+export function setShowRangeNav(on){
+  state.showRangeNav = !!on;
+  remember(showRangeNavKey, on);
+}
+
+/** @param {string} key @param {boolean} on */
+function remember(key, on){
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
   } catch {
     // A reader with storage blocked keeps the setting for this visit only,
     // which is better than the toggle refusing to move.

@@ -1,4 +1,4 @@
-import { state } from "../state.js";
+import { setShowRangeNav, state } from "../state.js";
 import { requestUpdate } from "../refresh.js";
 import { calcNatalAscDeg, calcNatalMCDeg, computeCompositeChart } from "../core/chart.js";
 import { ephemerisAstronomy, getBodyLonFromAll } from "../core/ephemeris.js";
@@ -11,6 +11,7 @@ import { $, debounce, el, escapeHTML, installHint, installHintText, setStatus } 
 import { getCheckedAspects, renderAspectChecks } from "./aspects.js";
 import { applyBodySets, renderBodyPicker, selectedBodies } from "./bodies.js";
 import { clearRowFocus } from "./rowfocus.js";
+import { renderFromCache } from "./timeline.js";
 import { fmtBirthPretty, fmtCoord } from "./format.js";
 import { wireChartReorder } from "./chart-drag.js";
 import { wireTransferUI } from "./transfer.js";
@@ -47,11 +48,44 @@ export function expandRange(direction){
   }
 }
 
+/**
+ * Shows or hides the arrows that move the range.
+ *
+ * The corner block is sized from --timeline-nav-total, because it has to cover
+ * the label column for the whole height of the axis and the arrows above it.
+ * With the arrows gone there is no row to cover, so the variable goes to zero
+ * and comes back by being removed rather than by being set: the stylesheet
+ * gives the row a taller value on a touch screen, and a number written here
+ * would overwrite that.
+ *
+ * @param {boolean} isVisible
+ */
+export function setRangeNavVisible(isVisible){
+  setShowRangeNav(isVisible);
+  const on = state.showRangeNav;
+  if (el.timelineNav) el.timelineNav.hidden = !on;
+  if (on) document.documentElement.style.removeProperty("--timeline-nav-total");
+  else document.documentElement.style.setProperty("--timeline-nav-total", "0px");
+  if (el.timelineNavToggle){
+    el.timelineNavToggle.setAttribute("aria-expanded", on ? "true" : "false");
+    // The same band the preset chips take when they are on, which is how the
+    // options button beside it says the same thing.
+    el.timelineNavToggle.classList.toggle("active", on);
+  }
+  // The arrows sit inside the sticky axis block, so showing them changes how
+  // tall it is and how far the chart has to travel under it.
+  if (state.cachedResults) renderFromCache(state.currentMaxRows);
+}
+
 export function wireRangeNav(){
   if (el.rangeShiftBack) el.rangeShiftBack.addEventListener("click", () => shiftRange(-1));
   if (el.rangeShiftForward) el.rangeShiftForward.addEventListener("click", () => shiftRange(1));
   if (el.rangeExpandBack) el.rangeExpandBack.addEventListener("click", () => expandRange(-1));
   if (el.rangeExpandForward) el.rangeExpandForward.addEventListener("click", () => expandRange(1));
+  setRangeNavVisible(state.showRangeNav);
+  if (el.timelineNavToggle){
+    el.timelineNavToggle.addEventListener("click", () => setRangeNavVisible(!state.showRangeNav));
+  }
 }
 
 export function readRuleOptions(){

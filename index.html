@@ -1412,6 +1412,15 @@
 <div id="mainContent">
   <div class="viewBar" id="viewBar">
     <div id="presetButtons" class="presetButtons" role="listbox" aria-label="Preset"></div>
+    <!-- The range arrows have their own switch. Moving the window is a reading
+         gesture, not a setting, and it had been living behind the same button
+         as the orb and the body chooser - so getting to next week meant opening
+         a drawer full of things you did not come to change. -->
+    <button id="timelineNavToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Move the range" aria-label="Move the range">
+      <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 12h16M9 7l-5 5 5 5M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
     <button id="advancedToggle" type="button" class="linkBtn viewBarToggle" aria-expanded="false" title="Options" aria-label="Options">
       <svg class="iconGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M4 8h10M18 8h2M4 16h4M12 16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
@@ -1495,7 +1504,7 @@
 
   <div class="dateAxisScroll" id="dateAxisScroll">
     <div class="dateAxisScrollInner">
-      <div class="timelineNav" data-advanced>
+      <div class="timelineNav" id="timelineNav" hidden>
         <div class="timelineNavGroup">
           <button class="timelineNavBtn" id="rangeShiftBack" type="button" aria-label="Shift range backward" title="Shift backward">‹</button>
           <button class="timelineNavBtn" id="rangeExpandBack" type="button" aria-label="Extend range backward" title="Extend backward">«</button>
