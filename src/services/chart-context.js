@@ -49,7 +49,7 @@ export function currentChartContext(){
 
 /**
  * The fixed longitude of each natal point a scan is about to look for. World
- * mode has none: both ends of a sky aspect move.
+ * mode has none: both ends of a world transit move.
  *
  * @param {ChartContext} ctx @param {string[]} targets
  * @returns {Record<string, number>|null}

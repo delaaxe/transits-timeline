@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { onRequestUpdate } from "./refresh.js";
 import { ephemerisAstronomy } from "./core/ephemeris.js";
 import { addDaysLocal, parseLocalDateOnly } from "./core/time.js";
-import { buildCandidateRules, buildSkyRules } from "./core/transits.js";
+import { buildCandidateRules, buildWorldRules } from "./core/transits.js";
 import { orderMap } from "./data/bodies.js";
 import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./services/chart-context.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
@@ -39,30 +39,31 @@ export function wireStaleRefreshOnRefocus(){
 /**
  * Every rule the chart is about to draw, in the order the rows start out in.
  *
- * World mode is the sky alone, as it always was. A personal chart is the natal
- * contacts, and - unless the reader has turned it off - the sky folded in after
- * them, so one scan answers both and the rows sort together by first hit.
+ * World mode is world transits alone, as it always was. A personal chart is the
+ * natal contacts, and - unless the reader has turned it off - the world
+ * transits folded in after them, so one scan answers both and the rows sort
+ * together by first hit.
  *
- * The sky half is never the reason a chart fails to draw. A selection too thin
- * to make a sky aspect contributes nothing rather than throwing: the reader was
- * asking about their chart, and a setting they left on months ago should not be
- * able to take that away from them.
+ * The world half is never the reason a chart fails to draw. A selection too
+ * thin to make a world transit contributes nothing rather than throwing: the
+ * reader was asking about their chart, and a setting they left on months ago
+ * should not be able to take that away from them.
  *
  * @param {import("./services/chart-context.js").ChartContext} ctx
  * @param {ReturnType<typeof readRuleOptions>} opts
  */
 function buildRules(ctx, opts){
-  const sky = ({ bodies }) => (bodies.length >= 2)
-    ? buildSkyRules({ bodies, aspects: opts.aspects, orb: opts.orb })
+  const worldRulesFor = (bodies) => (bodies.length >= 2)
+    ? buildWorldRules({ bodies, aspects: opts.aspects, orb: opts.orb })
     : [];
 
   if (ctx.mode === "world"){
-    if (opts.skyBodies.length < 2) throw new Error("Pick at least two bodies: a sky aspect needs both ends.");
-    return sky({ bodies: opts.skyBodies });
+    if (opts.worldBodies.length < 2) throw new Error("Pick at least two bodies: a world transit needs both ends.");
+    return worldRulesFor(opts.worldBodies);
   }
 
-  const worldRules = state.showWorldRows ? sky({ bodies: opts.skyBodies }) : [];
-  // With the sky on screen the chart is not empty, so an empty personal
+  const worldRules = state.showWorldRows ? worldRulesFor(opts.worldBodies) : [];
+  // With world transits on screen the chart is not empty, so an empty personal
   // selection is a narrowing rather than a mistake, and saying so would be
   // telling the reader to fix something that is not broken.
   const demand = (message) => { if (worldRules.length === 0) throw new Error(message); };
@@ -117,7 +118,7 @@ export async function updateTimeline(){
     // helps: on a multi-year view a date is what the eye wants.
     const showTime = spanDays <= 60;
 
-    // The personal rules only: the far end of a sky rule is a body in the sky,
+    // The personal rules only: the far end of a world rule is a moving body,
     // and asking a birth chart where it sits would be answering a question
     // nothing asked.
     const natalTargets = Array.from(new Set(

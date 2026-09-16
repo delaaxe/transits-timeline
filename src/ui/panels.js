@@ -61,7 +61,7 @@ export function readRuleOptions(){
     transitBodies: bodies.transit ?? [],
     natalBodies: bodies.natal ?? [],
     involvingBodies: bodies.involving ?? [],
-    skyBodies: bodies.sky ?? [],
+    worldBodies: bodies.world ?? [],
     aspects: getCheckedAspects(),
     orb: Number($("orb").value || 1.0)
   };
@@ -203,7 +203,7 @@ export function renderAppModeSection(){
   if (el.personalPanel) el.personalPanel.hidden = !appModeIsPersonal;
   if (el.personalSection) el.personalSection.hidden = !appModeIsPersonal;
   // The natal end of the chooser, and with it both angles, belongs to a birth
-  // chart: the sky has neither a natal side nor an Ascendant.
+  // chart: a world transit has neither a natal side nor an Ascendant.
   renderBodyPicker();
 }
 
@@ -366,13 +366,13 @@ export function setAppMode(modeKey){
     state.chartSummaryVisible = false;
     if (el.addChartPanel) el.addChartPanel.style.display = "none";
   }
-  // A row of the sky is not a row of a birth chart, so whatever was focused
+  // A world transit is not a row of a birth chart, so whatever was focused
   // does not survive the crossing.
   clearRowFocus();
   // A preset describes both modes at once - each carries its own set of bodies
-  // for the sky - so reapplying it is what puts the sky's half in place. A
+  // for the world - so reapplying it is what puts that half in place. A
   // selection built by hand is left alone: the three lists are separate, and
-  // glancing at the sky and coming back is no way to lose one.
+  // glancing at the World view and coming back is no way to lose one.
   if (state.activePresetKey) applyPreset(state.activePresetKey);
   renderPersonalSection();
 }
@@ -692,10 +692,10 @@ export function applyPreset(key){
   state.activePresetKey = p.key;
   renderPresetSection();
 
-  // Both ends and the sky set at once, whichever mode is showing: a preset is a
+  // Both ends and the world set at once, whichever mode is showing: a preset is a
   // whole query, and half-filling the one that is out of sight would leave the
   // other mode holding a selection nothing chose.
-  applyBodySets({ transit: p.transit, natal: p.natal, sky: p.world.bodies });
+  applyBodySets({ transit: p.transit, natal: p.natal, world: p.world.bodies });
   el.orb.value = String(p.orb);
   state.currentMaxRows = 50;
   renderAspectChecks(p.aspects);

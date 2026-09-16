@@ -17,14 +17,14 @@ import { aspectAngle, maxSpeedDegPerDay } from "../data/bodies.js";
  * @property {number} startMs
  * @property {number} endMs exclusive
  * @property {{lon:number, lat:number, height:number}} observer
- * @property {Record<string, number>|null} natalLon fixed natal longitudes; sky rules need none
+ * @property {Record<string, number>|null} natalLon fixed natal longitudes; world rules need none
  * @property {Rule[]} rules
  */
 
 /**
  * Which question a rule asks. It is a property of the rule rather than of the
- * job, because one job now carries both: a personal chart with the sky folded
- * into it scans natal contacts and sky meetings in the same pass, over one
+ * job, because one job now carries both: a personal chart with world transits
+ * folded into it scans both kinds in the same pass, over one
  * cache of longitudes. The job's mode is the fallback for a rule that predates
  * the stamp - the occurrence search builds one by hand, and the tests pass
  * plain literals.
@@ -59,12 +59,12 @@ function makeLonReader(observer){
 /**
  * Rules that share one moving angle share one scan. Against a natal chart that
  * is every rule with the same transiting body, whatever it aspects: the natal
- * points are fixed, so they are offsets on the same longitude. For a sky rule
+ * points are fixed, so they are offsets on the same longitude. For a world rule
  * both ends move, so the shared angle is the separation and a scan covers one
  * pair of bodies.
  *
  * The two kinds can arrive in the same list, so the scope is part of the group
- * key: "mars|saturn|1" as a sky pair and a natal contact on transiting Mars are
+ * key: "mars|saturn|1" as a world pair and a natal contact on transiting Mars are
  * different scans and must not land in the same bucket.
  *
  * @param {Rule[]} rules

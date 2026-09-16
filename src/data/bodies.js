@@ -97,22 +97,22 @@ export const order = ["sun","moon","mercury","venus","mars","jupiter","saturn","
 export const orderMap = new Map(order.map((k,i)=>[k,i]));
 
 // Mercury and Venus orbit inside Earth's, so their elongation from the Sun is
-// bounded and some sky-to-sky aspects between the three simply cannot happen: a
+// bounded and some world transits between the three simply cannot happen: a
 // Sun-Mercury square needs 90 degrees of separation and Mercury never manages 28.
 // Measured against this ephemeris over 1990-2050 (27.8, 47.2, 73.8) and rounded
 // up, with test/events.test.mjs re-measuring them so a wrong figure fails rather
 // than quietly dropping real aspects. Only world mode is constrained this way -
 // a natal Venus sits wherever it sits, so buildCandidateRules ignores this.
-export const maxSkySeparationDeg = {
+export const maxSeparationDeg = {
   "sun-mercury": 28,
   "sun-venus": 48,
   "mercury-venus": 76
 };
 
 /** The widest these two can get apart in the sky, or Infinity if unbounded. */
-export function maxSkySeparation(a, b){
+export function maxSeparation(a, b){
   const key = (orderMap.get(a) ?? 0) <= (orderMap.get(b) ?? 0) ? `${a}-${b}` : `${b}-${a}`;
-  return maxSkySeparationDeg[key] ?? Infinity;
+  return maxSeparationDeg[key] ?? Infinity;
 }
 
 /** @type {[string, string, number][]} */
@@ -223,7 +223,7 @@ export function zodiacSign(deg){
  * other fifty-nine.
  *
  * The scope is part of it because a chart can hold both kinds at once: Mars
- * square Saturn in the sky and transiting Mars square a natal Saturn are the
+ * square Saturn as a world transit and transiting Mars square a natal Saturn are the
  * same three words and two different rows, and without the scope following one
  * of them would light both.
  *

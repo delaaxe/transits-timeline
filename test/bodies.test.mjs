@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { angleKeys, bodyPresets, natalKeys, normalizeBodies, order, ruleKey, sameBodies, transitingKeys } from "../src/data/bodies.js";
 import { presets } from "../src/data/presets.js";
-import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
+import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
 
 const keysOf = (rules) => rules.map(r => `${r.transit}-${r.aspect}-${r.natal}`);
 
@@ -87,14 +87,14 @@ test("the mean node is read by conjunction alone, on the side that moves", () =>
   assert.equal(toNatalNode.length, 3);
 });
 
-test("a sky pair is named once, in chart order, whichever order it was chosen in", () => {
-  const forwards = keysOf(buildSkyRules({ bodies: ["mars", "venus"], aspects: ["trine"], orb: 1 }));
-  const backwards = keysOf(buildSkyRules({ bodies: ["venus", "mars"], aspects: ["trine"], orb: 1 }));
+test("a world pair is named once, in chart order, whichever order it was chosen in", () => {
+  const forwards = keysOf(buildWorldRules({ bodies: ["mars", "venus"], aspects: ["trine"], orb: 1 }));
+  const backwards = keysOf(buildWorldRules({ bodies: ["venus", "mars"], aspects: ["trine"], orb: 1 }));
   assert.deepEqual(forwards, ["venus-trine-mars"], "Venus comes before Mars in the chart, so it comes first here");
   assert.deepEqual(forwards, backwards);
 
-  // One body is not a pair, and no body aspects itself in the sky.
-  assert.deepEqual(buildSkyRules({ bodies: ["mars"], aspects: ["trine"], orb: 1 }), []);
+  // One body is not a pair, and no body aspects itself.
+  assert.deepEqual(buildWorldRules({ bodies: ["mars"], aspects: ["trine"], orb: 1 }), []);
 });
 
 test("the sets each end can hold are the ones that make sense there", () => {
@@ -113,13 +113,13 @@ test("every preset names bodies that exist, on ends that can hold them", () => {
   }
 
   for (const p of presets){
-    for (const [side, list] of [["transit", p.transit], ["natal", p.natal], ["sky", p.world.bodies]]){
+    for (const [side, list] of [["transit", p.transit], ["natal", p.natal], ["world", p.world.bodies]]){
       assert.equal(normalizeBodies(list).length, list.length,
         `the ${side} set of "${p.label}" names a body that does not exist, or names one twice`);
     }
     assert.ok(p.transit.every(k => !angleKeys.includes(k)), `"${p.label}" has an angle transiting`);
-    assert.ok(p.world.bodies.every(k => !angleKeys.includes(k)), `"${p.label}" has an angle in the sky`);
-    assert.ok(p.world.bodies.length >= 2, `"${p.label}" cannot make a sky aspect out of one body`);
+    assert.ok(p.world.bodies.every(k => !angleKeys.includes(k)), `"${p.label}" has an angle in its world set`);
+    assert.ok(p.world.bodies.length >= 2, `"${p.label}" cannot make a world transit out of one body`);
     assert.ok(p.transit.length > 0 && p.natal.length > 0, `"${p.label}" would draw nothing`);
   }
 });
@@ -131,25 +131,25 @@ test("a rule carries the question it was built for", () => {
   const opts = { aspects: ["square"], orb: 1 };
   const personal = buildCandidateRules({ transitBodies: ["mars"], natalBodies: ["saturn"], ...opts });
   const involving = buildCandidateRules({ mode: "involving", involvingBodies: ["mars"], ...opts });
-  const sky = buildSkyRules({ bodies: ["mars", "saturn"], ...opts });
+  const world = buildWorldRules({ bodies: ["mars", "saturn"], ...opts });
 
-  assert.ok(personal.length > 0 && involving.length > 0 && sky.length > 0);
+  assert.ok(personal.length > 0 && involving.length > 0 && world.length > 0);
   assert.ok(personal.every(r => r.scope === "personal"), "a natal contact is personal");
   assert.ok(involving.every(r => r.scope === "personal"), "and so is one asked about the other way round");
-  assert.ok(sky.every(r => r.scope === "world"), "a meeting in the sky is not");
+  assert.ok(world.every(r => r.scope === "world"), "a world transit is not");
 });
 
 // The two rules below are the same three words. The row key is what keeps the
 // followed one from lighting both.
-test("the same pairing in the sky and in a chart are different rows", () => {
-  const sky = buildSkyRules({ bodies: ["mars", "saturn"], aspects: ["square"], orb: 1 })[0];
+test("the same pairing as a world transit and in a chart are different rows", () => {
+  const world = buildWorldRules({ bodies: ["mars", "saturn"], aspects: ["square"], orb: 1 })[0];
   const natal = buildCandidateRules({
     transitBodies: ["mars"], natalBodies: ["saturn"], aspects: ["square"], orb: 1
   })[0];
 
-  assert.equal(`${sky.transit}-${sky.aspect}-${sky.natal}`, `${natal.transit}-${natal.aspect}-${natal.natal}`,
+  assert.equal(`${world.transit}-${world.aspect}-${world.natal}`, `${natal.transit}-${natal.aspect}-${natal.natal}`,
     "the pairing the prose is filed under is the same for both");
-  assert.notEqual(ruleKey(sky), ruleKey(natal), "but the row they name is not");
+  assert.notEqual(ruleKey(world), ruleKey(natal), "but the row they name is not");
   assert.equal(ruleKey({ ...natal, scope: undefined }), ruleKey(natal),
     "an unstamped rule is a personal one, so a followed row survives the change");
   assert.equal(ruleKey(null), "");

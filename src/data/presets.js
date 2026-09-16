@@ -23,11 +23,11 @@ const TRANSIT_YEAR = ["jupiter","saturn","uranus","neptune","pluto","node","chir
 const NATAL_NEAR = ["sun","moon","mercury","venus","mars","jupiter","saturn","node","chiron","mc","asc"];
 const NATAL_ALL = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron","mc","asc"];
 
-// World mode has one set rather than two: both ends of a sky aspect move, so
+// World mode has one set rather than two: both ends of a world transit move, so
 // there is no transiting side and no natal side to tell apart.
-const SKY_ALL = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron"];
-const SKY_NO_MOON = SKY_ALL.filter(k => k !== "moon");
-const SKY_OUTER = ["jupiter","saturn","uranus","neptune","pluto","node","chiron"];
+const WORLD_ALL = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto","node","chiron"];
+const WORLD_NO_MOON = WORLD_ALL.filter(k => k !== "moon");
+const WORLD_OUTER = ["jupiter","saturn","uranus","neptune","pluto","node","chiron"];
 
 export const defaultPresetKey = "week";
 
@@ -40,20 +40,20 @@ export const presets = [
     transit: TRANSIT_TODAY, natal: NATAL_NEAR,
     aspects: ALL_ASPECTS, orb:1.5,
     range:{startOffsetDays:0, endOffsetDays:0},
-    world:{ bodies: SKY_ALL } },
+    world:{ bodies: WORLD_ALL } },
   { key:"week", label:"Week",
     transit: TRANSIT_WEEK, natal: NATAL_ALL,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-1, endOffsetDays:6},
-    world:{ bodies: SKY_NO_MOON } },
+    world:{ bodies: WORLD_NO_MOON } },
   { key:"month", label:"Month",
     transit: TRANSIT_MONTH, natal: NATAL_ALL,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-7, endOffsetDays:29},
-    world:{ bodies: SKY_NO_MOON } },
+    world:{ bodies: WORLD_NO_MOON } },
   { key:"basic_longterm", label:"Year",
     transit: TRANSIT_YEAR, natal: NATAL_ALL,
     aspects: ALL_ASPECTS, orb:1.0,
     range:{startOffsetDays:-90, endOffsetDays:364},
-    world:{ bodies: SKY_OUTER } }
+    world:{ bodies: WORLD_OUTER } }
 ];

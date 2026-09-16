@@ -9,17 +9,17 @@ export const state = {
   activePresetKey: defaultPresetKey,
   chartSummaryVisible: false,
   appMode: "personal",
-  // Whether a personal chart also carries the sky. On by default: what the
-  // planets are doing to each other is the weather every chart is read in, and
-  // a reader who has never found the World view has never been offered it.
-  // World mode is unaffected - it is the sky alone, and there is nothing to
-  // fold in.
+  // Whether a personal chart also carries the world transits. On by default:
+  // what the planets are doing to each other is the weather every chart is read
+  // in, and a reader who has never found the World view has never been offered
+  // it. World mode is unaffected - it is world transits and nothing else, so
+  // there is nothing to fold in.
   showWorldRows: loadShowWorldRows(),
-  // The body chooser's selection. Three lists rather than two: world mode asks
-  // about one set of bodies in the sky, and losing a personal selection because
-  // the sky was glanced at would be its own small annoyance.
-  /** @type {{transit:string[], natal:string[], sky:string[], involving:string[]}} */
-  bodies: { transit: [], natal: [], sky: [], involving: [] },
+  // The body chooser's selection. Three lists rather than two: world transits
+  // ask about one set of bodies, and losing a personal selection because the
+  // World view was glanced at would be its own small annoyance.
+  /** @type {{transit:string[], natal:string[], world:string[], involving:string[]}} */
+  bodies: { transit: [], natal: [], world: [], involving: [] },
   // Which question is being asked, and so which lists the chooser shows.
   // See buildCandidateRules.
   /** @type {"directed"|"involving"} */
@@ -27,7 +27,7 @@ export const state = {
   // The row picked off the aspect axis, if any: {transit, aspect, natal}. It is
   // highlighted in the chart and is what the previous/next search steps through.
   // The scope comes with it because a chart can hold both a natal contact and a
-  // sky meeting on the same three bodies, and they are different rows.
+  // world transit on the same three bodies, and they are different rows.
   /** @type {{transit:string, aspect:string, natal:string, orb?:number, scope:"personal"|"world"}|null} */
   focusRule: null,
   focusStatus: "",

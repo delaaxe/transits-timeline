@@ -1,6 +1,6 @@
 // Which transits to look for. The looking itself is core/events.js.
 
-import { aspectAngle, isAngle, maxSkySeparation, natalKeys, normalizeBodies, transitingKeys } from "../data/bodies.js";
+import { aspectAngle, isAngle, maxSeparation, natalKeys, normalizeBodies, transitingKeys } from "../data/bodies.js";
 
 /**
  * Every transiting-body-to-natal-point pair the selection asks for.
@@ -14,7 +14,7 @@ import { aspectAngle, isAngle, maxSkySeparation, natalKeys, normalizeBodies, tra
  * answer is "all of it".
  *
  * Every rule is stamped with the scope it was built for, because a chart can
- * now hold both kinds at once: the sky rows sit among the natal ones, and by
+ * now hold both kinds at once: the world rows sit among the natal ones, and by
  * the time a rule reaches the scan there is nothing else about it that says
  * which of the two questions it came from.
  *
@@ -53,7 +53,7 @@ function directedPairs(transitBodies, natalBodies){
 /**
  * Every pair with one of these at one end and anything at the other. A body
  * appears on both sides - transiting Mars over the chart, and everything in the
- * sky over natal Mars - which between them is what "involving Mars" means.
+ * chart over natal Mars - which between them is what "involving Mars" means.
  *
  * @returns {[string, string][]}
  */
@@ -77,28 +77,29 @@ function involvingPairs(involvingBodies){
 }
 
 /**
- * Every aspect between two bodies in the sky. One set rather than two: both
+ * Every world transit: an aspect between two moving bodies. One set rather
+ * than two: both
  * ends move, so a pair has no direction and each is generated once, in chart
  * order.
  *
  * These carry scope "world", which is what tells the scan to read both ends as
- * moving and the chart to read the row as a meeting in the sky rather than a
+ * moving and the chart to read the row as a world transit rather than a
  * contact with a birth chart.
  *
  * @param {{bodies:string[], aspects:string[], orb:number}} opts
  */
-export function buildSkyRules({ bodies, aspects, orb }){
-  const sky = normalizeBodies(bodies).filter(k => !isAngle(k));
+export function buildWorldRules({ bodies, aspects, orb }){
+  const world = normalizeBodies(bodies).filter(k => !isAngle(k));
   /** @type {import("./job.js").Rule[]} */
   const rules = [];
-  for (let i=0; i<sky.length; i++){
-    for (let j=i+1; j<sky.length; j++){
+  for (let i=0; i<world.length; i++){
+    for (let j=i+1; j<world.length; j++){
       for (const asp of aspects){
-        if ((sky[i] === "node" || sky[j] === "node") && asp !== "conjunction") continue;
+        if ((world[i] === "node" || world[j] === "node") && asp !== "conjunction") continue;
         // An aspect the pair can never reach is not a transit that never fires,
         // it is a scan of the whole range looking for nothing.
-        if (aspectAngle(asp) - orb > maxSkySeparation(sky[i], sky[j])) continue;
-        rules.push({ transit: sky[i], aspect: asp, natal: sky[j], orb, scope: "world" });
+        if (aspectAngle(asp) - orb > maxSeparation(world[i], world[j])) continue;
+        rules.push({ transit: world[i], aspect: asp, natal: world[j], orb, scope: "world" });
       }
     }
   }

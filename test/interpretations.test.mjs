@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { buildCandidateRules, buildSkyRules } from "../src/core/transits.js";
+import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
 import { aspects, mythKeyFor, natalKeys, planets, transitingKeys, transitTiming } from "../src/data/bodies.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,7 +21,7 @@ const readJson = async (name) => JSON.parse(await readFile(join(repoRoot, name),
  *  controls: both builders are monotone in the bodies they are given - adding a
  *  body only ever adds rules - so every selection's keys are a subset of the
  *  keys the full sets produce, in both link modes. The orb is still swept, since
- *  buildSkyRules drops aspects a pair cannot reach and how many depends on how
+ *  buildWorldRules drops aspects a pair cannot reach and how many depends on how
  *  wide the orb is. */
 function reachableKeys(build){
   const keys = new Set();
@@ -40,7 +40,7 @@ function reachableKeys(build){
 }
 
 const personalKeys = () => reachableKeys(buildCandidateRules);
-const worldKeys = () => reachableKeys(buildSkyRules);
+const worldKeys = () => reachableKeys(buildWorldRules);
 const allKeys = () => new Set([...personalKeys(), ...worldKeys()]);
 
 test("every transit the scan can produce has a description", async () => {
@@ -64,7 +64,7 @@ test("every transit the scan can produce has a myth", async () => {
   assert.deepEqual([...new Set(missing)], [], "a bar would offer no Mythologically toggle");
 });
 
-test("every sky-to-sky aspect has a world reading", async () => {
+test("every world transit has a world reading", async () => {
   const world = await readJson("world.json");
   const missing = [...worldKeys()].filter(k => !world[k]);
   assert.deepEqual(missing, [], `world bars would open with an empty tooltip: ${missing.join(", ")}`);
@@ -74,7 +74,7 @@ test("no world reading is unreachable", async () => {
   const world = await readJson("world.json");
   const reachable = worldKeys();
   const dead = Object.keys(world).filter(k => !reachable.has(k));
-  assert.deepEqual(dead, [], `world prose no sky scan can reach: ${dead.join(", ")}`);
+  assert.deepEqual(dead, [], `world prose no world scan can reach: ${dead.join(", ")}`);
 });
 
 test("world readings never address a person", async () => {

@@ -171,18 +171,18 @@ export function refreshTooltipContent(){
  *
  * `scope` comes from the row rather than from the mode the app is in, because a
  * personal chart carries both kinds of row at once: the bar above this one can
- * be a natal contact and this one a meeting in the sky.
+ * be a natal contact and this one a world transit.
  */
 export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope="personal"){
   shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope];
   // Two bodies meeting in the sky is not the same event as one of them crossing
-  // a place in a birth chart, so a sky row reads from its own file rather than
+  // a place in a birth chart, so a world row reads from its own file rather than
   // from natal prose written in the second person about "your natal Neptune".
   const isWorld = scope === "world";
   const desc = isWorld ? worldDescription(descKey) : aspectDescription(descKey);
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There
-  // is no timing note on a sky row: the figure that matters there is how often
+  // is no timing note on a world row: the figure that matters there is how often
   // the pair meets, which is per-pair rather than per-body, and each world entry
   // carries it in its own words.
   const timing = isWorld ? "" : transitTimingFor(String(descKey).split("-")[0]);

@@ -38,7 +38,7 @@ function ruleTitle(rule){
   const pairing = `${planetLabel(rule.transit)} ${aspectSymbol(rule.aspect)} ${planetLabel(rule.natal)}`;
   // The bar is the one place with room for the words, and on a chart holding
   // both kinds it is the only thing naming which of the two is being followed.
-  return rule.scope === "world" ? `${pairing} in the sky` : pairing;
+  return rule.scope === "world" ? `${pairing} · world transit` : pairing;
 }
 
 /**
@@ -54,8 +54,8 @@ function ruleGlyphs(rule){
   const glyph = (k) => planetSymbols[k] || planetLabel(k);
   const pairing = `${glyph(rule.transit)} ${aspectSymbol(rule.aspect)} ${glyph(rule.natal)}`;
   // Two more characters where seventeen did not fit. A row the words could not
-  // name still has to say which sky it is in, and the glyphs leave room for it.
-  return rule.scope === "world" ? `${pairing} · sky` : pairing;
+  // name still has to say which kind it is, and the glyphs leave room for it.
+  return rule.scope === "world" ? `${pairing} · world` : pairing;
 }
 
 function rangeDays(){
@@ -187,7 +187,7 @@ async function stepOccurrence(direction){
       rule: searchRule,
       direction,
       fromMs,
-      // The row's own scope, not the app's: a sky row followed out of a
+      // The row's own scope, not the app's: a world row followed out of a
       // personal chart is still a pair of moving bodies, and asking the birth
       // chart where its far end sits would send the search after a fixed
       // longitude that nothing in the row is standing at.
@@ -231,9 +231,9 @@ async function stepOccurrence(direction){
 /**
  * Narrows the chooser to the focused row: this pairing, this aspect, alone.
  *
- * Alone means alone. On a personal chart carrying the sky, narrowing to one
- * natal contact has to empty the sky list too, and narrowing to one sky pair
- * has to empty both personal ends - otherwise "Only this" leaves the row the
+ * Alone means alone. On a personal chart carrying world transits, narrowing to
+ * one natal contact has to empty the world list too, and narrowing to one world
+ * pair has to empty both personal ends - otherwise "Only this" leaves the row the
  * reader asked for sitting in a chart of sixty others, which is the thing they
  * pressed it to get away from.
  */
@@ -241,13 +241,13 @@ function showOnlyFocused(){
   const rule = state.focusRule;
   if (!rule) return;
   renderAspectChecks([rule.aspect]);
-  const sky = [rule.transit, rule.natal];
-  // World mode shows nothing but the sky, so the personal lists are out of
-  // sight and stay untouched: glancing at the sky has never been a way to lose
-  // a selection, and pressing a button there should not become one.
-  if (state.appMode === "world") setSelection({ sky });
-  else if (rule.scope === "world") setSelection({ sky, transit: [], natal: [], involving: [] });
-  else setSelection({ mode: "directed", transit: [rule.transit], natal: [rule.natal], sky: [] });
+  const world = [rule.transit, rule.natal];
+  // World mode shows nothing else, so the personal lists are out of sight and
+  // stay untouched: glancing at the World view has never been a way to lose a
+  // selection, and pressing a button there should not become one.
+  if (state.appMode === "world") setSelection({ world });
+  else if (rule.scope === "world") setSelection({ world, transit: [], natal: [], involving: [] });
+  else setSelection({ mode: "directed", transit: [rule.transit], natal: [rule.natal], world: [] });
 }
 
 export function wireRowFocus(){

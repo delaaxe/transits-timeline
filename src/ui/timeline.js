@@ -508,6 +508,20 @@ export function renderAxisSVG({svg, start, endExclusive, showTime, layout}){
   }
 }
 
+/**
+ * Whether this chart holds both kinds of row at once.
+ *
+ * Everything that marks a world row asks this first. A mark is a comparison, so
+ * it is worth drawing only where there is something to compare with: world mode
+ * is every row alike, and so is a personal chart narrowed until nothing but the
+ * world is left. Marking all of them says nothing and costs the chart its quiet.
+ *
+ * @param {{scope?:string}[]} rules
+ */
+export function hasMixedScopes(rules){
+  return rules.some(r => r.scope === "world") && rules.some(r => r.scope !== "world");
+}
+
 export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=false}){
   if (!svg) return;
   clearSvg(svg);
@@ -525,11 +539,7 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 
   const labelX = labelW - 8;
   const focusKey = ruleKey(state.focusRule);
-  // The band tells a sky row from a natal one, so it is worth drawing only
-  // where the chart holds both. World mode is every row the same, and so is a
-  // personal chart narrowed until nothing but the sky is left: banding all of
-  // them says nothing and costs the column its quiet.
-  const mixedScopes = rules.some(r => r.scope === "world") && rules.some(r => r.scope !== "world");
+  const mixedScopes = hasMixedScopes(rules);
 
   for (let idx=0; idx<rules.length; idx++){
     const r = rules[idx];
@@ -542,35 +552,25 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
         fill: "var(--focus-band)", "pointer-events": "none"
       }));
     }
-    // Which sky a row belongs to, said in no characters at all.
+    // A world row's label is dimmed, and that is all the column does about it.
     //
-    // A leading glyph was the obvious marker and the wrong one: the column is a
-    // fixed 130px on a phone, nothing measures or truncates, and "Neptune △
-    // Neptune" already overruns it - so a marker made of text would push the
-    // longest pairings further out of their own column, and one drawn at its
-    // edge would sit under them. The band is behind everything and spans the
-    // whole column, so it reads the same whatever the label is doing, and it
-    // survives the narrowing into glyphs that a sideways scroll puts the column
-    // through. A focused sky row keeps the focus band instead: it is being
-    // followed first and a sky row second.
-    const bandSky = isWorldRow && mixedScopes && !isFocused;
-    if (bandSky){
-      svg.appendChild(svgEl("rect", {
-        x: 0, y, width: labelW, height: rowH,
-        fill: "var(--sky-band)", "pointer-events": "none"
-      }));
-    }
+    // It used to carry a band as well, from when the bars were solid and this
+    // was the only place a per-row mark could go. The bars are drawn through
+    // now, which is where the reader is already looking, so the band was a
+    // second word for something already said - and it spent the column's one
+    // band on a category, when a band there means "this is the row you asked
+    // about". One band, one meaning.
+    const dimWorld = isWorldRow && mixedScopes && !isFocused;
     const t = svgEl("text", {
       x: labelX,
       y: y + rowH/2 + 4,
       "font-size": String(labelFontSize),
       // Colour rather than weight: these labels are already as wide as the
       // column allows, and bold costs a character off the front of the long
-      // ones. The band behind it is doing most of the work anyway.
-      // A banded row is dimmed with it, so the two say one thing together. On a
-      // chart that is all sky there is nothing to contrast with, and the rows
-      // take the ordinary colour.
-      fill: isFocused ? "var(--accent)" : (bandSky ? "var(--muted)" : "var(--text)"),
+      // ones. The dimming is a quiet echo of the fade on the bars beside it; on
+      // a chart that is all one kind there is nothing to contrast with, and
+      // every row takes the ordinary colour.
+      fill: isFocused ? "var(--accent)" : (dimWorld ? "var(--muted)" : "var(--text)"),
       "text-anchor":"end"
     });
 
@@ -580,7 +580,7 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
       { text: transitLabel + " " },
       { text: aspectSymbol(r.aspect) + " " },
       // The underline says "this is your chart's ruler", which a body in the
-      // sky is not - it is only the far end of a pair that happens to share a
+      // world transit is not - it is only the far end of a pair that happens to share a
       // name with it.
       { text: natalLabel, underline: (!useSymbols && !isWorldRow && chartRuler && r.natal === chartRuler) }
     ];
@@ -605,7 +605,7 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
     });
     const title = document.createElementNS(svgNs, "title");
     const pairing = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
-      + (isWorldRow ? " in the sky" : "");
+      + (isWorldRow ? " · world transit" : "");
     title.textContent = `Follow ${pairing}: when it last happened, and when it happens next`;
     hit.appendChild(title);
     // A tap, not a drag. The column sits over a chart that scrolls sideways, so
@@ -627,6 +627,13 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 // over it, the same trick the exact-hit markers use.
 const minBarW = 3;
 const minHitW = 12;
+
+// How solid a world row's windows are on a chart that also holds natal ones. Low
+// enough that a glance sorts the two without reading a word, high enough that
+// the aspect colour still carries and a one-day bar is still a bar. The row
+// guide showing through is the point: these are the weather, and the chart is
+// about the reader.
+const WORLD_BAR_OPACITY = 0.45;
 
 // A bar whose window runs past the edge of the timeline is cut square there and
 // left rounded at the end it really has, so the two read differently. The
@@ -690,6 +697,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
   const spanMs = Math.max(1, endMs - startMs);
   const dateToX = (d) => x0 + ((d.getTime() - startMs) / spanMs) * timelineW;
   const focusKey = ruleKey(state.focusRule);
+  const mixedScopes = hasMixedScopes(rules);
 
   for (let idx=0; idx<rules.length; idx++){
     const r = rules[idx];
@@ -725,11 +733,16 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     }));
 
     const isWorldRow = r.scope === "world";
-    // A sky row says so in its own title: a card headed "Mars □ Saturn" over a
+    // A world row's windows are drawn through rather than solid, which is the
+    // marking that lives where the reader is actually looking: the bars. The
+    // aspect colours are unchanged underneath - a world square is the same square
+    // - so the row still reads as what it is, one plane back.
+    const fadeWorld = isWorldRow && mixedScopes;
+    // A world row says so in its own title: a card headed "Mars □ Saturn" over a
     // personal chart would otherwise read as a contact with the birth chart,
     // which is the one thing it is not.
     const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
-      + (isWorldRow ? " in the sky" : "");
+      + (isWorldRow ? " · world transit" : "");
 
     const events = eventsByRule[idx] ?? [];
     for (const event of events){
@@ -765,6 +778,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         // Two windows that meet in a row would otherwise read as one long bar.
         stroke: isHexColor(barColor) ? darken(barColor, 0.4) : "none",
         "stroke-width": "0.75",
+        ...(fadeWorld ? { opacity: String(WORLD_BAR_OPACITY) } : {}),
         class: "bar"
       });
 
@@ -848,6 +862,10 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           fill: "var(--ink)",
           stroke: isHexColor(barColor) ? darken(barColor, 0.45) : "none",
           "stroke-width": "1",
+          // Fades with its bar. A hard white point on a window drawn through
+          // would be the brightest thing in the row, which is the opposite of
+          // what the fade is for.
+          ...(fadeWorld ? { opacity: String(WORLD_BAR_OPACITY) } : {}),
           "pointer-events": "none"
         }));
       }

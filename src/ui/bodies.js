@@ -22,18 +22,19 @@ export function onBodiesChanged(fn){ changedHandler = fn; }
 
 /**
  * The panes on screen and the list each one edits. World mode has one: both
- * ends of a sky aspect move, so there is no transiting side to tell from a
- * natal one.
+ * ends of a world transit move, so there is no transiting side to tell from a
+ * natal one. Its heading is the bare word, since the mode is already named at
+ * the top of the page and this is the only list it has.
  *
- * A personal chart can have a third. It edits the same sky list world mode
- * does, from its own pane under the pair rather than in place of them - the
- * sky folded into a chart is another question being asked alongside the first,
- * not one of the two ends of it.
+ * A personal chart can have a third. It edits the same list world mode does,
+ * from its own pane under the pair rather than in place of them - world
+ * transits folded into a chart are another question being asked alongside the
+ * first, not one of the two ends of it.
  */
 export function activePanes(){
   if (state.appMode === "world"){
     return [{
-      field: "sky", title: "Bodies in the sky", keys: transitingKeys,
+      field: "world", title: "Bodies", keys: transitingKeys,
       chips: el.transitBodyChips, presets: el.transitBodyPresets
     }];
   }
@@ -52,24 +53,24 @@ export function activePanes(){
       ];
   if (!state.showWorldRows) return personal;
   return [...personal, {
-    field: "sky", title: "Also in the sky", keys: transitingKeys,
-    chips: el.skyBodyChips, presets: el.skyBodyPresets
+    field: "world", title: "Also: world transits", keys: transitingKeys,
+    chips: el.worldBodyChips, presets: el.worldBodyPresets
   }];
 }
 
-/** @param {"transit"|"natal"|"sky"|"involving"} field */
+/** @param {"transit"|"natal"|"world"|"involving"} field */
 export function getBodies(field){ return normalizeBodies(state.bodies[field]); }
 
 /**
  * The bodies a scan will actually use, whichever mode is showing. A personal
- * chart hands back the sky list too when it is carrying the sky; app.js decides
- * what a list too thin to make an aspect means.
+ * chart hands back the world list too when it is carrying world transits;
+ * app.js decides what a list too thin to make an aspect means.
  */
 export function selectedBodies(){
-  if (state.appMode === "world") return { sky: getBodies("sky") };
-  const sky = state.showWorldRows ? getBodies("sky") : [];
-  if (state.bodyMode === "involving") return { involving: getBodies("involving"), sky };
-  return { transit: getBodies("transit"), natal: getBodies("natal"), sky };
+  if (state.appMode === "world") return { world: getBodies("world") };
+  const world = state.showWorldRows ? getBodies("world") : [];
+  if (state.bodyMode === "involving") return { involving: getBodies("involving"), world };
+  return { transit: getBodies("transit"), natal: getBodies("natal"), world };
 }
 
 /**
@@ -79,12 +80,12 @@ export function selectedBodies(){
  * of bodies to watch - and "everything involving Mars" is a question the reader
  * poses rather than a view they picked, so nothing overwrites it behind them.
  *
- * @param {{transit:string[], natal:string[], sky:string[]}} sets
+ * @param {{transit:string[], natal:string[], world:string[]}} sets
  */
-export function applyBodySets({ transit, natal, sky }){
+export function applyBodySets({ transit, natal, world }){
   state.bodies.transit = normalizeBodies(transit);
   state.bodies.natal = normalizeBodies(natal);
-  state.bodies.sky = normalizeBodies(sky);
+  state.bodies.world = normalizeBodies(world);
   renderBodyPicker();
 }
 
@@ -102,25 +103,25 @@ function edited(){
  * An edit to the selection: any of the lists at once, so a change that touches
  * both ends costs one recompute rather than two.
  *
- * @param {{transit?:string[], natal?:string[], sky?:string[],
+ * @param {{transit?:string[], natal?:string[], world?:string[],
  *          involving?:string[], mode?:"directed"|"involving"}} selection
  */
 export function setSelection(selection){
-  const { transit, natal, sky, involving, mode } = selection;
+  const { transit, natal, world, involving, mode } = selection;
   if (transit !== undefined) state.bodies.transit = normalizeBodies(transit);
   if (natal !== undefined) state.bodies.natal = normalizeBodies(natal);
-  if (sky !== undefined) state.bodies.sky = normalizeBodies(sky);
+  if (world !== undefined) state.bodies.world = normalizeBodies(world);
   if (involving !== undefined) state.bodies.involving = normalizeBodies(involving);
   if (mode !== undefined) state.bodyMode = (mode === "involving") ? "involving" : "directed";
   edited();
 }
 
-/** @param {"transit"|"natal"|"sky"|"involving"} field @param {string[]} list */
+/** @param {"transit"|"natal"|"world"|"involving"} field @param {string[]} list */
 export function setBodies(field, list){
   setSelection({ [field]: list });
 }
 
-/** @param {"transit"|"natal"|"sky"|"involving"} field @param {string} key */
+/** @param {"transit"|"natal"|"world"|"involving"} field @param {string} key */
 export function toggleBody(field, key){
   const cur = new Set(getBodies(field));
   if (cur.has(key)) cur.delete(key);
@@ -211,7 +212,8 @@ function renderPresetChips(pane){
 function renderModeChips(){
   const wrap = el.bodyModeWrap;
   if (!wrap) return;
-  // The sky has no direction to choose and no chart to be involved with.
+  // A world transit has no direction to choose and no chart to be involved
+  // with.
   wrap.hidden = state.appMode === "world";
   for (const btn of wrap.querySelectorAll("button[data-body-mode]")){
     const on = btn.dataset.bodyMode === state.bodyMode;
@@ -224,17 +226,17 @@ export function renderBodyPicker(){
   const panes = activePanes();
   const showing = new Set(panes.map(p => p.field));
   // Whether the pair is on screen, rather than how many panes there are: the
-  // sky pane below them is a third pane and not a second column, so counting
-  // would have "involving plus the sky" laying itself out as a pair.
+  // world pane below them is a third pane and not a second column, so counting
+  // would have "involving plus world transits" laying itself out as a pair.
   const hasNatalPane = showing.has("natal");
   if (el.natalPane) el.natalPane.hidden = !hasNatalPane;
   if (el.bodyPicker) el.bodyPicker.classList.toggle("oneList", !hasNatalPane);
   // The pane exists whenever a chart does, so there is always something to
-  // switch the sky back on with. World mode is the sky already, and has
+  // switch world transits back on with. World mode is nothing else, and has
   // nothing to fold into itself.
   const personal = state.appMode === "personal";
-  if (el.skyPane) el.skyPane.hidden = !personal;
-  if (el.skyPaneBody) el.skyPaneBody.hidden = !state.showWorldRows;
+  if (el.worldPane) el.worldPane.hidden = !personal;
+  if (el.worldPaneBody) el.worldPaneBody.hidden = !state.showWorldRows;
   if (el.showWorldRows) el.showWorldRows.checked = !!state.showWorldRows;
   if (el.transitPaneTitle) el.transitPaneTitle.textContent = panes[0].title;
   for (const pane of panes){
@@ -252,8 +254,8 @@ export function wireBodyPicker(){
       // just describes less of it. So the lit chip stays lit, and this does not
       // go through edited().
       renderBodyPicker();
-      // A followed row that the sky took with it is dropped by the recompute,
-      // which already clears a focus the chart no longer has a line for.
+      // A followed row that went with them is dropped by the recompute, which
+      // already clears a focus the chart no longer has a line for.
       requestUpdate();
     });
   }
