@@ -245,3 +245,25 @@ export function zodiacSign(deg){
 export function ruleKey(rule){
   return rule ? `${rule.scope ?? "personal"}-${rule.transit}-${rule.aspect}-${rule.natal}` : "";
 }
+
+// What a world row adds to its own name, so a card headed "Mercury ☍ Saturn"
+// over a personal chart is not read as a contact with the birth chart. It is a
+// label on the row rather than part of the pairing, which is why it is written
+// once here: the places that append it and the one place that takes it back off
+// have to agree on the exact characters, separator included.
+export const worldTitleSuffix = " · world transit";
+
+/**
+ * The pairing alone, with the world label taken off if it is there.
+ *
+ * Copying a popup's title is how a transit leaves the app - into a note, a
+ * message, a calendar entry someone types themselves - and the label is the app
+ * talking about its own chart, not part of the event's name. Wherever the text
+ * lands there is no personal row beside it to be told apart from.
+ *
+ * @param {string} title
+ */
+export function titleWithoutWorldSuffix(title){
+  const text = String(title ?? "");
+  return text.endsWith(worldTitleSuffix) ? text.slice(0, -worldTitleSuffix.length) : text;
+}

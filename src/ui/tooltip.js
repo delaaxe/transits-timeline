@@ -1,4 +1,4 @@
-import { transitTimingFor } from "../data/bodies.js";
+import { titleWithoutWorldSuffix, transitTimingFor } from "../data/bodies.js";
 import { aspectDescription, mythDescription, worldDescription } from "../data/interpretations.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
@@ -244,7 +244,11 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
       calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}${appLinksHtml}</div></div>`;
     }
   }
-  tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(title)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
+  // Shown with its label, copied without it: on screen the label is what tells
+  // this card from a natal one, and in whatever the text is pasted into there is
+  // no natal card beside it and no app to be talking about.
+  const copyText = titleWithoutWorldSuffix(title);
+  tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(copyText)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
     + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
     + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
     + timingHtml

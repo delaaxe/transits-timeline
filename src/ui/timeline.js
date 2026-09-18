@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor, ruleKey } from "../data/bodies.js";
+import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor, ruleKey, worldTitleSuffix } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -608,7 +608,7 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
     });
     const title = document.createElementNS(svgNs, "title");
     const pairing = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
-      + (isWorldRow ? " · world transit" : "");
+      + (isWorldRow ? worldTitleSuffix : "");
     title.textContent = `Follow ${pairing}: when it last happened, and when it happens next`;
     hit.appendChild(title);
     // A tap, not a drag. The column sits over a chart that scrolls sideways, so
@@ -745,7 +745,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     // personal chart would otherwise read as a contact with the birth chart,
     // which is the one thing it is not.
     const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
-      + (isWorldRow ? " · world transit" : "");
+      + (isWorldRow ? worldTitleSuffix : "");
 
     const events = eventsByRule[idx] ?? [];
     for (const event of events){

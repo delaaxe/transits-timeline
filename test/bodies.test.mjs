@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { angleKeys, bodyPresets, natalKeys, normalizeBodies, order, ruleKey, sameBodies, transitingKeys } from "../src/data/bodies.js";
+import { angleKeys, bodyPresets, natalKeys, normalizeBodies, order, ruleKey, sameBodies, titleWithoutWorldSuffix, transitingKeys, worldTitleSuffix } from "../src/data/bodies.js";
 import { presets } from "../src/data/presets.js";
 import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
 
@@ -153,4 +153,18 @@ test("the same pairing as a world transit and in a chart are different rows", ()
   assert.equal(ruleKey({ ...natal, scope: undefined }), ruleKey(natal),
     "an unstamped rule is a personal one, so a followed row survives the change");
   assert.equal(ruleKey(null), "");
+});
+
+// The label is the app naming one of its own rows. A copied title is read
+// somewhere else, where there is no other row to be told apart from.
+test("a copied popup title carries the pairing without the world label", () => {
+  assert.equal(titleWithoutWorldSuffix(`Mercury ☍ Saturn${worldTitleSuffix}`), "Mercury ☍ Saturn",
+    "the separator goes with the words it introduces");
+  assert.equal(titleWithoutWorldSuffix("Mars □ Saturn"), "Mars □ Saturn",
+    "a natal contact never carried the label and is copied whole");
+  assert.equal(titleWithoutWorldSuffix(`Mercury ☍ Saturn${worldTitleSuffix} (exact)`),
+    `Mercury ☍ Saturn${worldTitleSuffix} (exact)`,
+    "only the label at the end is the label - the same words mid-title are someone's text");
+  assert.equal(titleWithoutWorldSuffix(""), "");
+  assert.equal(titleWithoutWorldSuffix(null), "");
 });

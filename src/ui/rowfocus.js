@@ -17,7 +17,7 @@
 
 import { addDaysLocal, fmtLocalYYYYMMDD, parseLocalDateOnly } from "../core/time.js";
 import { DAY_MS } from "../core/events.js";
-import { aspectSymbol, planetLabel, planetSymbols } from "../data/bodies.js";
+import { aspectSymbol, planetLabel, planetSymbols, worldTitleSuffix } from "../data/bodies.js";
 import { requestUpdate } from "../refresh.js";
 import { currentChartContext, natalLongitudes } from "../services/chart-context.js";
 import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow, returnRange } from "../services/search.js";
@@ -39,7 +39,7 @@ function ruleTitle(rule){
   const pairing = `${planetLabel(rule.transit)} ${aspectSymbol(rule.aspect)} ${planetLabel(rule.natal)}`;
   // The bar is the one place with room for the words, and on a chart holding
   // both kinds it is the only thing naming which of the two is being followed.
-  return rule.scope === "world" ? `${pairing} · world transit` : pairing;
+  return rule.scope === "world" ? `${pairing}${worldTitleSuffix}` : pairing;
 }
 
 /**
