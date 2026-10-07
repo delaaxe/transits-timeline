@@ -1,0 +1,48 @@
+# Every branch pushed here deploys a preview under its own name, and Pages
+# keeps every one of those deployments until something deletes them. This is
+# that something: run it by hand with the branch's name and it removes each
+# deployment the branch made, which also retires the branch's alias URL.
+# Production is never touched - it filters to preview deployments only.
+name: Remove preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: The git branch whose preview deployments to delete
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the branch's Pages deployments
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          # The same folding deploy.yml applies, so the name matches what Pages holds.
+          pages_branch="$(printf '%s' "$BRANCH" | tr -c 'A-Za-z0-9._/-' '-')"
+          base="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/transits-timeline/deployments"
+          auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+          deleted=0
+          page=1
+          while :; do
+            ids="$(curl -sS "${auth[@]}" "$base?env=preview&per_page=25&page=$page" \
+              | jq -r --arg b "$pages_branch" '.result[] | select(.deployment_trigger.metadata.branch == $b) | .id')"
+            count="$(curl -sS "${auth[@]}" "$base?env=preview&per_page=25&page=$page" | jq '.result | length')"
+            for id in $ids; do
+              curl -sS -X DELETE "${auth[@]}" "$base/$id?force=true" | jq -e '.success' > /dev/null
+              deleted=$((deleted + 1))
+            done
+            [ "$count" -lt 25 ] && break
+            # Deleting shifts the pages, so the same page is read again until it holds none of ours.
+            [ -n "$ids" ] || page=$((page + 1))
+          done
+          echo "Deleted $deleted preview deployment(s) for $pages_branch."
