@@ -17,7 +17,7 @@
 
 import { addDaysLocal, fmtLocalYYYYMMDD, parseLocalDateOnly } from "../core/time.js";
 import { DAY_MS } from "../core/events.js";
-import { aspectSymbol, planetLabel, planetSymbols, worldTitleSuffix } from "../data/bodies.js";
+import { isIngressRule, needsWorldLabel, rulePairing, worldTitleSuffix } from "../data/bodies.js";
 import { requestUpdate } from "../refresh.js";
 import { currentChartContext, natalLongitudes } from "../services/chart-context.js";
 import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow, returnRange } from "../services/search.js";
@@ -36,10 +36,10 @@ const MAX_JUMP_DAYS = 3650;
 
 /** @param {{transit:string, aspect:string, natal:string, scope?:string}} rule */
 function ruleTitle(rule){
-  const pairing = `${planetLabel(rule.transit)} ${aspectSymbol(rule.aspect)} ${planetLabel(rule.natal)}`;
+  const pairing = rulePairing(rule);
   // The bar is the one place with room for the words, and on a chart holding
   // both kinds it is the only thing naming which of the two is being followed.
-  return rule.scope === "world" ? `${pairing}${worldTitleSuffix}` : pairing;
+  return needsWorldLabel(rule) ? `${pairing}${worldTitleSuffix}` : pairing;
 }
 
 /**
@@ -52,11 +52,10 @@ function ruleTitle(rule){
  * @param {{transit:string, aspect:string, natal:string, scope?:string}} rule
  */
 function ruleGlyphs(rule){
-  const glyph = (k) => planetSymbols[k] || planetLabel(k);
-  const pairing = `${glyph(rule.transit)} ${aspectSymbol(rule.aspect)} ${glyph(rule.natal)}`;
+  const pairing = rulePairing(rule, { glyphs: true });
   // Two more characters where seventeen did not fit. A row the words could not
   // name still has to say which kind it is, and the glyphs leave room for it.
-  return rule.scope === "world" ? `${pairing} · world` : pairing;
+  return needsWorldLabel(rule) ? `${pairing} · world` : pairing;
 }
 
 function rangeDays(){
@@ -241,6 +240,15 @@ async function stepOccurrence(direction){
 function showOnlyFocused(){
   const rule = state.focusRule;
   if (!rule) return;
+  // An ingress is not one of the aspects, so the boxes are left as they are:
+  // emptying them would be asking for a chart with nothing in it. One body in
+  // the world list makes no pair, so what is left is that body's sign changes.
+  if (isIngressRule(rule)){
+    const world = [rule.transit];
+    if (state.appMode === "world") setSelection({ world });
+    else setSelection({ world, transit: [], natal: [], involving: [] });
+    return;
+  }
   renderAspectChecks([rule.aspect]);
   const world = [rule.transit, rule.natal];
   // World mode shows nothing else, so the personal lists are out of sight and

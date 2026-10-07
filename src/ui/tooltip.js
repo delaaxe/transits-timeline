@@ -1,4 +1,4 @@
-import { titleWithoutWorldSuffix, transitTimingFor } from "../data/bodies.js";
+import { INGRESS, ingressDescription, titleWithoutWorldSuffix, transitTimingFor } from "../data/bodies.js";
 import { aspectDescription, mythDescription, worldDescription } from "../data/interpretations.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
@@ -162,7 +162,7 @@ let shownArgs = null;
 
 export function refreshTooltipContent(){
   if (tooltip.style.display !== "block" || !shownArgs) return;
-  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,"personal"|"world"]} */ (shownArgs)));
+  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,"personal"|"world",string[]]} */ (shownArgs)));
 }
 
 /**
@@ -172,20 +172,31 @@ export function refreshTooltipContent(){
  * `scope` comes from the row rather than from the mode the app is in, because a
  * personal chart carries both kinds of row at once: the bar above this one can
  * be a natal contact and this one a world transit.
+ *
+ * `positions` is where the window's exact hits land, one line each, already
+ * written out by the timeline.
+ * @param {string[]} [positions]
  */
-export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope="personal"){
-  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope];
+export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope="personal", positions=[]){
+  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope, positions];
   // Two bodies meeting in the sky is not the same event as one of them crossing
   // a place in a birth chart, so a world row reads from its own file rather than
   // from natal prose written in the second person about "your natal Neptune".
+  // A sign change has no file at all: what there is to say about it is written
+  // from the key, dates counted off the exact label.
   const isWorld = scope === "world";
-  const desc = isWorld ? worldDescription(descKey) : aspectDescription(descKey);
+  const [keyTransit, keyAspect, keyNatal] = String(descKey).split("-");
+  const isIngress = keyAspect === INGRESS;
+  const desc = isIngress
+    ? ingressDescription({ transit: keyTransit, natal: keyNatal }, exactLabel ? exactLabel.split(" \u00b7 ").length : 0)
+    : (isWorld ? worldDescription(descKey) : aspectDescription(descKey));
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There
   // is no timing note on a world row: the figure that matters there is how often
   // the pair meets, which is per-pair rather than per-body, and each world entry
-  // carries it in its own words.
-  const timing = isWorld ? "" : transitTimingFor(String(descKey).split("-")[0]);
+  // carries it in its own words. An ingress is one body at one degree, which is
+  // exactly what the note describes, so it gets one.
+  const timing = (isWorld && !isIngress) ? "" : transitTimingFor(keyTransit);
   const timingHtml = timing ? `<div class="timing">${escapeHtml(timing)}</div>` : "";
   const safeMyth = myth ? escapeHtml(myth) : "";
   const useToggle = !!safeMyth;
@@ -193,13 +204,17 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     ? `<button type="button" class="mythToggle" aria-expanded="false">Mythologically →</button><div class="myth mythHidden" hidden><em>${safeMyth}</em></div>`
     : "";
   const exactHtml = exactLabel ? ` <span class="sub">(${escapeHtml("exact: " + exactLabel)})</span>` : "";
+  const positionText = (positions ?? []).join("\n");
+  const positionHtml = positionText
+    ? `<div class="sub positions">${(positions ?? []).map(p => escapeHtml(p)).join("<br>")}</div>`
+    : "";
   const closeBtn = popupMode ? `<button type="button" class="tooltipClose" aria-label="Close">✕</button>` : "";
   let calendarHtml = "";
   if (popupMode && calendarData){
     const titleText = String(calendarData.title || title || "Transit");
     const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
     const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
-    const detailsText = [firstLine, desc || "", timing, mythLine].filter(Boolean).join("\n\n");
+    const detailsText = [firstLine, positionText, desc || "", timing, mythLine].filter(Boolean).join("\n\n");
     const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
     const segmentEndForCalendar = segmentAllDay
       ? new Date(calendarData.segmentEnd.getFullYear(), calendarData.segmentEnd.getMonth(), calendarData.segmentEnd.getDate() + 1)
@@ -250,6 +265,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
   const copyText = titleWithoutWorldSuffix(title);
   tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(copyText)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
     + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
+    + positionHtml
     + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
     + timingHtml
     + mythHtml
@@ -285,9 +301,11 @@ export function isCoarsePointer(){
 /**
  * @param {{title: string, segmentStart: Date, segmentEnd: Date, exactTime: Date|null}|null} [calendarData]
  *   what an "Add to calendar" link would carry; a hover has none, only a popup does
+ * @param {"personal"|"world"} [scope]
+ * @param {string[]} [positions] where each exact hit lands, written out
  */
-export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, scope="personal"){
-  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope);
+export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, scope="personal", positions=[]){
+  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope, positions);
   tooltip.style.display = "block";
   tooltip.style.visibility = "hidden";
   tooltip.classList.toggle("popup", !!popupMode);

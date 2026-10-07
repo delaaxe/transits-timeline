@@ -194,7 +194,10 @@ export function planetLabel(key){ return planets.find(p => p[0] === key)?.[1] ??
 export function aspectAngle(key){ return aspects.find(a => a[0] === key)?.[2] ?? 0; }
 
 /** @param {string} key */
-export function aspectSymbol(key){ return aspects.find(a => a[0] === key)?.[1]?.split(" ")[0] ?? "•"; }
+export function aspectSymbol(key){
+  if (key === INGRESS) return "→";
+  return aspects.find(a => a[0] === key)?.[1]?.split(" ")[0] ?? "•";
+}
 
 /** @param {string} a @param {string} b */
 export function mythKeyFor(a, b){
@@ -208,6 +211,120 @@ export function mythKeyFor(a, b){
 
 export const signSymbols = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
 
+export const signNames = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+
+// The key a sign is known by where a rule names one: the far end of an ingress
+// row is a sign rather than a body, and it sits in the same field a natal point
+// would. Lowercase like the body keys, so "jupiter-ingress-gemini" reads like
+// "jupiter-conjunction-sun" and is told apart by its aspect, not its spelling.
+export const signKeys = signNames.map(n => n.toLowerCase());
+
+/** @param {string} key */
+export function isSignKey(key){ return signKeys.includes(key); }
+
+/** @param {string} key @returns {number} 0 for Aries through 11 for Pisces, or -1 */
+export function signIndexOf(key){ return signKeys.indexOf(key); }
+
+/** @param {number} deg @returns {number} 0 for Aries through 11 for Pisces */
+export function signIndexAt(deg){ return Math.floor(wrap360(deg) / 30) % 12; }
+
+/**
+ * A longitude as an astrologer writes it: "14°03′ Pisces". Rounded to the
+ * minute before it is split, so 29°59.6′ Aquarius comes out as 0°00′ Pisces
+ * rather than 30°00′ of a sign that stops at thirty.
+ * @param {number} deg
+ */
+export function fmtZodiacDeg(deg){
+  if (!Number.isFinite(deg)) return "";
+  const totalMin = Math.round(wrap360(deg) * 60) % 21600;
+  const sign = Math.floor(totalMin / 1800);
+  const rem = totalMin - sign * 1800;
+  const d = Math.floor(rem / 60);
+  const m = rem % 60;
+  return `${d}°${String(m).padStart(2, "0")}′ ${signNames[sign]}`;
+}
+
+// A body entering a sign. Not in the aspect list: it is not an angle between
+// two things, there is no checkbox for it, and the rows it makes are switched
+// on and off as a kind rather than ticked one by one.
+export const INGRESS = "ingress";
+
+/** @param {{aspect?: string}|null|undefined} rule */
+export function isIngressRule(rule){ return !!rule && rule.aspect === INGRESS; }
+
+/**
+ * The cusp an ingress row watches, in degrees. A body going the ordinary way
+ * enters a sign at its first degree; the mean node only ever moves backward,
+ * so it enters a sign from the far end, over the cusp the sign shares with the
+ * one after it. Either way the row is named for the sign being entered, which
+ * is the sign the reader will find the body in afterwards.
+ * @param {string} transit @param {string} signKey @returns {number|null}
+ */
+export function ingressCuspDeg(transit, signKey){
+  const idx = signIndexOf(signKey);
+  if (idx < 0) return null;
+  return wrap360((transit === "node" ? idx + 1 : idx) * 30);
+}
+
+/** The sign an ingress into `signKey` leaves behind. @param {string} transit @param {string} signKey */
+export function ingressFromSign(transit, signKey){
+  const idx = signIndexOf(signKey);
+  if (idx < 0) return "";
+  return signNames[(idx + (transit === "node" ? 1 : 11)) % 12];
+}
+
+/**
+ * The prose an ingress row shows, written here rather than looked up: twelve
+ * signs for each body is a file nobody has written, and what the popup has to
+ * say is mostly arithmetic anyway.
+ * @param {{transit: string, natal: string}} rule
+ * @param {number} exactCount how many times the window crosses the cusp
+ */
+export function ingressDescription(rule, exactCount){
+  const body = rule.transit === "node" ? "The mean node" : planetLabel(rule.transit);
+  const into = endLabel(rule.natal);
+  const from = ingressFromSign(rule.transit, rule.natal);
+  const way = rule.transit === "node" ? " backward" : "";
+  const first = `${body} crosses${way} out of ${from} and into ${into}.`;
+  if (exactCount <= 1) return first;
+  return `${first} It is dated more than once because it stations and crosses the cusp again: the dates are each time it changes sign, in either direction.`;
+}
+
+/**
+ * A row's name: "Saturn □ Sun", "Mars ☌ Jupiter", "Jupiter → Gemini". In words
+ * or in glyphs, and the same three parts either way.
+ * @param {{transit:string, aspect:string, natal:string}} rule
+ * @param {{glyphs?: boolean}} [opts]
+ */
+export function rulePairing(rule, { glyphs = false } = {}){
+  const end = glyphs ? endGlyph : endLabel;
+  return `${end(rule.transit)} ${aspectSymbol(rule.aspect)} ${end(rule.natal)}`;
+}
+
+/**
+ * Whether a row has to say it is a world transit. A pair of moving bodies over
+ * a personal chart does, or "Mars □ Saturn" reads as a contact with the birth
+ * chart. An ingress is drawn on the same plane but names its own kind: nothing
+ * in anyone's chart is called Gemini, so the label would be saying what the
+ * arrow already says.
+ * @param {{scope?: string, aspect?: string}} rule
+ */
+export function needsWorldLabel(rule){
+  return rule.scope === "world" && !isIngressRule(rule);
+}
+
+/** The name of either end of a rule: a body, a point, or a sign. @param {string} key */
+export function endLabel(key){
+  const idx = signIndexOf(key);
+  return idx >= 0 ? signNames[idx] : planetLabel(key);
+}
+
+/** The glyph for either end of a rule, or its name where it has none. @param {string} key */
+export function endGlyph(key){
+  const idx = signIndexOf(key);
+  return idx >= 0 ? signSymbols[idx] : (planetSymbols[key] || planetLabel(key));
+}
+
 // The node stays in the lookup - the line still needs its longitude - but it
 // is drawn last, after Ac and Mc: it is a point rather than a body, and it
 // reads as one at the end of the line.
@@ -218,15 +335,12 @@ export const summaryPointSymbols = { asc: "Ac", mc: "Mc" };
 
 /** @param {number} deg */
 export function zodiacSignSymbol(deg){
-  const idx = Math.floor(wrap360(deg) / 30) % 12;
-  return signSymbols[idx] || "";
+  return signSymbols[signIndexAt(deg)] || "";
 }
 
 /** @param {number} deg */
 export function zodiacSign(deg){
-  const signs = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
-  const idx = Math.floor(wrap360(deg) / 30) % 12;
-  return signs[idx] || "";
+  return signNames[signIndexAt(deg)] || "";
 }
 
 /**

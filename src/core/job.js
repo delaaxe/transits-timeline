@@ -5,7 +5,7 @@
 import { wrap360 } from "./angles.js";
 import { wrap180, aspectTargets, scanAspectWindows } from "./events.js";
 import { getBodyLonAt } from "./ephemeris.js";
-import { aspectAngle, maxSpeedDegPerDay } from "../data/bodies.js";
+import { aspectAngle, ingressCuspDeg, isIngressRule, maxSpeedDegPerDay } from "../data/bodies.js";
 
 /**
  * @typedef {{transit: string, natal: string, aspect: string, orb: number|string,
@@ -69,6 +69,12 @@ function makeLonReader(observer){
  * key: "mars|saturn|1" as a world pair and a natal contact on transiting Mars are
  * different scans and must not land in the same bucket.
  *
+ * An ingress is the first kind of scan whatever scope it carries: one body
+ * against a fixed degree, the degree being a cusp rather than a natal point.
+ * So it joins the transiting body's single-body group, and on a personal chart
+ * that is the very scan the natal contacts are read from - a sign change costs
+ * twelve more offsets on a longitude already being read.
+ *
  * @param {Rule[]} rules
  * @param {"personal"|"world"|undefined} mode the scope of rules that carry none
  * @param {Record<string, number>|null} natalLon
@@ -79,12 +85,15 @@ export function groupRules(rules, mode, natalLon){
 
   for (let i = 0; i < rules.length; i++){
     const r = rules[i];
-    const scope = scopeOf(r, mode);
+    const ingress = isIngressRule(r);
+    // The scope of the scan, which for an ingress is the single-body kind
+    // whatever the rule says about where the row belongs.
+    const scope = ingress ? "personal" : scopeOf(r, mode);
     const isWorld = scope === "world";
     const orb = Number(r.orb) || 0;
-    const natalDeg = isWorld ? 0 : Number(natalLon?.[r.natal]);
+    const natalDeg = isWorld ? 0 : (ingress ? ingressCuspDeg(r.transit, r.natal) : Number(natalLon?.[r.natal]));
     // A natal point this chart does not carry is not an error, it just has no
-    // transits.
+    // transits. Nor is a sign that does not exist.
     if (!isWorld && !Number.isFinite(natalDeg)) continue;
 
     const key = isWorld ? `world|${r.transit}|${r.natal}|${orb}` : `personal|${r.transit}|${orb}`;
@@ -95,9 +104,10 @@ export function groupRules(rules, mode, natalLon){
     }
 
     // An aspect contributes one offset for a conjunction or an opposition and
-    // two otherwise, since a sextile is exact both ahead and behind.
-    const slots = aspectTargets(aspectAngle(r.aspect)).map(sep => {
-      const offset = isWorld ? wrap360(sep) : wrap360(natalDeg + sep);
+    // two otherwise, since a sextile is exact both ahead and behind. An ingress
+    // is one cusp, which is the one offset a conjunction would have.
+    const slots = aspectTargets(ingress ? 0 : aspectAngle(r.aspect)).map(sep => {
+      const offset = isWorld ? wrap360(sep) : wrap360(Number(natalDeg) + sep);
       const found = g.offsets.indexOf(offset);
       if (found !== -1) return found;
       g.offsets.push(offset);
@@ -150,8 +160,21 @@ export function computeTransitEvents(job, onProgress){
     });
 
     for (const member of g.members){
+      const rule = rules[member.ruleIndex];
       const events = member.slots.flatMap(slot => perOffset[slot]);
       events.sort((a, b) => a.start - b.start);
+      // Where each exact hit happens, as well as when. The reads are the ones
+      // the scan just made, so they come out of the cache for nothing - and
+      // where a transit lands is how an astrologer remembers it, which the
+      // time alone never says.
+      for (const event of events){
+        event.exactLon = event.exacts.map(ms => lon.read(g.transit, ms));
+        event.exactLonNatal = (g.scope === "world")
+          ? event.exacts.map(ms => lon.read(g.natal, ms))
+          : event.exacts.map(() => isIngressRule(rule)
+              ? Number(ingressCuspDeg(rule.transit, rule.natal))
+              : Number(natalLon?.[rule.natal]));
+      }
       byRule[member.ruleIndex] = events;
     }
 

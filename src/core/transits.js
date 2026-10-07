@@ -1,6 +1,6 @@
 // Which transits to look for. The looking itself is core/events.js.
 
-import { aspectAngle, isAngle, maxSeparation, natalKeys, normalizeBodies, transitingKeys } from "../data/bodies.js";
+import { INGRESS, aspectAngle, isAngle, maxSeparation, natalKeys, normalizeBodies, signKeys, transitingKeys } from "../data/bodies.js";
 
 /**
  * Every transiting-body-to-natal-point pair the selection asks for.
@@ -103,6 +103,32 @@ export function buildWorldRules({ bodies, aspects, orb }){
         if (aspectAngle(asp) - orb > maxSeparation(world[i], world[j])) continue;
         rules.push({ transit: world[i], aspect: asp, natal: world[j], orb, scope: "world" });
       }
+    }
+  }
+  return rules;
+}
+
+/**
+ * Every sign change a body can make: one rule per body per sign, with the sign
+ * where a natal point would go. They ride with the world transits - a body
+ * entering a sign is weather, not a contact with anyone's chart - and carry
+ * that scope so the chart draws them one plane back the same way.
+ *
+ * Twelve rules a body rather than one, because a row is one cusp: Jupiter
+ * entering Gemini is a window around 0° Gemini, and its exact hits are each
+ * crossing of that line, which a station can make three of. The scan drops the
+ * eleven signs a body never reaches in the range, as it drops any rule with
+ * nothing in it.
+ *
+ * @param {{bodies:string[], orb:number}} opts
+ */
+export function buildIngressRules({ bodies, orb }){
+  const moving = normalizeBodies(bodies).filter(k => !isAngle(k));
+  /** @type {import("./job.js").Rule[]} */
+  const rules = [];
+  for (const body of moving){
+    for (const sign of signKeys){
+      rules.push({ transit: body, aspect: INGRESS, natal: sign, orb, scope: "world" });
     }
   }
   return rules;

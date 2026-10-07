@@ -4,9 +4,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { angleKeys, bodyPresets, natalKeys, normalizeBodies, order, ruleKey, sameBodies, titleWithoutWorldSuffix, transitingKeys, worldTitleSuffix } from "../src/data/bodies.js";
+import { INGRESS, angleKeys, aspectSymbol, bodyPresets, fmtZodiacDeg, ingressCuspDeg, ingressDescription, natalKeys, needsWorldLabel, normalizeBodies, order, ruleKey, rulePairing, sameBodies, signKeys, titleWithoutWorldSuffix, transitingKeys, worldTitleSuffix } from "../src/data/bodies.js";
 import { presets } from "../src/data/presets.js";
-import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
+import { buildCandidateRules, buildIngressRules, buildWorldRules } from "../src/core/transits.js";
 
 const keysOf = (rules) => rules.map(r => `${r.transit}-${r.aspect}-${r.natal}`);
 
@@ -167,4 +167,51 @@ test("a copied popup title carries the pairing without the world label", () => {
     "only the label at the end is the label - the same words mid-title are someone's text");
   assert.equal(titleWithoutWorldSuffix(""), "");
   assert.equal(titleWithoutWorldSuffix(null), "");
+});
+
+test("a longitude is written the way an astrologer reads it", () => {
+  assert.equal(fmtZodiacDeg(0), "0°00′ Aries");
+  assert.equal(fmtZodiacDeg(344.05), "14°03′ Pisces");
+  assert.equal(fmtZodiacDeg(254.5), "14°30′ Sagittarius");
+  assert.equal(fmtZodiacDeg(-16), "14°00′ Pisces", "wrapped like every other angle");
+  // Rounded to the minute before the sign is read off, so the last seconds of
+  // a sign are the first minute of the next rather than a thirtieth degree.
+  assert.equal(fmtZodiacDeg(29.9999), "0°00′ Taurus");
+  assert.equal(fmtZodiacDeg(359.9999), "0°00′ Aries");
+  assert.equal(fmtZodiacDeg(NaN), "");
+});
+
+test("an ingress row is named for the sign being entered, whichever way the body goes", () => {
+  assert.equal(ingressCuspDeg("sun", "aries"), 0);
+  assert.equal(ingressCuspDeg("jupiter", "gemini"), 60);
+  assert.equal(ingressCuspDeg("jupiter", "pisces"), 330);
+  // The mean node only ever moves backward, so it enters a sign over the far
+  // cusp: into Pisces at 0° Aries, into Aries at 0° Taurus.
+  assert.equal(ingressCuspDeg("node", "pisces"), 0);
+  assert.equal(ingressCuspDeg("node", "aries"), 30);
+  assert.equal(ingressCuspDeg("sun", "sun"), null, "a body is not a sign");
+
+  assert.equal(ingressDescription({ transit: "jupiter", natal: "gemini" }, 1), "Jupiter crosses out of Taurus and into Gemini.");
+  assert.match(ingressDescription({ transit: "node", natal: "pisces" }, 1), /^The mean node crosses backward out of Aries and into Pisces\./);
+  assert.match(ingressDescription({ transit: "jupiter", natal: "gemini" }, 3), /stations and crosses the cusp again/);
+});
+
+test("sign changes are one rule per body per sign, riding with the world transits", () => {
+  const rules = buildIngressRules({ bodies: ["jupiter", "mc", "asc", "node"], orb: 1 });
+  assert.equal(rules.length, 24, "twelve signs for each of the two bodies, and none for the angles");
+  assert.ok(rules.every(r => r.aspect === INGRESS && r.scope === "world" && r.orb === 1));
+  assert.deepEqual(rules.filter(r => r.transit === "jupiter").map(r => r.natal), signKeys);
+  assert.equal(buildIngressRules({ bodies: [], orb: 1 }).length, 0);
+});
+
+test("an ingress row names its own kind and carries no world label", () => {
+  const ingress = { transit: "jupiter", aspect: INGRESS, natal: "gemini", scope: "world" };
+  assert.equal(aspectSymbol(INGRESS), "→");
+  assert.equal(rulePairing(ingress), "Jupiter → Gemini");
+  assert.equal(rulePairing(ingress, { glyphs: true }), "♃ → ♊");
+  assert.equal(needsWorldLabel(ingress), false, "nothing in a birth chart is called Gemini");
+  assert.equal(needsWorldLabel({ transit: "mars", aspect: "square", natal: "saturn", scope: "world" }), true);
+  assert.equal(needsWorldLabel({ transit: "mars", aspect: "square", natal: "saturn", scope: "personal" }), false);
+  assert.equal(rulePairing({ transit: "saturn", aspect: "square", natal: "asc" }), "Saturn □ Asc");
+  assert.equal(ruleKey(ingress), "world-jupiter-ingress-gemini", "a row like any other on the axis");
 });

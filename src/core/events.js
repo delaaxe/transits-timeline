@@ -105,6 +105,10 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  * @property {boolean} startClipped the window was already open at the range start
  * @property {boolean} endClipped   the window was still open at the range end
  * @property {number} peakOrb smallest separation from exact reached, in degrees
+ * @property {number[]} [exactLon] the transiting body's longitude at each exact
+ *   hit, filled in by the job once it knows which body the window belongs to
+ * @property {number[]} [exactLonNatal] the far end's longitude at each exact
+ *   hit: the natal point, the cusp, or the other moving body
  */
 
 /**

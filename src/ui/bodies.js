@@ -10,7 +10,7 @@
 // selection is a set that can be anything.
 
 import { requestUpdate } from "../refresh.js";
-import { setShowWorldRows, state } from "../state.js";
+import { setShowIngresses, setShowWorldRows, state } from "../state.js";
 import { bodyPresets, isAngle, natalKeys, normalizeBodies, planetLabel, planetSymbols, sameBodies, transitingKeys } from "../data/bodies.js";
 import { el } from "./dom.js";
 
@@ -238,6 +238,17 @@ export function renderBodyPicker(){
   if (el.worldPane) el.worldPane.hidden = !personal;
   if (el.worldPaneBody) el.worldPaneBody.hidden = !state.showWorldRows;
   if (el.showWorldRows) el.showWorldRows.checked = !!state.showWorldRows;
+  if (el.showIngresses) el.showIngresses.checked = !!state.showIngresses;
+  // The switch follows the world list: into the first pane in world mode, and
+  // under the world pane's chips on a personal chart. It goes away with the
+  // list it applies to.
+  const worldPane = panes.find(p => p.field === "world");
+  if (el.ingressPane){
+    el.ingressPane.hidden = !worldPane;
+    if (worldPane?.chips && el.ingressPane.previousElementSibling !== worldPane.chips){
+      worldPane.chips.insertAdjacentElement("afterend", el.ingressPane);
+    }
+  }
   if (el.transitPaneTitle) el.transitPaneTitle.textContent = panes[0].title;
   for (const pane of panes){
     renderPresetChips(pane);
@@ -256,6 +267,13 @@ export function wireBodyPicker(){
       renderBodyPicker();
       // A followed row that went with them is dropped by the recompute, which
       // already clears a focus the chart no longer has a line for.
+      requestUpdate();
+    });
+  }
+
+  if (el.showIngresses){
+    el.showIngresses.addEventListener("change", () => {
+      setShowIngresses(el.showIngresses.checked);
       requestUpdate();
     });
   }

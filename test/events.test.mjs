@@ -5,10 +5,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DAY_MS, aspectTargets, brentRoot, isLeadingStub, scanAspectWindows, wrap180 } from "../src/core/events.js";
 import { computeTransitEvents, groupRules } from "../src/core/job.js";
-import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
+import { buildCandidateRules, buildIngressRules, buildWorldRules } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
 import { ephemerisAstronomy, getBodyLonAt, getBodyLonFromAll } from "../src/core/ephemeris.js";
-import { aspectAngle, maxSeparation, maxSpeedDegPerDay } from "../src/data/bodies.js";
+import { aspectAngle, ingressCuspDeg, maxSeparation, maxSpeedDegPerDay } from "../src/data/bodies.js";
 
 const T0 = Date.UTC(2026, 0, 1);
 const days = (ms) => (ms - T0) / DAY_MS;
@@ -522,4 +522,87 @@ test("the stub test survives an empty or degenerate range", () => {
   assert.equal(isLeadingStub([], R0, R1, 0.05), false);
   assert.equal(isLeadingStub(undefined, R0, R1, 0.05), false);
   assert.equal(isLeadingStub([ev(0, 1, { startClipped: true })], R0, R0, 0.05), false);
+});
+
+test("a sign change is found where the body crosses the cusp", () => {
+  const rules = buildIngressRules({ bodies: ["sun", "node"], orb: 1 });
+  const res = computeTransitEvents({
+    startMs: Date.UTC(2025, 0, 1), endMs: Date.UTC(2026, 0, 1),
+    observer: OBSERVER, natalLon: null, rules
+  });
+  const sunRows = res.rules.filter(r => r.transit === "sun");
+  assert.equal(sunRows.length, 12, "the Sun enters every sign once a year");
+  for (let i = 0; i < res.rules.length; i++){
+    const r = res.rules[i];
+    const cusp = ingressCuspDeg(r.transit, r.natal);
+    for (const event of res.events[i]){
+      assert.equal(event.exacts.length, 1, `${r.transit} → ${r.natal} crosses once`);
+      const lon = getBodyLonAt(r.transit, new Date(event.exacts[0]), OBSERVER);
+      assert.ok(angDist(lon, cusp) < 0.001, `${r.transit} → ${r.natal} exact at ${lon}, cusp ${cusp}`);
+      assert.ok(angDist(event.exactLon[0], cusp) < 0.001, "the hit carries where it landed");
+    }
+  }
+  // The March equinox, as the almanacs give it: within the hour of a series
+  // that is not the one they were computed from.
+  const aries = res.rules.findIndex(r => r.transit === "sun" && r.natal === "aries");
+  const equinox = res.events[aries][0].exacts[0];
+  assert.ok(Math.abs(equinox - Date.UTC(2025, 2, 20, 9, 1)) < 3600 * 1000, new Date(equinox).toISOString());
+
+  // The node went into Pisces in early 2025, backward over 0° Aries, and that
+  // is the sign the row is named for.
+  const nodeRows = res.rules.filter(r => r.transit === "node").map(r => r.natal);
+  assert.deepEqual(nodeRows, ["pisces"]);
+  const nodeIdx = res.rules.findIndex(r => r.transit === "node");
+  const crossing = res.events[nodeIdx][0].exacts[0];
+  const before = getBodyLonAt("node", new Date(crossing - DAY_MS), OBSERVER);
+  const after = getBodyLonAt("node", new Date(crossing + DAY_MS), OBSERVER);
+  assert.ok(before < 1 && after > 359, `moving backward: ${before} then ${after}`);
+});
+
+test("an ingress shares the scan of its body's natal contacts", () => {
+  const natal = buildCandidateRules({ transitBodies: ["saturn"], natalBodies: ["sun"], aspects: ["square"], orb: 1 });
+  const ingress = buildIngressRules({ bodies: ["saturn"], orb: 1 });
+  const groups = groupRules([...natal, ...ingress], undefined, { sun: 100 });
+  assert.equal(groups.length, 1, "one longitude read serves the square and the twelve cusps");
+  assert.equal(groups[0].offsets.length, 14, "two square targets and twelve cusps");
+  assert.equal(groups[0].members.length, 13);
+});
+
+test("every exact hit carries where both ends were", () => {
+  const natalLon = { sun: 254.2, moon: 30 };
+  const personal = computeTransitEvents({
+    startMs: Date.UTC(2026, 0, 1), endMs: Date.UTC(2026, 6, 1), observer: OBSERVER, natalLon,
+    rules: buildCandidateRules({ transitBodies: ["sun", "mars"], natalBodies: ["sun", "moon"], aspects: ["conjunction", "square", "trine"], orb: 1 })
+  });
+  let checked = 0;
+  for (let i = 0; i < personal.rules.length; i++){
+    const r = personal.rules[i];
+    for (const event of personal.events[i]){
+      assert.equal(event.exactLon.length, event.exacts.length);
+      assert.equal(event.exactLonNatal.length, event.exacts.length);
+      event.exacts.forEach((ms, k) => {
+        assert.ok(angDist(event.exactLon[k], getBodyLonAt(r.transit, new Date(ms), OBSERVER)) < 1e-9);
+        assert.equal(event.exactLonNatal[k], natalLon[r.natal], "the natal end does not move");
+        checked++;
+      });
+    }
+  }
+  assert.ok(checked > 3, `expected a few exact hits, got ${checked}`);
+
+  const world = computeTransitEvents({
+    startMs: Date.UTC(2026, 0, 1), endMs: Date.UTC(2026, 6, 1), observer: OBSERVER, natalLon: null,
+    rules: buildWorldRules({ bodies: ["sun", "mars", "jupiter"], aspects: ["conjunction", "square", "opposition"], orb: 1 })
+  });
+  let worldChecked = 0;
+  for (let i = 0; i < world.rules.length; i++){
+    const r = world.rules[i];
+    for (const event of world.events[i]){
+      event.exacts.forEach((ms, k) => {
+        assert.ok(angDist(event.exactLon[k], getBodyLonAt(r.transit, new Date(ms), OBSERVER)) < 1e-9);
+        assert.ok(angDist(event.exactLonNatal[k], getBodyLonAt(r.natal, new Date(ms), OBSERVER)) < 1e-9, "the far end is read at the same moment");
+        worldChecked++;
+      });
+    }
+  }
+  assert.ok(worldChecked > 0);
 });

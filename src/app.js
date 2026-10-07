@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { onRequestUpdate } from "./refresh.js";
 import { ephemerisAstronomy } from "./core/ephemeris.js";
 import { addDaysLocal, parseLocalDateOnly } from "./core/time.js";
-import { buildCandidateRules, buildWorldRules } from "./core/transits.js";
+import { buildCandidateRules, buildIngressRules, buildWorldRules } from "./core/transits.js";
 import { orderMap } from "./data/bodies.js";
 import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./services/chart-context.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
@@ -54,12 +54,17 @@ export function wireStaleRefreshOnRefocus(){
  * @param {ReturnType<typeof readRuleOptions>} opts
  */
 function buildRules(ctx, opts){
-  const worldRulesFor = (bodies) => (bodies.length >= 2)
-    ? buildWorldRules({ bodies, aspects: opts.aspects, orb: opts.orb })
-    : [];
+  // The sign changes ride with the world transits: same bodies, same plane,
+  // and one body is enough to make one where a transit needs a pair.
+  const worldRulesFor = (bodies) => [
+    ...((bodies.length >= 2) ? buildWorldRules({ bodies, aspects: opts.aspects, orb: opts.orb }) : []),
+    ...(state.showIngresses ? buildIngressRules({ bodies, orb: opts.orb }) : [])
+  ];
 
   if (ctx.mode === "world"){
-    if (opts.worldBodies.length < 2) throw new Error("Pick at least two bodies: a world transit needs both ends.");
+    if (opts.worldBodies.length < 2 && !(state.showIngresses && opts.worldBodies.length === 1)){
+      throw new Error("Pick at least two bodies: a world transit needs both ends.");
+    }
     return worldRulesFor(opts.worldBodies);
   }
 

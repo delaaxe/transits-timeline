@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { aspectColors, aspectSymbol, mythKeyFor, planetLabel, planetSymbols, returnColor, ruleKey, worldTitleSuffix } from "../data/bodies.js";
+import { aspectColors, aspectSymbol, endGlyph, endLabel, fmtZodiacDeg, isIngressRule, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -577,8 +577,8 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
       "text-anchor":"end"
     });
 
-    const transitLabel = useSymbols ? (planetSymbols[r.transit] || planetLabel(r.transit)) : planetLabel(r.transit);
-    const natalLabel = useSymbols ? (planetSymbols[r.natal] || planetLabel(r.natal)) : planetLabel(r.natal);
+    const transitLabel = useSymbols ? endGlyph(r.transit) : endLabel(r.transit);
+    const natalLabel = useSymbols ? endGlyph(r.natal) : endLabel(r.natal);
     const parts = [
       { text: transitLabel + " " },
       { text: aspectSymbol(r.aspect) + " " },
@@ -607,8 +607,7 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
       class: "rowLabelHit"
     });
     const title = document.createElementNS(svgNs, "title");
-    const pairing = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
-      + (isWorldRow ? worldTitleSuffix : "");
+    const pairing = rulePairing(r) + (needsWorldLabel(r) ? worldTitleSuffix : "");
     title.textContent = `Follow ${pairing}: when it last happened, and when it happens next`;
     hit.appendChild(title);
     // A tap, not a drag. The column sits over a chart that scrolls sideways, so
@@ -623,6 +622,33 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
     });
     svg.appendChild(hit);
   }
+}
+
+/**
+ * The degrees a window's exact hits land on, written out.
+ *
+ * Against a natal point the transiting body is at the same degree every time
+ * the window perfects - the point does not move - so one line says it all. A
+ * world pair perfects somewhere different each time, and a triple pass gets a
+ * line per hit. Nothing for an ingress, whose degree is the cusp in its name,
+ * and nothing for a window that never perfects.
+ *
+ * @param {import("../core/job.js").Rule} rule
+ * @param {import("../core/events.js").AspectEvent} event
+ * @returns {{titleAt: string, lines: string[]}}
+ */
+export function positionLines(rule, event){
+  const lons = event.exactLon ?? [];
+  const others = event.exactLonNatal ?? [];
+  if (isIngressRule(rule) || lons.length === 0) return { titleAt: "", lines: [] };
+  const transit = endLabel(rule.transit);
+  const natal = endLabel(rule.natal);
+  const line = (i) => {
+    const far = Number.isFinite(others[i]) ? ` · ${rule.scope === "world" ? "" : "natal "}${natal} ${fmtZodiacDeg(others[i])}` : "";
+    return `${transit} ${fmtZodiacDeg(lons[i])}${far}`;
+  };
+  const lines = (rule.scope === "world") ? lons.map((_, i) => line(i)) : [line(0)];
+  return { titleAt: fmtZodiacDeg(lons[0]), lines };
 }
 
 // Narrower than this and a bar stops reading as a segment; narrower than the
@@ -744,8 +770,9 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     // A world row says so in its own title: a card headed "Mars □ Saturn" over a
     // personal chart would otherwise read as a contact with the birth chart,
     // which is the one thing it is not.
-    const rowLabel = `${planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetLabel(r.natal)}`
-      + (isWorldRow ? worldTitleSuffix : "");
+    const rowLabel = rulePairing(r);
+    const worldLabel = needsWorldLabel(r) ? worldTitleSuffix : "";
+    const isIngress = isIngressRule(r);
 
     const events = eventsByRule[idx] ?? [];
     for (const event of events){
@@ -762,7 +789,9 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const barX = Math.max(x0, Math.min(xa, x0 + timelineW - w));
 
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
-      const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
+      // An ingress has no aspect colour of its own, and takes the conjunction's:
+      // it is a body arriving at a degree, which is what a conjunction is.
+      const barColor = isReturn ? returnColor : (aspectColors[isIngress ? "conjunction" : r.aspect] || "var(--text)");
       const barH = rowH - 8;
       // A window the scan found already open at the range start, or still open
       // at its end, does not really begin or end here - the timeline just stops
@@ -790,8 +819,8 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       // before the interpretations arrive still open with text once they have.
       const descKey = `${r.transit}-${r.aspect}-${r.natal}`;
       const mythKey = mythKeyFor(r.transit, r.natal);
-      const glyphTitleCore = `${planetSymbols[r.transit] || planetLabel(r.transit)} ${aspectSymbol(r.aspect)} ${planetSymbols[r.natal] || planetLabel(r.natal)}`;
-      const calendarTitle = isWorldRow ? `${glyphTitleCore} world` : glyphTitleCore;
+      const glyphTitleCore = rulePairing(r, { glyphs: true });
+      const calendarTitle = needsWorldLabel(r) ? `${glyphTitleCore} world` : glyphTitleCore;
 
       // The scan already found these to the second; a retrograde pass that
       // stays within orb throughout hits more than once.
@@ -799,6 +828,12 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       // Each formatted hit can carry its own comma, so they are separated by
       // something a date never contains.
       const exactLabel = exactDates.map(d => formatExactPretty(d, a, b, showYear)).join(" \u00b7 ");
+      // Where it happens, as well as when. The transiting body's degree at the
+      // first exact hit goes into the title - "Saturn □ Sun at 14°03′ Pisces"
+      // is how the contact will be remembered - and the sub line gives both
+      // ends. An ingress is at 0° of its sign by definition, so it says nothing.
+      const positions = positionLines(r, event);
+      const title = positions.titleAt ? `${rowLabel} at ${positions.titleAt}${worldLabel}` : `${rowLabel}${worldLabel}`;
       const buildCalendarData = () => ({
         title: calendarTitle,
         segmentStart: a,
@@ -807,11 +842,11 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       });
       const scope = isWorldRow ? "world" : "personal";
       const bindSegmentTooltipEvents = (target) => {
-        const openPopup = (e) => showTooltip(e, rowLabel, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData(), scope);
+        const openPopup = (e) => showTooltip(e, title, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData(), scope, positions.lines);
         target.addEventListener("pointerenter", (e) => {
           if (isCoarsePointer()) return;
           if (tooltip.classList.contains("popup")) return;
-          showTooltip(e, rowLabel, descKey, rangeText, false, mythKey, exactLabel, null, scope);
+          showTooltip(e, title, descKey, rangeText, false, mythKey, exactLabel, null, scope, positions.lines);
         });
         target.addEventListener("pointermove", (e) => {
           if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){

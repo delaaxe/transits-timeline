@@ -11,6 +11,8 @@ export const showWorldRowsKey = "tt_show_world_rows";
 
 export const showRangeNavKey = "tt_show_range_nav";
 
+export const showIngressesKey = "tt_show_ingresses";
+
 /**
  * The last completed computation, kept so "Show more" can paginate without
  * recomputing. It is the shape the whole chart is drawn from - timeline.js
@@ -40,6 +42,10 @@ export const state = {
   // it. World mode is unaffected - it is world transits and nothing else, so
   // there is nothing to fold in.
   showWorldRows: loadShowWorldRows(),
+  // Whether the world layer also marks each body's sign changes. On by default,
+  // for the same reason the world rows are: Jupiter entering Gemini is weather
+  // every chart is read in, and it is a row or two a year, not a flood.
+  showIngresses: loadShowIngresses(),
   // The body chooser's selection. Three lists rather than two: world transits
   // ask about one set of bodies, and losing a personal selection because the
   // World view was glanced at would be its own small annoyance.
@@ -100,6 +106,21 @@ function loadShowWorldRows(){
 export function setShowWorldRows(on){
   state.showWorldRows = !!on;
   remember(showWorldRowsKey, on);
+}
+
+// Remembered like the world rows, and defaulting to on like them.
+function loadShowIngresses(){
+  try {
+    return localStorage.getItem(showIngressesKey) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/** @param {boolean} on */
+export function setShowIngresses(on){
+  state.showIngresses = !!on;
+  remember(showIngressesKey, on);
 }
 
 // The other way round from the one above: absent means off, because the arrows

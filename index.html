@@ -1048,6 +1048,23 @@
       accent-color: var(--star);
     }
     .worldPaneTitle:hover{ color: var(--ink-soft); }
+    .ingressSwitch{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      user-select: none;
+    }
+    .ingressSwitch input[type="checkbox"]{
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--star);
+    }
+    .ingressSwitch:hover{ color: var(--ink); }
     .bodyModeBtn{
       padding: 4px 10px;
       border: 0;
@@ -1507,6 +1524,16 @@
           <div class="bodyPresets" id="worldBodyPresets"></div>
           <div class="bodyChips" id="worldBodyChips" role="group" aria-label="Bodies for world transits"></div>
         </div>
+      </div>
+      <!-- Sign changes ride on the world bodies, so the switch sits under the
+           chips it applies to rather than beside the aspects, which it is not
+           one of. Which pane those chips are in depends on the mode, so the
+           picker moves this under them when it renders. -->
+      <div class="ingressPane" id="ingressPane" hidden>
+        <label class="ingressSwitch" for="showIngresses">
+          <input id="showIngresses" type="checkbox" checked />
+          <span>Mark when these change sign</span>
+        </label>
       </div>
     </div>
 
