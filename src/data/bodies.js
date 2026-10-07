@@ -263,6 +263,15 @@ export const INGRESS = "ingress";
 /** @param {{aspect?: string}|null|undefined} rule */
 export function isIngressRule(rule){ return !!rule && rule.aspect === INGRESS; }
 
+// Which crossing a folded marker on the strip shows, first wins. The Sun's
+// ingresses are the months of the zodiac, so the Sun leads whenever it is
+// there. Then the classical planets, slowest first - Jupiter's change of sign
+// is a year's news and Mercury's a month's - and only then the bodies the eye
+// has never seen, slowest first again, so that Jupiter is not hidden under
+// Chiron nor Saturn under Neptune. The Moon last: it changes sign every two
+// and a half days, and a cluster is never about that.
+export const ingressLeadOrder = ["sun","saturn","jupiter","mars","venus","mercury","pluto","neptune","uranus","chiron","node","moon"];
+
 // The one row every sign change is drawn on. A row per body per sign was a
 // dozen lines saying the same small thing, so they are folded into one strip
 // after the scan: each window on it remembers the rule it came from, which is

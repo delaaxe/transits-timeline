@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { DAY_MS, isLeadingStub } from "../core/events.js";
-import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, isIngressRow, isIngressRule, maxSpeedDegPerDay, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -656,22 +656,20 @@ export function stayLine(exact, leavesMs, a, b, showYear){
 }
 
 /**
- * The crossing a folded marker shows. The Sun's, where there is one: its
- * ingresses are the months of the zodiac, and the fast bodies cluster around
- * them. Otherwise the slowest body's, whose change of sign is the rarest and
- * the one the reader would least want to lose under Mercury's.
+ * The crossing a folded marker shows: the first in ingressLeadOrder, and the
+ * earliest of those where a body crosses twice in the run.
  *
  * @template {{body:string}} T
  * @param {T[]} cluster
  * @returns {T}
  */
 export function leadMarker(cluster){
-  const sun = cluster.find(m => m.body === "sun");
-  if (sun) return sun;
+  const rank = (/** @type {string} */ body) => {
+    const i = ingressLeadOrder.indexOf(body);
+    return i < 0 ? ingressLeadOrder.length : i;
+  };
   let best = cluster[0];
-  for (const m of cluster){
-    if ((maxSpeedDegPerDay[m.body] ?? 99) < (maxSpeedDegPerDay[best.body] ?? 99)) best = m;
-  }
+  for (const m of cluster) if (rank(m.body) < rank(best.body)) best = m;
   return best;
 }
 

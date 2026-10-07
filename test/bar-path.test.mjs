@@ -41,3 +41,14 @@ test("markers within one width of a run's first member join it, and no run is wi
   assert.deepEqual(clusterByGap(at(0, 8, 16, 24), 10).map(run => run.map(m => m.x)), [[0, 8], [16, 24]]);
   assert.deepEqual(clusterByGap([], 10), []);
 });
+
+test("a folded marker leads with the Sun, then the classical planets, and never the Moon", async () => {
+  const { leadMarker } = await import("../src/ui/timeline.js");
+  const of = (...bodies) => bodies.map((body, i) => ({ body, i }));
+  assert.equal(leadMarker(of("mercury", "sun", "chiron")).body, "sun");
+  assert.equal(leadMarker(of("chiron", "jupiter")).body, "jupiter", "Jupiter over Chiron");
+  assert.equal(leadMarker(of("neptune", "saturn")).body, "saturn", "Saturn over Neptune");
+  assert.equal(leadMarker(of("mercury", "jupiter")).body, "jupiter", "slowest of the classical planets first");
+  assert.equal(leadMarker(of("moon", "node")).body, "node", "the Moon leads nothing");
+  assert.equal(leadMarker(of("venus", "venus")).i, 0, "the earliest of a tie");
+});
