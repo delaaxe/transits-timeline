@@ -235,13 +235,24 @@ export function signIndexAt(deg){ return Math.floor(wrap360(deg) / 30) % 12; }
  * @param {number} deg
  */
 export function fmtZodiacDeg(deg){
-  if (!Number.isFinite(deg)) return "";
+  const parts = zodiacParts(deg);
+  return parts ? `${parts.degrees} ${parts.sign}` : "";
+}
+
+/**
+ * The same longitude in two pieces, for a line that wants to say the sign in
+ * one place and the degree in another.
+ * @param {number} deg
+ * @returns {{degrees: string, sign: string}|null}
+ */
+export function zodiacParts(deg){
+  if (!Number.isFinite(deg)) return null;
   const totalMin = Math.round(wrap360(deg) * 60) % 21600;
   const sign = Math.floor(totalMin / 1800);
   const rem = totalMin - sign * 1800;
   const d = Math.floor(rem / 60);
   const m = rem % 60;
-  return `${d}°${String(m).padStart(2, "0")}′ ${signNames[sign]}`;
+  return { degrees: `${d}°${String(m).padStart(2, "0")}′`, sign: signNames[sign] };
 }
 
 // A body entering a sign. Not in the aspect list: it is not an angle between

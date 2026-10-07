@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, fmtZodiacDeg, ingressAsCrossed, isIngressRow, isIngressRule, maxSpeedDegPerDay, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, isIngressRow, isIngressRule, maxSpeedDegPerDay, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -682,7 +682,10 @@ export function clusterByGap(sorted, width){
 }
 
 /**
- * The degrees a window's exact hits land on, written out.
+ * Where a window's exact hits land, written out: "Saturn in Aries square
+ * natal Mercury in Cancer (14°04′)". The aspect is a whole number of signs,
+ * so at the moment it is exact both ends stand at the same degree of their
+ * signs, and the degree is said once.
  *
  * Against a natal point the transiting body is at the same degree every time
  * the window perfects - the point does not move - so one line says it all. A
@@ -692,20 +695,23 @@ export function clusterByGap(sorted, width){
  *
  * @param {import("../core/job.js").Rule} rule
  * @param {import("../core/events.js").AspectEvent} event
- * @returns {{titleAt: string, lines: string[]}}
+ * @returns {string[]}
  */
 export function positionLines(rule, event){
   const lons = event.exactLon ?? [];
   const others = event.exactLonNatal ?? [];
-  if (isIngressRule(rule) || lons.length === 0) return { titleAt: "", lines: [] };
+  if (isIngressRule(rule) || lons.length === 0) return [];
   const transit = endLabel(rule.transit);
   const natal = endLabel(rule.natal);
   const line = (i) => {
-    const far = Number.isFinite(others[i]) ? ` · ${rule.scope === "world" ? "" : "natal "}${natal} ${fmtZodiacDeg(others[i])}` : "";
-    return `${transit} ${fmtZodiacDeg(lons[i])}${far}`;
+    const here = zodiacParts(lons[i]);
+    const there = zodiacParts(others[i]);
+    if (!here) return "";
+    if (!there) return `${transit} in ${here.sign} (${here.degrees})`;
+    return `${transit} in ${here.sign} ${rule.aspect} ${rule.scope === "world" ? "" : "natal "}${natal} in ${there.sign} (${here.degrees})`;
   };
   const lines = (rule.scope === "world") ? lons.map((_, i) => line(i)) : [line(0)];
-  return { titleAt: fmtZodiacDeg(lons[0]), lines };
+  return lines.filter(Boolean);
 }
 
 // Narrower than this and a bar stops reading as a segment; narrower than the
@@ -1015,14 +1021,12 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       // Each formatted hit can carry its own comma, so they are separated by
       // something a date never contains.
       const exactLabel = exactDates.map(d => formatExactPretty(d, a, b, showYear)).join(" \u00b7 ");
-      // Where it happens, as well as when. The transiting body's degree at the
-      // first exact hit goes into the title - "Saturn □ Sun at 14°03′ Pisces"
-      // is how the contact will be remembered - and the sub line gives both
-      // ends.
-      const positions = positionLines(r, event);
+      // Where it happens, as well as when, on a line under the dates: the
+      // title stays the pairing, which is the row's name and what a copy of
+      // it should carry.
       const card = {
-        title: positions.titleAt ? `${rowLabel} at ${positions.titleAt}${worldLabel}` : `${rowLabel}${worldLabel}`,
-        descKey, range: rangeText, mythKey, exactLabel, positions: positions.lines,
+        title: `${rowLabel}${worldLabel}`,
+        descKey, range: rangeText, mythKey, exactLabel, positions: positionLines(r, event),
         calendar: () => ({ title: calendarTitle, segmentStart: a, segmentEnd: b, exactTime: exactDates[0] ?? null })
       };
 
