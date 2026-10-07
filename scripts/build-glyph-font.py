@@ -44,9 +44,11 @@ SOURCES = [
         "NotoSansSymbols-Regular.ttf",
         f"{NOTO}/NotoSansSymbols/hinted/ttf/NotoSansSymbols-Regular.ttf",
         # moon mercury venus mars jupiter saturn uranus neptune node
-        # chiron conjunction sextile opposition
+        # chiron conjunction sextile opposition, and the twelve signs, which
+        # iOS otherwise hands to the colour emoji font like Venus and Mars.
         [0x263E, 0x263F, 0x2640, 0x2642, 0x2643, 0x2644, 0x2645, 0x2646,
-         0x260A, 0x26B7, 0x260C, 0x26B9, 0x260D],
+         0x260A, 0x26B7, 0x260C, 0x26B9, 0x260D,
+         *range(0x2648, 0x2654)],
     ),
     (
         "NotoSansSymbols2-Regular.ttf",

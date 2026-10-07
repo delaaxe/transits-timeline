@@ -185,10 +185,10 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
   // A sign change has no file at all: what there is to say about it is written
   // from the key, dates counted off the exact label.
   const isWorld = scope === "world";
-  const [keyTransit, keyAspect, keyNatal] = String(descKey).split("-");
+  const [keyTransit, keyAspect, keyNatal, keyWay] = String(descKey).split("-");
   const isIngress = keyAspect === INGRESS;
   const desc = isIngress
-    ? ingressDescription({ transit: keyTransit, natal: keyNatal }, exactLabel ? exactLabel.split(" \u00b7 ").length : 0)
+    ? ingressDescription({ transit: keyTransit, natal: keyNatal }, keyWay === "back")
     : (isWorld ? worldDescription(descKey) : aspectDescription(descKey));
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There

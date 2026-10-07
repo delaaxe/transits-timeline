@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { aspectColors, aspectSymbol, endGlyph, endLabel, fmtZodiacDeg, isIngressRule, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, fmtZodiacDeg, ingressAsCrossed, isIngressRow, isIngressRule, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -579,7 +579,9 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 
     const transitLabel = useSymbols ? endGlyph(r.transit) : endLabel(r.transit);
     const natalLabel = useSymbols ? endGlyph(r.natal) : endLabel(r.natal);
-    const parts = [
+    // The strip of sign changes is several things on one line, so it has a
+    // name rather than a pairing, in words whichever way the other labels go.
+    const parts = isIngressRow(r) ? [{ text: INGRESS_ROW_LABEL }] : [
       { text: transitLabel + " " },
       { text: aspectSymbol(r.aspect) + " " },
       // The underline says "this is your chart's ruler", which a body in the
@@ -596,6 +598,10 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
     }
 
     svg.appendChild(t);
+
+    // Nothing to follow on the strip: "when does this happen next" is a
+    // question about one body and one cusp, and the line holds a dozen.
+    if (isIngressRow(r)) continue;
 
     // The label itself is a line of text a couple of pixels tall in the places
     // between the glyphs, so the row's whole strip is what is tapped. It sits
@@ -770,12 +776,101 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     // A world row says so in its own title: a card headed "Mars □ Saturn" over a
     // personal chart would otherwise read as a contact with the birth chart,
     // which is the one thing it is not.
-    const rowLabel = rulePairing(r);
-    const worldLabel = needsWorldLabel(r) ? worldTitleSuffix : "";
-    const isIngress = isIngressRule(r);
+    const scope = isWorldRow ? "world" : "personal";
+    /**
+     * What a bar, a hit target or a marker opens.
+     * @param {Element} target
+     * @param {{title:string, descKey:string, range:string, mythKey:string, exactLabel:string,
+     *          positions:string[], calendar:() => {title:string, segmentStart:Date, segmentEnd:Date, exactTime:Date|null}}} card
+     */
+    const bindTooltip = (target, card) => {
+      const openPopup = (e) => showTooltip(e, card.title, card.descKey, card.range, true, card.mythKey, card.exactLabel, card.calendar(), scope, card.positions);
+      target.addEventListener("pointerenter", (e) => {
+        if (isCoarsePointer()) return;
+        if (tooltip.classList.contains("popup")) return;
+        showTooltip(e, card.title, card.descKey, card.range, false, card.mythKey, card.exactLabel, null, scope, card.positions);
+      });
+      target.addEventListener("pointermove", (e) => {
+        const pe = /** @type {PointerEvent} */ (e);
+        if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
+          moveTooltip(pe.clientX, pe.clientY);
+        }
+      });
+      target.addEventListener("pointerleave", () => {
+        if (isCoarsePointer()) return;
+        if (tooltip.classList.contains("popup")) return;
+        hideTooltip();
+      });
+      // Bars sit inside a horizontally scrollable container, so a tap that
+      // drifts a little makes the browser claim the gesture and fire
+      // pointercancel. Let it arbitrate: it only synthesises click for a real
+      // tap, using its own slop, and withholds it after a scroll.
+      target.addEventListener("click", openPopup);
+    };
 
     const events = eventsByRule[idx] ?? [];
+
+    // The strip of sign changes is crossings rather than windows. A window is
+    // the body within orb of the cusp, which for Chiron is seven weeks either
+    // side, and a dozen of those on one line is one long bar hiding every
+    // crossing under it. What the line is for is the moment the sign changes,
+    // so that is all it draws: the body and the sign it is now in, at the
+    // instant it got there, each with its own card.
+    if (isIngressRow(r)){
+      for (const event of events){
+        const er = event.rule ?? r;
+        const a = new Date(event.start);
+        const b = new Date(event.end);
+        (event.exacts ?? []).forEach((ms, k) => {
+          const exact = new Date(ms);
+          const xExact = dateToX(exact);
+          if (xExact < x0 || xExact > x0 + timelineW) return;
+          const crossed = ingressAsCrossed(er, event.entering?.[k] ?? true);
+          const shown = crossed.rule;
+          const when = formatExactPretty(exact, a, b, showYear);
+          const glyphPair = rulePairing(shown, { glyphs: true });
+          const card = {
+            title: rulePairing(shown),
+            descKey: `${shown.transit}-${shown.aspect}-${shown.natal}${crossed.back ? "-back" : ""}`,
+            range: when,
+            mythKey: "",
+            exactLabel: "",
+            positions: [],
+            calendar: () => ({ title: glyphPair, segmentStart: exact, segmentEnd: exact, exactTime: exact })
+          };
+          const cy = y + rowH / 2;
+          const fontSize = Math.round(rowH * 0.66);
+          // Centred on the crossing, except at the edges: a crossing on the
+          // first day of the range would otherwise put half its glyphs over
+          // the label column. The marker is the only thing drawn for it, so
+          // the few pixels of slip are better than the glyphs being cut.
+          const xText = Math.max(x0 + fontSize, Math.min(xExact, x0 + timelineW - fontSize));
+          const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
+          bindTooltip(hit, card);
+          svg.appendChild(hit);
+          // Not faded with the world bars: these are two thin glyphs rather
+          // than a block of colour, and at the bars' opacity they are hard to
+          // read. The dimmed label is what places the row one plane back.
+          const glyphs = svgEl("text", {
+            x: xText, y: cy,
+            "font-size": String(fontSize),
+            "text-anchor": "middle",
+            "dominant-baseline": "central",
+            fill: "var(--ink)",
+            class: "symbolGlyphText",
+            "pointer-events": "none"
+          });
+          glyphs.textContent = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
+          svg.appendChild(glyphs);
+        });
+      }
+      continue;
+    }
+
     for (const event of events){
+      const rowLabel = rulePairing(r);
+      const worldLabel = needsWorldLabel(r) ? worldTitleSuffix : "";
+
       const a = new Date(event.start);
       const b = new Date(event.end);
       const xa = dateToX(a);
@@ -789,9 +884,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       const barX = Math.max(x0, Math.min(xa, x0 + timelineW - w));
 
       const isReturn = r.aspect === "conjunction" && r.transit === r.natal;
-      // An ingress has no aspect colour of its own, and takes the conjunction's:
-      // it is a body arriving at a degree, which is what a conjunction is.
-      const barColor = isReturn ? returnColor : (aspectColors[isIngress ? "conjunction" : r.aspect] || "var(--text)");
+      const barColor = isReturn ? returnColor : (aspectColors[r.aspect] || "var(--text)");
       const barH = rowH - 8;
       // A window the scan found already open at the range start, or still open
       // at its end, does not really begin or end here - the timeline just stops
@@ -831,41 +924,15 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       // Where it happens, as well as when. The transiting body's degree at the
       // first exact hit goes into the title - "Saturn □ Sun at 14°03′ Pisces"
       // is how the contact will be remembered - and the sub line gives both
-      // ends. An ingress is at 0° of its sign by definition, so it says nothing.
+      // ends.
       const positions = positionLines(r, event);
-      const title = positions.titleAt ? `${rowLabel} at ${positions.titleAt}${worldLabel}` : `${rowLabel}${worldLabel}`;
-      const buildCalendarData = () => ({
-        title: calendarTitle,
-        segmentStart: a,
-        segmentEnd: b,
-        exactTime: exactDates[0] ?? null
-      });
-      const scope = isWorldRow ? "world" : "personal";
-      const bindSegmentTooltipEvents = (target) => {
-        const openPopup = (e) => showTooltip(e, title, descKey, rangeText, true, mythKey, exactLabel, buildCalendarData(), scope, positions.lines);
-        target.addEventListener("pointerenter", (e) => {
-          if (isCoarsePointer()) return;
-          if (tooltip.classList.contains("popup")) return;
-          showTooltip(e, title, descKey, rangeText, false, mythKey, exactLabel, null, scope, positions.lines);
-        });
-        target.addEventListener("pointermove", (e) => {
-          if (tooltip.style.display === "block" && !isCoarsePointer() && !tooltip.classList.contains("popup")){
-            moveTooltip(e.clientX, e.clientY);
-          }
-        });
-        target.addEventListener("pointerleave", () => {
-          if (isCoarsePointer()) return;
-          if (tooltip.classList.contains("popup")) return;
-          hideTooltip();
-        });
-        // Bars sit inside a horizontally scrollable container, so a tap that
-        // drifts a little makes the browser claim the gesture and fire
-        // pointercancel. Let it arbitrate: it only synthesises click for a real
-        // tap, using its own slop, and withholds it after a scroll.
-        target.addEventListener("click", openPopup);
+      const card = {
+        title: positions.titleAt ? `${rowLabel} at ${positions.titleAt}${worldLabel}` : `${rowLabel}${worldLabel}`,
+        descKey, range: rangeText, mythKey, exactLabel, positions: positions.lines,
+        calendar: () => ({ title: calendarTitle, segmentStart: a, segmentEnd: b, exactTime: exactDates[0] ?? null })
       };
 
-      bindSegmentTooltipEvents(rect);
+      bindTooltip(rect, card);
 
       svg.appendChild(rect);
       if (w < minHitW){
@@ -874,7 +941,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           fill: "transparent",
           class: "bar"
         });
-        bindSegmentTooltipEvents(hit);
+        bindTooltip(hit, card);
         svg.appendChild(hit);
       }
       for (const exact of exactDates){
@@ -888,7 +955,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           fill: "transparent",
           class: "bar"
         });
-        bindSegmentTooltipEvents(hitCircle);
+        bindTooltip(hitCircle, card);
         svg.appendChild(hitCircle);
         // A hard point. The ring this replaced was a 1.6px stroke and a 1.9px
         // core over a gradient, and at the size it is actually drawn those

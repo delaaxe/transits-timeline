@@ -606,3 +606,21 @@ test("every exact hit carries where both ends were", () => {
   }
   assert.ok(worldChecked > 0);
 });
+
+test("a station on a cusp is three crossings, and each knows which way it went", () => {
+  // Saturn entered Aries in May 2025, retrograded back into Pisces at the
+  // start of September, and crossed into Aries for good in February 2026.
+  const rules = buildIngressRules({ bodies: ["saturn"], orb: 1 }).filter(r => r.natal === "aries");
+  const res = computeTransitEvents({
+    startMs: Date.UTC(2025, 0, 1), endMs: Date.UTC(2026, 6, 1),
+    observer: OBSERVER, natalLon: null, rules
+  });
+  assert.equal(res.rules.length, 1);
+  const crossings = res.events[0].flatMap(e => e.exacts.map((ms, k) => ({ ms, entering: e.entering[k] })));
+  assert.equal(crossings.length, 3, crossings.map(c => new Date(c.ms).toISOString()).join(", "));
+  assert.deepEqual(crossings.map(c => c.entering), [true, false, true]);
+  const months = crossings.map(c => new Date(c.ms).getUTCMonth() + 1);
+  assert.deepEqual(months, [5, 9, 2]);
+  const years = crossings.map(c => new Date(c.ms).getUTCFullYear());
+  assert.deepEqual(years, [2025, 2025, 2026]);
+});

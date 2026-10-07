@@ -4,9 +4,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { INGRESS, angleKeys, aspectSymbol, bodyPresets, fmtZodiacDeg, ingressCuspDeg, ingressDescription, natalKeys, needsWorldLabel, normalizeBodies, order, ruleKey, rulePairing, sameBodies, signKeys, titleWithoutWorldSuffix, transitingKeys, worldTitleSuffix } from "../src/data/bodies.js";
+import { INGRESS, ingressAsCrossed, isIngressRow, angleKeys, aspectSymbol, bodyPresets, fmtZodiacDeg, ingressCuspDeg, ingressDescription, natalKeys, needsWorldLabel, normalizeBodies, order, ruleKey, rulePairing, sameBodies, signKeys, titleWithoutWorldSuffix, transitingKeys, worldTitleSuffix } from "../src/data/bodies.js";
 import { presets } from "../src/data/presets.js";
-import { buildCandidateRules, buildIngressRules, buildWorldRules } from "../src/core/transits.js";
+import { buildCandidateRules, buildIngressRules, buildWorldRules, foldIngressRows } from "../src/core/transits.js";
 
 const keysOf = (rules) => rules.map(r => `${r.transit}-${r.aspect}-${r.natal}`);
 
@@ -191,9 +191,17 @@ test("an ingress row is named for the sign being entered, whichever way the body
   assert.equal(ingressCuspDeg("node", "aries"), 30);
   assert.equal(ingressCuspDeg("sun", "sun"), null, "a body is not a sign");
 
-  assert.equal(ingressDescription({ transit: "jupiter", natal: "gemini" }, 1), "Jupiter crosses out of Taurus and into Gemini.");
-  assert.match(ingressDescription({ transit: "node", natal: "pisces" }, 1), /^The mean node crosses backward out of Aries and into Pisces\./);
-  assert.match(ingressDescription({ transit: "jupiter", natal: "gemini" }, 3), /stations and crosses the cusp again/);
+  assert.equal(ingressDescription({ transit: "jupiter", natal: "gemini" }), "Jupiter crosses out of Taurus and into Gemini.");
+  assert.match(ingressDescription({ transit: "node", natal: "pisces" }), /^The mean node crosses backward out of Aries and into Pisces\./);
+  assert.match(ingressDescription({ transit: "jupiter", natal: "taurus" }, true), /^Jupiter, retrograde, slips back out of Gemini and into Taurus\./);
+
+  // A crossing back is named for where the body ends up, so the marker and
+  // the card agree with the sky rather than with the rule that found them.
+  const rule = { transit: "jupiter", aspect: INGRESS, natal: "gemini", orb: 1, scope: "world" };
+  assert.deepEqual(ingressAsCrossed(rule, true), { rule, back: false });
+  assert.deepEqual(ingressAsCrossed(rule, false), { rule: { ...rule, natal: "taurus" }, back: true });
+  const node = { transit: "node", aspect: INGRESS, natal: "pisces", orb: 1, scope: "world" };
+  assert.equal(ingressAsCrossed(node, false).rule.natal, "aries", "the node falls back the other way");
 });
 
 test("sign changes are one rule per body per sign, riding with the world transits", () => {
@@ -214,4 +222,23 @@ test("an ingress row names its own kind and carries no world label", () => {
   assert.equal(needsWorldLabel({ transit: "mars", aspect: "square", natal: "saturn", scope: "personal" }), false);
   assert.equal(rulePairing({ transit: "saturn", aspect: "square", natal: "asc" }), "Saturn □ Asc");
   assert.equal(ruleKey(ingress), "world-jupiter-ingress-gemini", "a row like any other on the axis");
+});
+
+test("every sign change is folded onto one row that remembers each window's rule", () => {
+  const natal = { transit: "saturn", aspect: "square", natal: "sun", orb: 1, scope: "personal" };
+  const jup = { transit: "jupiter", aspect: INGRESS, natal: "gemini", orb: 1, scope: "world" };
+  const sun = { transit: "sun", aspect: INGRESS, natal: "aries", orb: 1, scope: "world" };
+  const w = (start) => ({ start, end: start + 10, exacts: [start + 5], startClipped: false, endClipped: false, peakOrb: 0 });
+  const { rules, events } = foldIngressRows([jup, natal, sun], [[w(300)], [w(100)], [w(200), w(400)]]);
+  assert.equal(rules.length, 2);
+  assert.deepEqual(rules[0], natal, "a natal contact keeps its own row, in its place");
+  assert.ok(isIngressRow(rules[1]));
+  assert.equal(rules[1].scope, "world");
+  assert.deepEqual(events[1].map(e => e.start), [200, 300, 400], "the strip is in date order across bodies");
+  assert.deepEqual(events[1].map(e => e.rule.transit), ["sun", "jupiter", "sun"]);
+  assert.equal(events[0][0].rule, undefined, "only the strip's windows carry a rule");
+
+  const none = foldIngressRows([natal], [[w(1)]]);
+  assert.equal(none.rules.length, 1, "no strip when there is nothing to put on it");
+  assert.equal(isIngressRow(natal), false);
 });

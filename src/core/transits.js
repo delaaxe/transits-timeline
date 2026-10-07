@@ -114,11 +114,11 @@ export function buildWorldRules({ bodies, aspects, orb }){
  * entering a sign is weather, not a contact with anyone's chart - and carry
  * that scope so the chart draws them one plane back the same way.
  *
- * Twelve rules a body rather than one, because a row is one cusp: Jupiter
+ * Twelve rules a body rather than one, because a scan is one cusp: Jupiter
  * entering Gemini is a window around 0° Gemini, and its exact hits are each
  * crossing of that line, which a station can make three of. The scan drops the
  * eleven signs a body never reaches in the range, as it drops any rule with
- * nothing in it.
+ * nothing in it, and foldIngressRows puts what is left on one line.
  *
  * @param {{bodies:string[], orb:number}} opts
  */
@@ -132,4 +132,42 @@ export function buildIngressRules({ bodies, orb }){
     }
   }
   return rules;
+}
+
+/**
+ * The scan's answer with every sign change on one row.
+ *
+ * The windows keep the rule they were found for, so a bar on the strip still
+ * knows it is Jupiter entering Gemini. The strip sorts like any row, by its
+ * first window, and carries the orb and scope of the rules it stands in for.
+ *
+ * @param {import("./job.js").Rule[]} rules
+ * @param {import("./events.js").AspectEvent[][]} events one list per rule
+ * @returns {{rules: import("./job.js").Rule[], events: import("./events.js").AspectEvent[][]}}
+ */
+export function foldIngressRows(rules, events){
+  /** @type {import("./job.js").Rule[]} */
+  const keptRules = [];
+  /** @type {import("./events.js").AspectEvent[][]} */
+  const keptEvents = [];
+  /** @type {import("./events.js").AspectEvent[]} */
+  const strip = [];
+  /** @type {import("./job.js").Rule|null} */
+  let first = null;
+  for (let i = 0; i < rules.length; i++){
+    const rule = rules[i];
+    if (rule.aspect !== INGRESS){
+      keptRules.push(rule);
+      keptEvents.push(events[i]);
+      continue;
+    }
+    first ??= rule;
+    for (const event of events[i]) strip.push({ ...event, rule });
+  }
+  if (first){
+    strip.sort((a, b) => a.start - b.start);
+    keptRules.push({ transit: INGRESS, aspect: INGRESS, natal: INGRESS, orb: first.orb, scope: "world" });
+    keptEvents.push(strip);
+  }
+  return { rules: keptRules, events: keptEvents };
 }

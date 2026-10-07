@@ -167,13 +167,24 @@ export function computeTransitEvents(job, onProgress){
       // the scan just made, so they come out of the cache for nothing - and
       // where a transit lands is how an astrologer remembers it, which the
       // time alone never says.
+      const ingress = isIngressRule(rule);
+      const cusp = ingress ? Number(ingressCuspDeg(rule.transit, rule.natal)) : NaN;
       for (const event of events){
         event.exactLon = event.exacts.map(ms => lon.read(g.transit, ms));
         event.exactLonNatal = (g.scope === "world")
           ? event.exacts.map(ms => lon.read(g.natal, ms))
-          : event.exacts.map(() => isIngressRule(rule)
-              ? Number(ingressCuspDeg(rule.transit, rule.natal))
-              : Number(natalLon?.[rule.natal]));
+          : event.exacts.map(() => ingress ? cusp : Number(natalLon?.[rule.natal]));
+        // Which way the cusp was crossed. A body a few hours before the
+        // crossing is on one side of it or the other, and the side says
+        // whether it entered the rule's sign or fell back out of it. The node
+        // enters from above, since it only ever moves backward; everything
+        // else enters from below.
+        if (ingress){
+          event.entering = event.exacts.map(ms => {
+            const side = wrap180(lon.read(g.transit, ms - 6 * 3600 * 1000) - cusp);
+            return rule.transit === "node" ? side > 0 : side < 0;
+          });
+        }
       }
       byRule[member.ruleIndex] = events;
     }

@@ -17,7 +17,7 @@
 
 import { addDaysLocal, fmtLocalYYYYMMDD, parseLocalDateOnly } from "../core/time.js";
 import { DAY_MS } from "../core/events.js";
-import { isIngressRule, needsWorldLabel, rulePairing, worldTitleSuffix } from "../data/bodies.js";
+import { needsWorldLabel, rulePairing, worldTitleSuffix } from "../data/bodies.js";
 import { requestUpdate } from "../refresh.js";
 import { currentChartContext, natalLongitudes } from "../services/chart-context.js";
 import { SEARCH_LIMIT_YEARS, findOccurrence, occurrenceWindow, returnRange } from "../services/search.js";
@@ -240,15 +240,6 @@ async function stepOccurrence(direction){
 function showOnlyFocused(){
   const rule = state.focusRule;
   if (!rule) return;
-  // An ingress is not one of the aspects, so the boxes are left as they are:
-  // emptying them would be asking for a chart with nothing in it. One body in
-  // the world list makes no pair, so what is left is that body's sign changes.
-  if (isIngressRule(rule)){
-    const world = [rule.transit];
-    if (state.appMode === "world") setSelection({ world });
-    else setSelection({ world, transit: [], natal: [], involving: [] });
-    return;
-  }
   renderAspectChecks([rule.aspect]);
   const world = [rule.transit, rule.natal];
   // World mode shows nothing else, so the personal lists are out of sight and

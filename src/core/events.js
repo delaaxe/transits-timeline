@@ -109,6 +109,10 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  *   hit, filled in by the job once it knows which body the window belongs to
  * @property {number[]} [exactLonNatal] the far end's longitude at each exact
  *   hit: the natal point, the cusp, or the other moving body
+ * @property {boolean[]} [entering] on a sign change, whether each crossing put
+ *   the body into the rule's sign (true) or back out of it (false)
+ * @property {import("./job.js").Rule} [rule] on a folded row, the rule this
+ *   window was found for, since the row's own rule stands for several
  */
 
 /**

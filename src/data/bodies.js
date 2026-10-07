@@ -252,6 +252,15 @@ export const INGRESS = "ingress";
 /** @param {{aspect?: string}|null|undefined} rule */
 export function isIngressRule(rule){ return !!rule && rule.aspect === INGRESS; }
 
+// The one row every sign change is drawn on. A row per body per sign was a
+// dozen lines saying the same small thing, so they are folded into one strip
+// after the scan: each window on it remembers the rule it came from, which is
+// what the popup and the glyph on the bar read.
+export const INGRESS_ROW_LABEL = "Sign changes";
+
+/** @param {{transit?: string, aspect?: string}|null|undefined} rule */
+export function isIngressRow(rule){ return isIngressRule(rule) && rule?.transit === INGRESS; }
+
 /**
  * The cusp an ingress row watches, in degrees. A body going the ordinary way
  * enters a sign at its first degree; the mean node only ever moves backward,
@@ -266,28 +275,63 @@ export function ingressCuspDeg(transit, signKey){
   return wrap360((transit === "node" ? idx + 1 : idx) * 30);
 }
 
-/** The sign an ingress into `signKey` leaves behind. @param {string} transit @param {string} signKey */
-export function ingressFromSign(transit, signKey){
+/**
+ * The key of the sign an ingress into `signKey` leaves behind - the one on the
+ * other side of the cusp, which for the backward-moving node is the next sign
+ * along rather than the one before.
+ * @param {string} transit @param {string} signKey
+ */
+export function ingressFromSignKey(transit, signKey){
   const idx = signIndexOf(signKey);
   if (idx < 0) return "";
-  return signNames[(idx + (transit === "node" ? 1 : 11)) % 12];
+  return signKeys[(idx + (transit === "node" ? 1 : 11)) % 12];
+}
+
+/** The same sign by name. @param {string} transit @param {string} signKey */
+export function ingressFromSign(transit, signKey){
+  const key = ingressFromSignKey(transit, signKey);
+  return key ? signNames[signIndexOf(key)] : "";
 }
 
 /**
- * The prose an ingress row shows, written here rather than looked up: twelve
+ * What a crossing of the cusp actually did. A rule watches one cusp and names
+ * the sign on the far side of it, but a body that stations there crosses it
+ * both ways, and the crossing back puts the body in the sign it came from.
+ * This is the rule as the reader should see that crossing: named for the sign
+ * the body is in afterwards, and marked so the prose can say "back".
+ *
+ * @param {{transit: string, natal: string, aspect: string, orb?: number|string, scope?: "personal"|"world"}} rule
+ * @param {boolean} entering whether the body ended up in the rule's sign
+ */
+export function ingressAsCrossed(rule, entering){
+  if (entering) return { rule, back: false };
+  return { rule: { ...rule, natal: ingressFromSignKey(rule.transit, rule.natal) }, back: true };
+}
+
+/**
+ * The prose a sign change shows, written here rather than looked up: twelve
  * signs for each body is a file nobody has written, and what the popup has to
  * say is mostly arithmetic anyway.
- * @param {{transit: string, natal: string}} rule
- * @param {number} exactCount how many times the window crosses the cusp
+ *
+ * `back` is a crossing against the body's usual direction - a planet
+ * retrograding out of a sign it had entered, which is a real event and the
+ * one the reader most wants named. The node has no such thing: backward is
+ * its usual direction, and it never turns.
+ *
+ * @param {{transit: string, natal: string}} rule named for the sign the body is in afterwards
+ * @param {boolean} [back]
  */
-export function ingressDescription(rule, exactCount){
+export function ingressDescription(rule, back = false){
   const body = rule.transit === "node" ? "The mean node" : planetLabel(rule.transit);
   const into = endLabel(rule.natal);
+  if (back){
+    // The sign it slips back out of is the one the forward crossing goes to.
+    const outOf = signNames[(signIndexOf(rule.natal) + 1) % 12];
+    return `${body}, retrograde, slips back out of ${outOf} and into ${into}. It will cross into ${outOf} again once it turns direct.`;
+  }
   const from = ingressFromSign(rule.transit, rule.natal);
   const way = rule.transit === "node" ? " backward" : "";
-  const first = `${body} crosses${way} out of ${from} and into ${into}.`;
-  if (exactCount <= 1) return first;
-  return `${first} It is dated more than once because it stations and crosses the cusp again: the dates are each time it changes sign, in either direction.`;
+  return `${body} crosses${way} out of ${from} and into ${into}.`;
 }
 
 /**

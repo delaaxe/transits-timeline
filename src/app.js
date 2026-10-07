@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { onRequestUpdate } from "./refresh.js";
 import { ephemerisAstronomy } from "./core/ephemeris.js";
 import { addDaysLocal, parseLocalDateOnly } from "./core/time.js";
-import { buildCandidateRules, buildIngressRules, buildWorldRules } from "./core/transits.js";
+import { buildCandidateRules, buildIngressRules, buildWorldRules, foldIngressRows } from "./core/transits.js";
 import { orderMap } from "./data/bodies.js";
 import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./services/chart-context.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
@@ -135,7 +135,7 @@ export async function updateTimeline(){
 
     // No mode on the job: every rule carries its own scope, and a chart that
     // holds both kinds has no single one to name.
-    const { rules: rulesOut, events: eventsByRule } = await computeEvents({
+    const { rules: scanned, events: scannedEvents } = await computeEvents({
       startMs: rangeStartLocal.getTime(),
       endMs: endExclusive.getTime(),
       observer: ctx.observer,
@@ -150,6 +150,10 @@ export async function updateTimeline(){
       setStatus(`Computing\u2026 ${pct}%`);
       if (!hadResults) setTimelineState(`Computing\u2026 ${pct}%`, "busy");
     });
+
+    // One strip for every sign change rather than a row per body per sign:
+    // they are small, there are several, and they all say the same kind of thing.
+    const { rules: rulesOut, events: eventsByRule } = foldIngressRows(scanned, scannedEvents);
 
     const firstHitByRule = eventsByRule.map(events => events[0].start);
 
