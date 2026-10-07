@@ -71,11 +71,24 @@ export function setRangeNavVisible(isVisible, { animate = true } = {}){
   setShowRangeNav(isVisible);
   const on = state.showRangeNav;
   if (on) document.documentElement.style.removeProperty("--timeline-nav-total");
+  // On a touch screen the view bar comes down to its chips while the arrows
+  // are open, and the stylesheet moves it there at the slide's pace. The
+  // stored setting is applied after the page has painted with the toggle
+  // shut, so without this the bar would arrive at full height and then
+  // shrink - the same page-still-arriving slide the row itself skips below.
+  const bar = el.viewBar;
+  if (!animate && bar) bar.style.transition = "none";
   if (el.timelineNavToggle){
     el.timelineNavToggle.setAttribute("aria-expanded", on ? "true" : "false");
     // The same band the preset chips take when they are on, which is how the
     // options button beside it says the same thing.
     el.timelineNavToggle.classList.toggle("active", on);
+  }
+  if (!animate && bar){
+    // Laid out with the transition off, so the new height is simply there;
+    // then the stylesheet's transition is handed back for the taps to come.
+    void bar.offsetHeight;
+    bar.style.removeProperty("transition");
   }
 
   // The first call of the session is the stored setting being applied rather
