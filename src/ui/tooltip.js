@@ -162,7 +162,7 @@ let shownArgs = null;
 
 export function refreshTooltipContent(){
   if (tooltip.style.display !== "block" || !shownArgs) return;
-  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,"personal"|"world",string[]]} */ (shownArgs)));
+  setTooltipContent(...(/** @type {[string,string,string,string,boolean,string,any,"personal"|"world",string[],CardSection[]]} */ (shownArgs)));
 }
 
 /**
@@ -175,24 +175,41 @@ export function refreshTooltipContent(){
  *
  * `positions` is where the window's exact hits land, one line each, already
  * written out by the timeline.
+ *
+ * `sections` is for a card standing for several sign changes at once: each
+ * crossing gets its own heading, its own sub line and its own prose, looked up
+ * by key here so that a card opened before the prose lands fills in when it
+ * does.
+ * @typedef {{heading: string, sub?: string, descKey: string}} CardSection
  * @param {string[]} [positions]
+ * @param {CardSection[]} [sections]
  */
-export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope="personal", positions=[]){
-  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope, positions];
+export function setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope="personal", positions=[], sections=[]){
+  shownArgs = [title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope, positions, sections];
   // Two bodies meeting in the sky is not the same event as one of them crossing
   // a place in a birth chart, so a world row reads from its own file rather than
   // from natal prose written in the second person about "your natal Neptune".
   // A sign change has no file at all: what there is to say about it is written
   // from the key, dates counted off the exact label.
   const isWorld = scope === "world";
-  const [keyTransit, keyAspect, keyNatal, keyWay] = String(descKey).split("-");
-  const isIngress = keyAspect === INGRESS;
   // A sign change says what crossed where, and then what the body is like in
   // the sign it has arrived in - which is the reading the reader opened the
   // card for, and comes from its own file.
+  /** @param {string} key */
+  const ingressProse = (key) => {
+    const [t, , n, way] = String(key).split("-");
+    return [ingressDescription({ transit: t, natal: n }, way === "back"), signDescription(t, n)].filter(Boolean).join(" ");
+  };
+  const [keyTransit, keyAspect] = String(descKey).split("-");
+  const isIngress = keyAspect === INGRESS;
   const desc = isIngress
-    ? [ingressDescription({ transit: keyTransit, natal: keyNatal }, keyWay === "back"), signDescription(keyTransit, keyNatal)].filter(Boolean).join(" ")
+    ? ingressProse(descKey)
     : (isWorld ? worldDescription(descKey) : aspectDescription(descKey));
+  const sectionsHtml = (sections ?? []).map(s =>
+    `<div class="section"><div class="sub positions">${escapeHtml(s.heading)}</div>`
+    + (s.sub ? `<div class="sub">${escapeHtml(s.sub)}</div>` : "")
+    + `<div class="desc">${escapeHtml(ingressProse(s.descKey))}</div></div>`
+  ).join("");
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There
   // is no timing note on a world row: the figure that matters there is how often
@@ -217,7 +234,8 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     const titleText = String(calendarData.title || title || "Transit");
     const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
     const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
-    const detailsText = [firstLine, positionText, desc || "", timing, mythLine].filter(Boolean).join("\n\n");
+    const sectionsText = (sections ?? []).map(s => [s.heading, s.sub, ingressProse(s.descKey)].filter(Boolean).join("\n")).join("\n\n");
+    const detailsText = [firstLine, positionText, desc || "", sectionsText, timing, mythLine].filter(Boolean).join("\n\n");
     const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
     const segmentEndForCalendar = segmentAllDay
       ? new Date(calendarData.segmentEnd.getFullYear(), calendarData.segmentEnd.getMonth(), calendarData.segmentEnd.getDate() + 1)
@@ -270,6 +288,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
     + positionHtml
     + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
+    + sectionsHtml
     + timingHtml
     + mythHtml
     + calendarHtml;
@@ -306,9 +325,10 @@ export function isCoarsePointer(){
  *   what an "Add to calendar" link would carry; a hover has none, only a popup does
  * @param {"personal"|"world"} [scope]
  * @param {string[]} [positions] where each exact hit lands, written out
+ * @param {CardSection[]} [sections] one per crossing, on a card that stands for several
  */
-export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, scope="personal", positions=[]){
-  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope, positions);
+export function showTooltip(e, title, descKey, range, popupMode, mythKey, exactLabel, calendarData=null, scope="personal", positions=[], sections=[]){
+  setTooltipContent(title, descKey, range, mythKey, popupMode, exactLabel, calendarData, scope, positions, sections);
   tooltip.style.display = "block";
   tooltip.style.visibility = "hidden";
   tooltip.classList.toggle("popup", !!popupMode);

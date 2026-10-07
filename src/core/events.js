@@ -111,6 +111,9 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  *   hit: the natal point, the cusp, or the other moving body
  * @property {boolean[]} [entering] on a sign change, whether each crossing put
  *   the body into the rule's sign (true) or back out of it (false)
+ * @property {number[]} [leavesAt] on a sign change, when the body next changes
+ *   sign after each crossing (NaN when not found within the horizon)
+ * @property {string[]} [leavesInto] the sign key it goes into then
  * @property {import("./job.js").Rule} [rule] on a folded row, the rule this
  *   window was found for, since the row's own rule stands for several
  */

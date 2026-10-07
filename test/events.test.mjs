@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DAY_MS, aspectTargets, brentRoot, isLeadingStub, scanAspectWindows, wrap180 } from "../src/core/events.js";
-import { computeTransitEvents, groupRules } from "../src/core/job.js";
+import { computeTransitEvents, groupRules, nextSignChange } from "../src/core/job.js";
 import { buildCandidateRules, buildIngressRules, buildWorldRules } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
 import { ephemerisAstronomy, getBodyLonAt, getBodyLonFromAll } from "../src/core/ephemeris.js";
@@ -623,4 +623,22 @@ test("a station on a cusp is three crossings, and each knows which way it went",
   assert.deepEqual(months, [5, 9, 2]);
   const years = crossings.map(c => new Date(c.ms).getUTCFullYear());
   assert.deepEqual(years, [2025, 2025, 2026]);
+});
+
+test("a sign change knows when the body leaves the sign, and by which door", () => {
+  const read = (body, ms) => getBodyLonAt(body, new Date(ms), OBSERVER);
+  // The Sun entered Aries on 20 March 2025 and Taurus a month later.
+  const sunLeaves = nextSignChange("sun", Date.UTC(2025, 2, 20, 9, 2), read);
+  assert.ok(sunLeaves);
+  assert.equal(sunLeaves.into, "taurus");
+  assert.ok(Math.abs(sunLeaves.at - Date.UTC(2025, 3, 19, 19, 57)) < 3600 * 1000, new Date(sunLeaves.at).toISOString());
+  // Saturn entered Aries in May 2025 and slipped back into Pisces at the start of September.
+  const rules = buildIngressRules({ bodies: ["saturn"], orb: 1 }).filter(r => r.natal === "aries");
+  const res = computeTransitEvents({ startMs: Date.UTC(2025, 0, 1), endMs: Date.UTC(2026, 0, 1), observer: OBSERVER, natalLon: null, rules });
+  const first = res.events[0][0];
+  assert.equal(first.leavesInto[0], "pisces", "back out by the cusp it came in by");
+  assert.equal(new Date(first.leavesAt[0]).getUTCMonth() + 1, 9);
+  // The Moon is in a sign for two and a half days.
+  const moon = nextSignChange("moon", Date.UTC(2026, 0, 1), read);
+  assert.ok(moon && moon.at - Date.UTC(2026, 0, 1) < 3 * DAY_MS);
 });

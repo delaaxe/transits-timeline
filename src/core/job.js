@@ -3,9 +3,9 @@
 // directly, which is what makes the event model testable.
 
 import { wrap360 } from "./angles.js";
-import { wrap180, aspectTargets, scanAspectWindows } from "./events.js";
+import { DAY_MS, aspectTargets, brentRoot, scanAspectWindows, wrap180 } from "./events.js";
 import { getBodyLonAt } from "./ephemeris.js";
-import { aspectAngle, ingressCuspDeg, isIngressRule, maxSpeedDegPerDay } from "../data/bodies.js";
+import { aspectAngle, ingressCuspDeg, isIngressRule, maxSpeedDegPerDay, signIndexAt, signKeys } from "../data/bodies.js";
 
 /**
  * @typedef {{transit: string, natal: string, aspect: string, orb: number|string,
@@ -119,6 +119,52 @@ export function groupRules(rules, mode, natalLon){
   return [...groups.values()];
 }
 
+// How far ahead to look for a body leaving a sign. Pluto's longest stay in one
+// is about thirty-one years; nothing the app draws stays longer.
+const LEAVE_HORIZON_MS = 40 * 365.25 * DAY_MS;
+
+/**
+ * When a body next changes sign after `fromMs`, and into which sign.
+ *
+ * Stepped forward by the same safety the scan uses: from a sample, the nearer
+ * cusp of the sign the body is in cannot be reached for (distance / top speed)
+ * days, so a step of that length cannot skip a crossing. Once a sample lands in
+ * another sign the crossing is bracketed and Brent takes it to the second.
+ * Either cusp counts: a body that stations and slips back out leaves by the
+ * one it came in by.
+ *
+ * @param {string} body
+ * @param {number} fromMs a moment just inside the sign - in practice the ingress
+ *   itself, nudged forward so the sample is not sitting on the cusp
+ * @param {(body:string, ms:number)=>number} read
+ * @returns {{at:number, into:string}|null} null when nothing within the horizon
+ */
+export function nextSignChange(body, fromMs, read){
+  const speed = Math.max(1e-9, maxSpeedDegPerDay[body] ?? 25);
+  let t = fromMs + 60 * 1000;
+  const sign = signIndexAt(read(body, t));
+  const floor = sign * 30;
+  let prevT = t;
+  while (t - fromMs < LEAVE_HORIZON_MS){
+    const lon = read(body, t);
+    const here = signIndexAt(lon);
+    if (here !== sign){
+      // Bracketed: the crossing lies between prevT (inside) and t (outside).
+      // Which cusp was crossed decides the function Brent solves.
+      const forward = here === (sign + 1) % 12;
+      const cusp = forward ? floor + 30 : floor;
+      const f = (/** @type {number} */ ms) => wrap180(read(body, ms) - cusp);
+      const root = brentRoot(f, prevT, t, f(prevT), f(t), 1000);
+      return { at: root ?? t, into: signKeys[here] };
+    }
+    const within = wrap360(lon - floor);
+    const toCusp = Math.max(1e-6, Math.min(within, 30 - within));
+    prevT = t;
+    t += Math.max(60 * 1000, (toCusp / speed) * DAY_MS);
+  }
+  return null;
+}
+
 /** @param {string} scope @param {string} transit @param {string} natal */
 function speedCeiling(scope, transit, natal){
   const t = maxSpeedDegPerDay[transit] ?? 25;
@@ -184,6 +230,12 @@ export function computeTransitEvents(job, onProgress){
             const side = wrap180(lon.read(g.transit, ms - 6 * 3600 * 1000) - cusp);
             return rule.transit === "node" ? side > 0 : side < 0;
           });
+          // And how long it stays: the card says "in Gemini until", which is
+          // the next change of sign after this one, found here because this
+          // is where the ephemeris is.
+          const leaves = event.exacts.map(ms => nextSignChange(g.transit, ms, lon.read));
+          event.leavesAt = leaves.map(l => l ? l.at : NaN);
+          event.leavesInto = leaves.map(l => l ? l.into : "");
         }
       }
       byRule[member.ruleIndex] = events;

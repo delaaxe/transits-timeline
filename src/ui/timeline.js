@@ -1,10 +1,10 @@
 import { state } from "../state.js";
-import { isLeadingStub } from "../core/events.js";
+import { DAY_MS, isLeadingStub } from "../core/events.js";
 import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, isIngressRow, isIngressRule, maxSpeedDegPerDay, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
-import { fmtDatePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
+import { fmtDatePretty, fmtTimePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
 import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, getYearStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
 
@@ -633,8 +633,24 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 /**
  * What a bar, a marker or a pill opens.
  * @typedef {{title:string, descKey:string, range:string, mythKey:string, exactLabel:string,
- *   positions:string[], calendar:() => ({title:string, segmentStart:Date, segmentEnd:Date, exactTime:Date|null}|null)}} TooltipCard
+ *   positions:string[], sections?:import("./tooltip.js").CardSection[],
+ *   calendar:() => ({title:string, segmentStart:Date, segmentEnd:Date, exactTime:Date|null}|null)}} TooltipCard
  */
+
+/**
+ * "In Gemini until Jun 9, 2026", for a sign change. With the time of day
+ * when the stay is short enough for it to matter, which is the Moon's two
+ * and a half days. Empty when the scan found no leaving within its horizon.
+ * @param {string} sign the sign entered
+ * @param {number} enteredMs @param {number} leavesMs
+ */
+export function staysUntilLine(sign, enteredMs, leavesMs){
+  if (!Number.isFinite(leavesMs)) return "";
+  const leaves = new Date(leavesMs);
+  const brief = (leavesMs - enteredMs) < 14 * DAY_MS;
+  const when = brief ? `${fmtDatePretty(leaves, true)}, ${fmtTimePretty(leaves)}` : fmtDatePretty(leaves, true);
+  return `In ${endLabel(sign)} until ${when}.`;
+}
 
 /**
  * The crossing a folded marker shows. The Sun's, where there is one: its
@@ -840,11 +856,11 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
      * @param {TooltipCard} card
      */
     const bindTooltip = (target, card) => {
-      const openPopup = (e) => showTooltip(e, card.title, card.descKey, card.range, true, card.mythKey, card.exactLabel, card.calendar(), scope, card.positions);
+      const openPopup = (e) => showTooltip(e, card.title, card.descKey, card.range, true, card.mythKey, card.exactLabel, card.calendar(), scope, card.positions, card.sections);
       target.addEventListener("pointerenter", (e) => {
         if (isCoarsePointer()) return;
         if (tooltip.classList.contains("popup")) return;
-        showTooltip(e, card.title, card.descKey, card.range, false, card.mythKey, card.exactLabel, null, scope, card.positions);
+        showTooltip(e, card.title, card.descKey, card.range, false, card.mythKey, card.exactLabel, null, scope, card.positions, card.sections);
       });
       target.addEventListener("pointermove", (e) => {
         const pe = /** @type {PointerEvent} */ (e);
@@ -875,7 +891,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     if (isIngressRow(r)){
       const cy = y + rowH / 2;
       const fontSize = Math.round(rowH * 0.66);
-      /** @type {{x:number, exact:Date, label:string, glyphs:string, body:string, card:TooltipCard}[]} */
+      /** @type {{x:number, exact:Date, label:string, glyphs:string, body:string, until:string, card:TooltipCard}[]} */
       const markers = [];
       for (const event of events){
         const er = event.rule ?? r;
@@ -890,15 +906,16 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           const when = formatExactPretty(exact, a, b, showYear);
           const glyphs = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
           const label = rulePairing(shown);
+          const until = staysUntilLine(shown.natal, ms, event.leavesAt?.[k] ?? NaN);
           markers.push({
-            x: xExact, exact, label, glyphs, body: shown.transit,
+            x: xExact, exact, label, glyphs, body: shown.transit, until,
             card: {
               title: label,
               descKey: `${shown.transit}-${shown.aspect}-${shown.natal}${crossed.back ? "-back" : ""}`,
               range: when,
               mythKey: "",
               exactLabel: "",
-              positions: [],
+              positions: until ? [until] : [],
               calendar: () => ({ title: rulePairing(shown, { glyphs: true }), segmentStart: exact, segmentEnd: exact, exactTime: exact })
             }
           });
@@ -926,14 +943,22 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         const lead = leadMarker(cluster);
         const first = cluster[0].exact;
         const last = cluster[cluster.length - 1].exact;
+        // A folded card is one section per crossing, each with its own time,
+        // its own stay and its own prose: the lead gives the card its name,
+        // and no crossing is read for it.
         const card = single ? cluster[0].card : {
           title: `${lead.label} and ${cluster.length - 1} more`,
-          descKey: lead.card.descKey,
+          descKey: "",
           // The days they span, and each one's own time on its line below.
           range: isMultiDayLocal(first, last) ? formatRangePretty(first, last, false, showYear) : fmtDatePretty(first, showYear),
           mythKey: "",
           exactLabel: "",
-          positions: cluster.map(m => `${m.glyphs}\u00A0 ${m.label} \u00b7 ${formatExactPretty(m.exact, first, last, showYear)}`),
+          positions: [],
+          sections: cluster.map(m => ({
+            heading: `${m.glyphs}\u00A0 ${m.label} \u00b7 ${formatExactPretty(m.exact, first, last, showYear)}`,
+            sub: m.until || undefined,
+            descKey: m.card.descKey
+          })),
           calendar: () => null
         };
         const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
