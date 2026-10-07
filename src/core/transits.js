@@ -138,8 +138,10 @@ export function buildIngressRules({ bodies, orb }){
  * The scan's answer with every sign change on one row.
  *
  * The windows keep the rule they were found for, so a bar on the strip still
- * knows it is Jupiter entering Gemini. The strip sorts like any row, by its
- * first window, and carries the orb and scope of the rules it stands in for.
+ * knows it is Jupiter entering Gemini. Only windows with a crossing in them
+ * count: the strip draws the moment a sign changes and nothing else, so a
+ * body merely within orb of a cusp would be a row with nothing on it, and a
+ * range in which nothing changes sign gets no strip at all.
  *
  * @param {import("./job.js").Rule[]} rules
  * @param {import("./events.js").AspectEvent[][]} events one list per rule
@@ -161,8 +163,11 @@ export function foldIngressRows(rules, events){
       keptEvents.push(events[i]);
       continue;
     }
-    first ??= rule;
-    for (const event of events[i]) strip.push({ ...event, rule });
+    for (const event of events[i]){
+      if (!(event.exacts ?? []).length) continue;
+      first ??= rule;
+      strip.push({ ...event, rule });
+    }
   }
   if (first){
     strip.sort((a, b) => a.start - b.start);

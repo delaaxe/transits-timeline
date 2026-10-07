@@ -229,16 +229,19 @@ test("every sign change is folded onto one row that remembers each window's rule
   const jup = { transit: "jupiter", aspect: INGRESS, natal: "gemini", orb: 1, scope: "world" };
   const sun = { transit: "sun", aspect: INGRESS, natal: "aries", orb: 1, scope: "world" };
   const w = (start) => ({ start, end: start + 10, exacts: [start + 5], startClipped: false, endClipped: false, peakOrb: 0 });
-  const { rules, events } = foldIngressRows([jup, natal, sun], [[w(300)], [w(100)], [w(200), w(400)]]);
+  const near = { ...w(50), exacts: [] };
+  const { rules, events } = foldIngressRows([jup, natal, sun], [[w(300)], [w(100)], [near, w(200), w(400)]]);
   assert.equal(rules.length, 2);
   assert.deepEqual(rules[0], natal, "a natal contact keeps its own row, in its place");
   assert.ok(isIngressRow(rules[1]));
   assert.equal(rules[1].scope, "world");
-  assert.deepEqual(events[1].map(e => e.start), [200, 300, 400], "the strip is in date order across bodies");
+  assert.deepEqual(events[1].map(e => e.start), [200, 300, 400], "the strip is in date order across bodies, and a window with no crossing is not on it");
   assert.deepEqual(events[1].map(e => e.rule.transit), ["sun", "jupiter", "sun"]);
   assert.equal(events[0][0].rule, undefined, "only the strip's windows carry a rule");
 
   const none = foldIngressRows([natal], [[w(1)]]);
   assert.equal(none.rules.length, 1, "no strip when there is nothing to put on it");
+  const onlyNear = foldIngressRows([natal, jup], [[w(1)], [near]]);
+  assert.equal(onlyNear.rules.length, 1, "a body near a cusp that never crosses it makes no strip either");
   assert.equal(isIngressRow(natal), false);
 });

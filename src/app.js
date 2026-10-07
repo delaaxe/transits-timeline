@@ -3,7 +3,7 @@ import { onRequestUpdate } from "./refresh.js";
 import { ephemerisAstronomy } from "./core/ephemeris.js";
 import { addDaysLocal, parseLocalDateOnly } from "./core/time.js";
 import { buildCandidateRules, buildIngressRules, buildWorldRules, foldIngressRows } from "./core/transits.js";
-import { orderMap } from "./data/bodies.js";
+import { isIngressRow, orderMap } from "./data/bodies.js";
 import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./services/chart-context.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
 import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
@@ -159,6 +159,11 @@ export async function updateTimeline(){
 
     const idxs = rulesOut.map((_, i) => i);
     idxs.sort((a,b) => {
+      // The strip of sign changes is the calendar the rest is read against,
+      // so it stays at the top whatever is first to happen.
+      const sa = isIngressRow(rulesOut[a]) ? 0 : 1;
+      const sb = isIngressRow(rulesOut[b]) ? 0 : 1;
+      if (sa !== sb) return sa - sb;
       const da = firstHitByRule[a] - firstHitByRule[b];
       if (da !== 0) return da;
       const pa = (orderMap.get(rulesOut[a].transit) ?? 999) - (orderMap.get(rulesOut[b].transit) ?? 999);
