@@ -103,8 +103,12 @@
          sticky-header cost. */
       --axis-pad: 8px;
       --axis-pad-top: 4px;
-      --timeline-nav-h: 32px;
-      --timeline-nav-total: calc(var(--timeline-nav-h) + 10px);
+      /* The arrows are 28px glyphs and the row is that plus a small seat
+         for the month title under them: no tap-target's worth of air. The
+         total adds the seat and a little slack for the corner block. */
+      --timeline-nav-h: 28px;
+      --timeline-nav-seat: 4px;
+      --timeline-nav-total: calc(var(--timeline-nav-h) + var(--timeline-nav-seat) + 4px);
     }
     /* The app's alphabet, vendored, because the platforms disagree about it:
        Android has no Chiron (U+26B7) in its fallback and draws tofu, and both
@@ -392,7 +396,14 @@
       justify-content: space-between;
       align-items: center;
       gap: 16px;
-      padding: 2px 0 4px;
+      padding: 0 0 var(--timeline-nav-seat);
+      /* --axis-pad-top is the breath between the view bar and the month title
+         when the title is the first thing under the bar. Open, the arrows are,
+         and they bring their own box, so the row reaches up through that
+         padding. A margin on the row rather than a rule on the padding so the
+         slide can move it: a padding that flips when the row is hidden lands
+         as a four-pixel jump at the end of the close. */
+      margin-top: calc(-1 * var(--axis-pad-top));
       margin-left: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) + var(--axis-pad));
       margin-right: 6px;
       user-select: none;
@@ -402,11 +413,18 @@
     .timelineNavBtn{
       background: none;
       border: none;
-      padding: 0;
       color: var(--ink-soft);
       font-size: 28px;
       line-height: 1;
       cursor: pointer;
+      /* A guillemet's ink is about 16px tall and sits low in its em box:
+         nine pixels of air above it and three below, in every system font
+         this has been measured in. The box is fixed at the row's height, and
+         the bottom padding lifts the line box so the ink lands in the middle
+         of it rather than near its floor. */
+      box-sizing: border-box;
+      height: var(--timeline-nav-h);
+      padding: 0 0 6px;
     }
     .timelineNavBtn:disabled{ opacity: 0.5; cursor: not-allowed; }
     #dateAxisSvg{ will-change: transform; position: relative; z-index: 1; }
@@ -773,10 +791,33 @@
        which is what keeps the corner block covering the nav. */
     @media (hover: none) and (pointer: coarse){
       :root{
-        --timeline-nav-h: 44px;
         --viewbar-min: 60px;
+        /* The chips' height, and the air the bar's minimum leaves on each
+           side of them: (60 - 40) / 2. */
+        --viewbar-chip: 40px;
+        --viewbar-air: 10px;
       }
-      .timelineNavBtn{ min-width: 44px; min-height: 44px; }
+      /* With the arrows open, the bar gives up the air under its chips. Shut,
+         it holds 60px around 40px chips and the extra is air on both sides,
+         which under them is where the month title wants a little; open, that
+         air sat on top of the row's own and read as a band of nothing between
+         the chips and the arrows. The minimum comes down to the chips and the
+         air above them moves into the top padding, so the chips hold still
+         and only the bar's bottom edge comes up. It moves at the slide's own
+         pace, so the row arrives as the bar gives way rather than after it. */
+      .viewBar:has(#timelineNavToggle[aria-expanded="true"]){
+        --viewbar-min: var(--viewbar-chip);
+        padding-top: calc(var(--viewbar-pad) + var(--viewbar-air));
+      }
+      .viewBar{
+        transition: min-height 190ms cubic-bezier(0.2, 0, 0.2, 1),
+                    padding-top 190ms cubic-bezier(0.2, 0, 0.2, 1);
+      }
+      /* Wide enough to tap, and no taller than the glyph: the arrows sit in
+         a row of their own with nothing above or below them to miss, and
+         every pixel of box around them read as a band of empty space between
+         the view bar and the month title. */
+      .timelineNavBtn{ min-width: 44px; }
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
@@ -812,7 +853,7 @@
        36px here, below the 44 this file uses everywhere else - a deliberate
        trade in the one orientation where height is the scarce thing. */
     @media (max-height: 520px){
-      :root{ --viewbar-min: 46px; --viewbar-pad: 2px; }
+      :root{ --viewbar-min: 46px; --viewbar-pad: 2px; --viewbar-chip: 36px; --viewbar-air: 5px; }
       .appBar{ padding: max(4px, env(safe-area-inset-top)) 0 4px; }
       .wordmark{ font-size: 13px; }
       .wordmark svg{ width: 17px; height: 17px; }
@@ -862,6 +903,8 @@
       }
       .presetBtn{ padding-inline: 10px; }
       .dateAxisScrollInner{ padding: 0; }
+      /* No padding above to reach up through. */
+      .timelineNav{ margin-top: 0; }
       .timelineScroll{ padding: 0; border-radius: 0; width: 100%; margin: 0; }
       /* The inner scroller loses its top padding here, so the block has to
          start at the very top of the plate: at --axis-pad-top the month title
@@ -1358,6 +1401,7 @@
     }
     @media (prefers-reduced-motion: reduce){
       .timelineState.busy .timelineStatePlate::before{ animation: none; opacity: .8; }
+      .viewBar{ transition: none; }
     }
     .installHint{
       margin: var(--sp-3) 0 0;

@@ -45,6 +45,7 @@ export function slide(node, open){
   // the only chance to catch it.
   const inFlight = running.get(node);
   const caught = inFlight ? node.getBoundingClientRect().height : null;
+  const caughtMargins = inFlight ? readMargins(node) : null;
   if (inFlight){
     inFlight.cancel();
     running.delete(node);
@@ -65,7 +66,7 @@ export function slide(node, open){
     const target = node.getBoundingClientRect().height;
     const from = caught ?? 0;
     if (target <= 0 || Math.abs(target - from) < 1) return Promise.resolve();
-    return run(node, from, target, true);
+    return run(node, from, target, true, caughtMargins ?? NO_MARGINS, readMargins(node));
   }
 
   if (node.hidden) return Promise.resolve();
@@ -74,14 +75,30 @@ export function slide(node, open){
     node.hidden = true;
     return Promise.resolve();
   }
-  return run(node, from, 0, false);
+  return run(node, from, 0, false, caughtMargins ?? readMargins(node), NO_MARGINS);
+}
+
+/** @typedef {{ top: number, bottom: number }} Margins */
+
+/** @type {Margins} */
+const NO_MARGINS = { top: 0, bottom: 0 };
+
+// The block margins the stylesheet gives the panel. The arrows row reaches up
+// through the axis block's top padding with a negative one, and a margin that
+// is simply there the moment the row is shown, and simply gone the moment it
+// is hidden, is a jump at each end of the slide - so the margins travel with
+// the height. Mid-flight this reads the animated value, which is the point.
+/** @param {HTMLElement} node @returns {Margins} */
+function readMargins(node){
+  const cs = getComputedStyle(node);
+  return { top: parseFloat(cs.marginTop) || 0, bottom: parseFloat(cs.marginBottom) || 0 };
 }
 
 /**
  * @param {HTMLElement} node @param {number} from @param {number} to
- * @param {boolean} open
+ * @param {boolean} open @param {Margins} fromMargins @param {Margins} toMargins
  */
-function run(node, from, to, open){
+function run(node, from, to, open, fromMargins, toMargins){
   // Clipped only while the box is the wrong size. The aspect menu inside the
   // options drawer is a popup that hangs outside it, so leaving overflow hidden
   // once the panel is open would cut the menu off at the drawer's edge.
@@ -94,8 +111,8 @@ function run(node, from, to, open){
 
   const animation = node.animate(
     [
-      { height: `${from}px`, opacity: open ? 0 : 1 },
-      { height: `${to}px`, opacity: open ? 1 : 0 }
+      { height: `${from}px`, marginTop: `${fromMargins.top}px`, marginBottom: `${fromMargins.bottom}px`, opacity: open ? 0 : 1 },
+      { height: `${to}px`, marginTop: `${toMargins.top}px`, marginBottom: `${toMargins.bottom}px`, opacity: open ? 1 : 0 }
     ],
     { duration: DURATION_MS, easing: EASING }
   );
