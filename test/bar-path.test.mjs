@@ -31,3 +31,13 @@ test("the radius never exceeds the height or the width it has to fit", () => {
   // Tall bars clamp at half the height.
   assert.match(barPath(0, 0, 100, 20, true, true), /A 10 10 /);
 });
+
+test("markers within one width of a run's first member join it, and no run is wider than that", async () => {
+  const { clusterByGap } = await import("../src/ui/timeline.js");
+  const at = (...xs) => xs.map(x => ({ x }));
+  assert.deepEqual(clusterByGap(at(0, 5, 9, 40, 100, 104), 10).map(run => run.map(m => m.x)),
+    [[0, 5, 9], [40], [100, 104]]);
+  // A chain of near neighbours is cut every width, not kept as one run.
+  assert.deepEqual(clusterByGap(at(0, 8, 16, 24), 10).map(run => run.map(m => m.x)), [[0, 8], [16, 24]]);
+  assert.deepEqual(clusterByGap([], 10), []);
+});

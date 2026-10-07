@@ -1250,6 +1250,10 @@
       font-variant-numeric: tabular-nums;
       white-space: normal;
     }
+    /* Where the hits land, and the list on a pill of sign changes. The lines
+       carry glyphs, which only the glyph font keeps out of the emoji set; the
+       letters fall through to the UI font as everywhere else. */
+    #tooltip .positions{ font-family: var(--font-glyph); }
     /* Pace and repeat passes: the same label treatment as the range, because it
        is the same kind of fact about when rather than about what. */
     #tooltip .timing{

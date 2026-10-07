@@ -4,7 +4,7 @@ import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, fmtZ
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
-import { formatExactPretty, formatRangePretty } from "./format.js";
+import { fmtDatePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
 import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, getYearStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
 
@@ -631,6 +631,37 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 }
 
 /**
+ * What a bar, a marker or a pill opens.
+ * @typedef {{title:string, descKey:string, range:string, mythKey:string, exactLabel:string,
+ *   positions:string[], calendar:() => ({title:string, segmentStart:Date, segmentEnd:Date, exactTime:Date|null}|null)}} TooltipCard
+ */
+
+/**
+ * Runs of markers that would overprint, in order. A marker joins the run
+ * before it when it is within `width` of that run's first member, so no run
+ * is wider than one marker and a run drawn at its first member's x cannot
+ * reach the next. Measured from the first member rather than the last on
+ * purpose: a chain of near neighbours - the Moon changes sign every two and
+ * a half days - would otherwise be one run the length of the range, and
+ * one pill saying "299".
+ *
+ * @template {{x:number}} T
+ * @param {T[]} sorted markers in x order
+ * @param {number} width what a marker takes up
+ * @returns {T[][]}
+ */
+export function clusterByGap(sorted, width){
+  /** @type {T[][]} */
+  const out = [];
+  for (const m of sorted){
+    const run = out[out.length - 1];
+    if (run && m.x - run[0].x < width) run.push(m);
+    else out.push([m]);
+  }
+  return out;
+}
+
+/**
  * The degrees a window's exact hits land on, written out.
  *
  * Against a natal point the transiting body is at the same degree every time
@@ -780,8 +811,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     /**
      * What a bar, a hit target or a marker opens.
      * @param {Element} target
-     * @param {{title:string, descKey:string, range:string, mythKey:string, exactLabel:string,
-     *          positions:string[], calendar:() => {title:string, segmentStart:Date, segmentEnd:Date, exactTime:Date|null}}} card
+     * @param {TooltipCard} card
      */
     const bindTooltip = (target, card) => {
       const openPopup = (e) => showTooltip(e, card.title, card.descKey, card.range, true, card.mythKey, card.exactLabel, card.calendar(), scope, card.positions);
@@ -817,6 +847,10 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     // so that is all it draws: the body and the sign it is now in, at the
     // instant it got there, each with its own card.
     if (isIngressRow(r)){
+      const cy = y + rowH / 2;
+      const fontSize = Math.round(rowH * 0.66);
+      /** @type {{x:number, exact:Date, label:string, glyphs:string, card:TooltipCard}[]} */
+      const markers = [];
       for (const event of events){
         const er = event.rule ?? r;
         const a = new Date(event.start);
@@ -828,41 +862,83 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           const crossed = ingressAsCrossed(er, event.entering?.[k] ?? true);
           const shown = crossed.rule;
           const when = formatExactPretty(exact, a, b, showYear);
-          const glyphPair = rulePairing(shown, { glyphs: true });
-          const card = {
-            title: rulePairing(shown),
-            descKey: `${shown.transit}-${shown.aspect}-${shown.natal}${crossed.back ? "-back" : ""}`,
-            range: when,
-            mythKey: "",
-            exactLabel: "",
-            positions: [],
-            calendar: () => ({ title: glyphPair, segmentStart: exact, segmentEnd: exact, exactTime: exact })
-          };
-          const cy = y + rowH / 2;
-          const fontSize = Math.round(rowH * 0.66);
-          // Centred on the crossing, except at the edges: a crossing on the
-          // first day of the range would otherwise put half its glyphs over
-          // the label column. The marker is the only thing drawn for it, so
-          // the few pixels of slip are better than the glyphs being cut.
-          const xText = Math.max(x0 + fontSize, Math.min(xExact, x0 + timelineW - fontSize));
-          const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
-          bindTooltip(hit, card);
-          svg.appendChild(hit);
-          // Not faded with the world bars: these are two thin glyphs rather
-          // than a block of colour, and at the bars' opacity they are hard to
-          // read. The dimmed label is what places the row one plane back.
-          const glyphs = svgEl("text", {
-            x: xText, y: cy,
-            "font-size": String(fontSize),
-            "text-anchor": "middle",
-            "dominant-baseline": "central",
-            fill: "var(--ink)",
-            class: "symbolGlyphText",
-            "pointer-events": "none"
+          const glyphs = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
+          const label = rulePairing(shown);
+          markers.push({
+            x: xExact, exact, label, glyphs,
+            card: {
+              title: label,
+              descKey: `${shown.transit}-${shown.aspect}-${shown.natal}${crossed.back ? "-back" : ""}`,
+              range: when,
+              mythKey: "",
+              exactLabel: "",
+              positions: [],
+              calendar: () => ({ title: rulePairing(shown, { glyphs: true }), segmentStart: exact, segmentEnd: exact, exactTime: exact })
+            }
           });
-          glyphs.textContent = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
-          svg.appendChild(glyphs);
         });
+      }
+      markers.sort((m, n) => m.x - n.x);
+
+      // Markers that would print over each other are folded into one pill
+      // with a count, whose card lists every crossing in it. A year of the
+      // Sun, Mercury and Venus is forty-odd crossings on one line, and drawn
+      // as glyphs on top of glyphs they say nothing at all; a "6" the reader
+      // can open says what the line is for and keeps every date reachable.
+      // Two glyphs are about 1.4 of the font size wide.
+      const markerW = fontSize * 1.4;
+      const clusters = clusterByGap(markers, markerW);
+      for (const cluster of clusters){
+        // Drawn at the first crossing in it - a pill reads as "from here, six
+        // changes" - and clamped at the edges, where a crossing on the first
+        // day of the range would otherwise put half its glyphs over the
+        // label column.
+        const xText = Math.max(x0 + fontSize, Math.min(cluster[0].x, x0 + timelineW - fontSize));
+        const single = cluster.length === 1;
+        const first = cluster[0].exact;
+        const last = cluster[cluster.length - 1].exact;
+        const card = single ? cluster[0].card : {
+          title: `${cluster.length} sign changes`,
+          descKey: "",
+          // The days they span, and each one's own time on its line below.
+          range: isMultiDayLocal(first, last) ? formatRangePretty(first, last, false, showYear) : fmtDatePretty(first, showYear),
+          mythKey: "",
+          exactLabel: "",
+          positions: cluster.map(m => `${m.glyphs}\u00A0 ${m.label} \u00b7 ${formatExactPretty(m.exact, first, last, showYear)}`),
+          calendar: () => null
+        };
+        const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
+        bindTooltip(hit, card);
+        svg.appendChild(hit);
+        if (!single){
+          // A count in a pill, in the conjunction's colour since that is what
+          // the single markers' bars would have worn: a body arriving at a
+          // degree.
+          const pillH = Math.round(rowH * 0.7);
+          const pillW = Math.max(pillH, Math.round(fontSize * 0.62 * String(cluster.length).length) + 10);
+          svg.appendChild(svgEl("rect", {
+            x: xText - pillW / 2, y: cy - pillH / 2, width: pillW, height: pillH, rx: pillH / 2,
+            fill: fillFor(aspectColors.conjunction),
+            stroke: darken(aspectColors.conjunction, 0.4), "stroke-width": "0.75",
+            ...(fadeWorld ? { opacity: String(WORLD_BAR_OPACITY) } : {}),
+            "pointer-events": "none"
+          }));
+        }
+        // Not faded with the world bars: these are two thin glyphs rather
+        // than a block of colour, and at the bars' opacity they are hard to
+        // read. The dimmed label is what places the row one plane back.
+        const text = svgEl("text", {
+          x: xText, y: cy,
+          "font-size": String(single ? fontSize : Math.round(fontSize * 0.8)),
+          "text-anchor": "middle",
+          "dominant-baseline": "central",
+          fill: "var(--ink)",
+          class: single ? "symbolGlyphText" : "",
+          ...(single ? {} : { "font-weight": "600" }),
+          "pointer-events": "none"
+        });
+        text.textContent = single ? cluster[0].glyphs : String(cluster.length);
+        svg.appendChild(text);
       }
       continue;
     }
