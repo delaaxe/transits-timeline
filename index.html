@@ -103,8 +103,12 @@
          sticky-header cost. */
       --axis-pad: 8px;
       --axis-pad-top: 4px;
-      --timeline-nav-h: 32px;
-      --timeline-nav-total: calc(var(--timeline-nav-h) + 10px);
+      /* The arrows are 28px glyphs; the row is them plus a 2px seat for the
+         axis titles below, and not a tap-target's worth of air around them.
+         The total adds that padding and a little slack for the corner block. */
+      --timeline-nav-h: 28px;
+      --timeline-nav-pad-bottom: 2px;
+      --timeline-nav-total: calc(var(--timeline-nav-h) + var(--timeline-nav-pad-bottom) + 4px);
     }
     /* The app's alphabet, vendored, because the platforms disagree about it:
        Android has no Chiron (U+26B7) in its fallback and draws tofu, and both
@@ -392,7 +396,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 16px;
-      padding: 2px 0 4px;
+      padding: 0 0 var(--timeline-nav-pad-bottom);
       margin-left: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) + var(--axis-pad));
       margin-right: 6px;
       user-select: none;
@@ -773,10 +777,14 @@
        which is what keeps the corner block covering the nav. */
     @media (hover: none) and (pointer: coarse){
       :root{
-        --timeline-nav-h: 44px;
+        --timeline-nav-h: 36px;
         --viewbar-min: 60px;
       }
-      .timelineNavBtn{ min-width: 44px; min-height: 44px; }
+      /* Wide enough to tap, but not the full 44px tall: the arrows sit in a
+         row of their own with nothing beside them to miss, and 44px of box
+         around a 28px glyph read as a band of empty space between the view
+         bar and the month title. */
+      .timelineNavBtn{ min-width: 44px; min-height: 36px; }
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
