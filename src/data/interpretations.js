@@ -9,6 +9,9 @@ export let mythDescriptions = {};
 /** @type {Record<string, string>} */
 export let worldDescriptions = {};
 
+/** @type {Record<string, string>} */
+export let signDescriptions = {};
+
 // Batches of prose that have landed. The files are independent, so none waits
 // on another: whichever arrives first is usable immediately.
 let arrived = 0;
@@ -30,7 +33,8 @@ export function loadInterpretations(){
   loading = Promise.all([
     loadAspectDescriptions().then(data => { aspectDescriptions = data; announce(); }),
     loadMythDescriptions().then(data => { mythDescriptions = data; announce(); }),
-    loadWorldDescriptions().then(data => { worldDescriptions = data; announce(); })
+    loadWorldDescriptions().then(data => { worldDescriptions = data; announce(); }),
+    loadSignDescriptions().then(data => { signDescriptions = data; announce(); })
   ]).then(() => undefined);
   return loading;
 }
@@ -50,6 +54,9 @@ export function mythDescription(key){ return mythDescriptions[key] || ""; }
 
 /** @param {string} key */
 export function worldDescription(key){ return worldDescriptions[key] || ""; }
+
+/** A body in a sign, keyed "jupiter-in-gemini". @param {string} body @param {string} sign */
+export function signDescription(body, sign){ return signDescriptions[`${body}-in-${sign}`] || ""; }
 
 /**
  * A missing file leaves the rest of the app working, so a failed fetch warns and
@@ -75,3 +82,5 @@ export function loadAspectDescriptions(){ return loadJson("aspects.json", "Aspec
 export function loadMythDescriptions(){ return loadJson("myths.json", "Myth descriptions"); }
 
 export function loadWorldDescriptions(){ return loadJson("world.json", "World descriptions"); }
+
+export function loadSignDescriptions(){ return loadJson("signs.json", "Sign descriptions"); }

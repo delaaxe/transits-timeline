@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { isLeadingStub } from "../core/events.js";
-import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, fmtZodiacDeg, ingressAsCrossed, isIngressRow, isIngressRule, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, fmtZodiacDeg, ingressAsCrossed, isIngressRow, isIngressRule, maxSpeedDegPerDay, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -637,6 +637,26 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
  */
 
 /**
+ * The crossing a folded marker shows. The Sun's, where there is one: its
+ * ingresses are the months of the zodiac, and the fast bodies cluster around
+ * them. Otherwise the slowest body's, whose change of sign is the rarest and
+ * the one the reader would least want to lose under Mercury's.
+ *
+ * @template {{body:string}} T
+ * @param {T[]} cluster
+ * @returns {T}
+ */
+export function leadMarker(cluster){
+  const sun = cluster.find(m => m.body === "sun");
+  if (sun) return sun;
+  let best = cluster[0];
+  for (const m of cluster){
+    if ((maxSpeedDegPerDay[m.body] ?? 99) < (maxSpeedDegPerDay[best.body] ?? 99)) best = m;
+  }
+  return best;
+}
+
+/**
  * Runs of markers that would overprint, in order. A marker joins the run
  * before it when it is within `width` of that run's first member, so no run
  * is wider than one marker and a run drawn at its first member's x cannot
@@ -849,7 +869,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     if (isIngressRow(r)){
       const cy = y + rowH / 2;
       const fontSize = Math.round(rowH * 0.66);
-      /** @type {{x:number, exact:Date, label:string, glyphs:string, card:TooltipCard}[]} */
+      /** @type {{x:number, exact:Date, label:string, glyphs:string, body:string, card:TooltipCard}[]} */
       const markers = [];
       for (const event of events){
         const er = event.rule ?? r;
@@ -865,7 +885,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           const glyphs = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
           const label = rulePairing(shown);
           markers.push({
-            x: xExact, exact, label, glyphs,
+            x: xExact, exact, label, glyphs, body: shown.transit,
             card: {
               title: label,
               descKey: `${shown.transit}-${shown.aspect}-${shown.natal}${crossed.back ? "-back" : ""}`,
@@ -880,26 +900,29 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
       }
       markers.sort((m, n) => m.x - n.x);
 
-      // Markers that would print over each other are folded into one pill
-      // with a count, whose card lists every crossing in it. A year of the
-      // Sun, Mercury and Venus is forty-odd crossings on one line, and drawn
-      // as glyphs on top of glyphs they say nothing at all; a "6" the reader
-      // can open says what the line is for and keeps every date reachable.
-      // Two glyphs are about 1.4 of the font size wide.
-      const markerW = fontSize * 1.4;
+      // Markers that would print over each other are folded into one, which
+      // shows the crossing that matters most with a plus after it and opens a
+      // card listing every crossing in it. A year of the Sun, Mercury and
+      // Venus is forty-odd crossings on one line, and drawn as glyphs on top
+      // of glyphs they say nothing at all; "☉♏+" says the Sun went into
+      // Scorpio and something else happened around then, and keeps every
+      // date reachable. Two glyphs and the plus are about 1.8 of the font
+      // size wide, and a little air on top of that keeps neighbours from
+      // reading as one word.
+      const markerW = fontSize * 2.1;
       const clusters = clusterByGap(markers, markerW);
       for (const cluster of clusters){
-        // Drawn at the first crossing in it - a pill reads as "from here, six
-        // changes" - and clamped at the edges, where a crossing on the first
-        // day of the range would otherwise put half its glyphs over the
-        // label column.
+        // Drawn at the first crossing in it and clamped at the edges, where a
+        // crossing on the first day of the range would otherwise put half its
+        // glyphs over the label column.
         const xText = Math.max(x0 + fontSize, Math.min(cluster[0].x, x0 + timelineW - fontSize));
         const single = cluster.length === 1;
+        const lead = leadMarker(cluster);
         const first = cluster[0].exact;
         const last = cluster[cluster.length - 1].exact;
         const card = single ? cluster[0].card : {
-          title: `${cluster.length} sign changes`,
-          descKey: "",
+          title: `${lead.label} and ${cluster.length - 1} more`,
+          descKey: lead.card.descKey,
           // The days they span, and each one's own time on its line below.
           range: isMultiDayLocal(first, last) ? formatRangePretty(first, last, false, showYear) : fmtDatePretty(first, showYear),
           mythKey: "",
@@ -910,34 +933,29 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
         bindTooltip(hit, card);
         svg.appendChild(hit);
-        if (!single){
-          // A count in a pill, in the conjunction's colour since that is what
-          // the single markers' bars would have worn: a body arriving at a
-          // degree.
-          const pillH = Math.round(rowH * 0.7);
-          const pillW = Math.max(pillH, Math.round(fontSize * 0.62 * String(cluster.length).length) + 10);
-          svg.appendChild(svgEl("rect", {
-            x: xText - pillW / 2, y: cy - pillH / 2, width: pillW, height: pillH, rx: pillH / 2,
-            fill: fillFor(aspectColors.conjunction),
-            stroke: darken(aspectColors.conjunction, 0.4), "stroke-width": "0.75",
-            ...(fadeWorld ? { opacity: String(WORLD_BAR_OPACITY) } : {}),
-            "pointer-events": "none"
-          }));
-        }
         // Not faded with the world bars: these are two thin glyphs rather
         // than a block of colour, and at the bars' opacity they are hard to
         // read. The dimmed label is what places the row one plane back.
         const text = svgEl("text", {
           x: xText, y: cy,
-          "font-size": String(single ? fontSize : Math.round(fontSize * 0.8)),
+          "font-size": String(fontSize),
           "text-anchor": "middle",
           "dominant-baseline": "central",
           fill: "var(--ink)",
-          class: single ? "symbolGlyphText" : "",
-          ...(single ? {} : { "font-weight": "600" }),
+          class: "symbolGlyphText",
           "pointer-events": "none"
         });
-        text.textContent = single ? cluster[0].glyphs : String(cluster.length);
+        text.textContent = lead.glyphs;
+        if (!single){
+          // The plus is the UI font's, smaller and dimmer: a footnote on the
+          // marker rather than a third glyph.
+          const plus = document.createElementNS(svgNs, "tspan");
+          plus.textContent = "+";
+          plus.setAttribute("font-size", String(Math.round(fontSize * 0.75)));
+          plus.setAttribute("fill", "var(--muted)");
+          plus.setAttribute("font-family", "var(--font-ui)");
+          text.appendChild(plus);
+        }
         svg.appendChild(text);
       }
       continue;

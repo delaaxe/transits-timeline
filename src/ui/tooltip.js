@@ -1,5 +1,5 @@
 import { INGRESS, ingressDescription, titleWithoutWorldSuffix, transitTimingFor } from "../data/bodies.js";
-import { aspectDescription, mythDescription, worldDescription } from "../data/interpretations.js";
+import { aspectDescription, mythDescription, signDescription, worldDescription } from "../data/interpretations.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
 
@@ -187,8 +187,11 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
   const isWorld = scope === "world";
   const [keyTransit, keyAspect, keyNatal, keyWay] = String(descKey).split("-");
   const isIngress = keyAspect === INGRESS;
+  // A sign change says what crossed where, and then what the body is like in
+  // the sign it has arrived in - which is the reading the reader opened the
+  // card for, and comes from its own file.
   const desc = isIngress
-    ? ingressDescription({ transit: keyTransit, natal: keyNatal }, keyWay === "back")
+    ? [ingressDescription({ transit: keyTransit, natal: keyNatal }, keyWay === "back"), signDescription(keyTransit, keyNatal)].filter(Boolean).join(" ")
     : (isWorld ? worldDescription(descKey) : aspectDescription(descKey));
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There

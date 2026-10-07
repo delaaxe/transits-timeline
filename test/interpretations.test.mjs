@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
-import { aspects, mythKeyFor, natalKeys, planets, transitingKeys, transitTiming } from "../src/data/bodies.js";
+import { aspects, mythKeyFor, natalKeys, planets, signKeys, transitingKeys, transitTiming } from "../src/data/bodies.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (name) => JSON.parse(await readFile(join(repoRoot, name), "utf8"));
@@ -113,4 +113,26 @@ test("no entry is truncated or padded", async () => {
       assert.doesNotMatch(text, runOn, `${name} ${key} runs two sentences together`);
     }
   }
+});
+
+// Every body that can change sign has a reading for every sign it can enter,
+// written as weather rather than as a birth chart, and short enough for a
+// card that already carries the crossing and the pace.
+test("signs.json covers every body in every sign, in the collective voice", async () => {
+  const signs = await readJson("signs.json");
+  const missing = [];
+  for (const body of transitingKeys){
+    for (const sign of signKeys){
+      const key = `${body}-in-${sign}`;
+      const text = signs[key];
+      if (!text) { missing.push(key); continue; }
+      const words = text.trim().split(/\s+/).length;
+      assert.ok(words >= 30 && words <= 75, `${key} is ${words} words`);
+      assert.doesNotMatch(text, /\b(you|your|yours|natal)\b/i, `${key} is written as a personal placement`);
+      assert.doesNotMatch(text, /[\u2014;]/, `${key} has an em-dash or a semicolon`);
+    }
+  }
+  assert.deepEqual(missing, [], "every body in every sign");
+  const extra = Object.keys(signs).filter(k => !transitingKeys.some(b => signKeys.some(s => k === `${b}-in-${s}`)));
+  assert.deepEqual(extra, [], "no key the strip can never ask for");
 });
