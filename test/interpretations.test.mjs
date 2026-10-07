@@ -127,7 +127,7 @@ test("signs.json covers every body in every sign, in the collective voice", asyn
       const text = signs[key];
       if (!text) { missing.push(key); continue; }
       const words = text.trim().split(/\s+/).length;
-      assert.ok(words >= 30 && words <= 75, `${key} is ${words} words`);
+      assert.ok(words >= 30 && words <= 60, `${key} is ${words} words`);
       assert.doesNotMatch(text, /\b(you|your|yours|natal)\b/i, `${key} is written as a personal placement`);
       assert.doesNotMatch(text, /[\u2014;]/, `${key} has an em-dash or a semicolon`);
     }
