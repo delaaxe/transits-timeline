@@ -791,15 +791,27 @@
     @media (hover: none) and (pointer: coarse){
       :root{
         --viewbar-min: 60px;
+        /* The chips' height, and the air the bar's minimum leaves on each
+           side of them: (60 - 40) / 2. */
+        --viewbar-chip: 40px;
+        --viewbar-air: 10px;
       }
-      /* With the arrows open, the bar comes down to its chips' own height.
-         Shut, it holds 60px around 40px chips and the extra is air under
-         them, which is where the month title wants a little; open, that air
-         sat on top of the row's own and read as a band of nothing between
-         the chips and the arrows. The bar's height moves at the slide's own
+      /* With the arrows open, the bar gives up the air under its chips. Shut,
+         it holds 60px around 40px chips and the extra is air on both sides,
+         which under them is where the month title wants a little; open, that
+         air sat on top of the row's own and read as a band of nothing between
+         the chips and the arrows. The minimum comes down to the chips and the
+         air above them moves into the top padding, so the chips hold still
+         and only the bar's bottom edge comes up. It moves at the slide's own
          pace, so the row arrives as the bar gives way rather than after it. */
-      .viewBar:has(#timelineNavToggle[aria-expanded="true"]){ --viewbar-min: 40px; }
-      .viewBar{ transition: min-height 190ms cubic-bezier(0.2, 0, 0.2, 1); }
+      .viewBar:has(#timelineNavToggle[aria-expanded="true"]){
+        --viewbar-min: var(--viewbar-chip);
+        padding-top: calc(var(--viewbar-pad) + var(--viewbar-air));
+      }
+      .viewBar{
+        transition: min-height 190ms cubic-bezier(0.2, 0, 0.2, 1),
+                    padding-top 190ms cubic-bezier(0.2, 0, 0.2, 1);
+      }
       /* Wide enough to tap, and no taller than the glyph: the arrows sit in
          a row of their own with nothing above or below them to miss, and
          every pixel of box around them read as a band of empty space between
@@ -840,7 +852,7 @@
        36px here, below the 44 this file uses everywhere else - a deliberate
        trade in the one orientation where height is the scarce thing. */
     @media (max-height: 520px){
-      :root{ --viewbar-min: 46px; --viewbar-pad: 2px; }
+      :root{ --viewbar-min: 46px; --viewbar-pad: 2px; --viewbar-chip: 36px; --viewbar-air: 5px; }
       .appBar{ padding: max(4px, env(safe-area-inset-top)) 0 4px; }
       .wordmark{ font-size: 13px; }
       .wordmark svg{ width: 17px; height: 17px; }
