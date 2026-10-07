@@ -103,11 +103,12 @@
          sticky-header cost. */
       --axis-pad: 8px;
       --axis-pad-top: 4px;
-      /* The arrows are 28px glyphs and the row is exactly that: no padding,
-         no tap-target's worth of air around them. The total adds a little
-         slack for the corner block. */
+      /* The arrows are 28px glyphs and the row is that plus a small seat
+         for the month title under them: no tap-target's worth of air. The
+         total adds the seat and a little slack for the corner block. */
       --timeline-nav-h: 28px;
-      --timeline-nav-total: calc(var(--timeline-nav-h) + 4px);
+      --timeline-nav-seat: 4px;
+      --timeline-nav-total: calc(var(--timeline-nav-h) + var(--timeline-nav-seat) + 4px);
     }
     /* The app's alphabet, vendored, because the platforms disagree about it:
        Android has no Chiron (U+26B7) in its fallback and draws tofu, and both
@@ -395,7 +396,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 16px;
-      padding: 0;
+      padding: 0 0 var(--timeline-nav-seat);
       /* --axis-pad-top is the breath between the view bar and the month title
          when the title is the first thing under the bar. Open, the arrows are,
          and they bring their own box, so the row reaches up through that
