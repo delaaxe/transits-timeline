@@ -396,6 +396,13 @@
       align-items: center;
       gap: 16px;
       padding: 0;
+      /* --axis-pad-top is the breath between the view bar and the month title
+         when the title is the first thing under the bar. Open, the arrows are,
+         and they bring their own box, so the row reaches up through that
+         padding. A margin on the row rather than a rule on the padding so the
+         slide can move it: a padding that flips when the row is hidden lands
+         as a four-pixel jump at the end of the close. */
+      margin-top: calc(-1 * var(--axis-pad-top));
       margin-left: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) + var(--axis-pad));
       margin-right: 6px;
       user-select: none;
@@ -420,12 +427,6 @@
     }
     .timelineNavBtn:disabled{ opacity: 0.5; cursor: not-allowed; }
     #dateAxisSvg{ will-change: transform; position: relative; z-index: 1; }
-    /* --axis-pad-top is the breath between the view bar and the month title
-       when the title is the first thing under the bar. With the arrows open
-       they are, and they bring their own box, so the padding goes - and the
-       corner block, which starts where the padding ends, starts at the top. */
-    .dateAxisScrollInner:has(> .timelineNav:not([hidden])){ padding-top: 0; }
-    .dateAxisScrollInner:has(> .timelineNav:not([hidden])) #axisCornerBlock{ top: 0; }
     #axisCornerBlock{
       position: absolute;
       left: var(--axis-pad);
@@ -884,6 +885,8 @@
       }
       .presetBtn{ padding-inline: 10px; }
       .dateAxisScrollInner{ padding: 0; }
+      /* No padding above to reach up through. */
+      .timelineNav{ margin-top: 0; }
       .timelineScroll{ padding: 0; border-radius: 0; width: 100%; margin: 0; }
       /* The inner scroller loses its top padding here, so the block has to
          start at the very top of the plate: at --axis-pad-top the month title
