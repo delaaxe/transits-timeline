@@ -4,7 +4,7 @@ import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingr
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
-import { fmtDatePretty, fmtTimePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
+import { fmtDatePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
 import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, getYearStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
 
@@ -638,18 +638,21 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
  */
 
 /**
- * "In Gemini until Jun 9, 2026", for a sign change. With the time of day
- * when the stay is short enough for it to matter, which is the Moon's two
- * and a half days. Empty when the scan found no leaving within its horizon.
- * @param {string} sign the sign entered
- * @param {number} enteredMs @param {number} leavesMs
+ * The date line of a sign change: the stay in the sign, from the crossing to
+ * the next one - "Sep 10, 08:01 – Oct 25" - so the card's one line of dates
+ * says how long it lasts the way an aspect's says how long it is in orb.
+ * With times when the stay is short enough for them to matter, which is the
+ * Moon's two and a half days. Just the crossing when the scan found no
+ * leaving within its horizon.
+ * @param {Date} exact @param {number} leavesMs
+ * @param {Date} a @param {Date} b the window, for how the crossing is written on its own
+ * @param {boolean} showYear
  */
-export function staysUntilLine(sign, enteredMs, leavesMs){
-  if (!Number.isFinite(leavesMs)) return "";
+export function stayLine(exact, leavesMs, a, b, showYear){
+  if (!Number.isFinite(leavesMs)) return formatExactPretty(exact, a, b, showYear);
   const leaves = new Date(leavesMs);
-  const brief = (leavesMs - enteredMs) < 14 * DAY_MS;
-  const when = brief ? `${fmtDatePretty(leaves, true)}, ${fmtTimePretty(leaves)}` : fmtDatePretty(leaves, true);
-  return `In ${endLabel(sign)} until ${when}.`;
+  const brief = (leavesMs - exact.getTime()) < 14 * DAY_MS;
+  return formatRangePretty(exact, leaves, brief, showYear);
 }
 
 /**
@@ -891,7 +894,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
     if (isIngressRow(r)){
       const cy = y + rowH / 2;
       const fontSize = Math.round(rowH * 0.66);
-      /** @type {{x:number, exact:Date, label:string, glyphs:string, body:string, until:string, card:TooltipCard}[]} */
+      /** @type {{x:number, exact:Date, label:string, glyphs:string, body:string, card:TooltipCard}[]} */
       const markers = [];
       for (const event of events){
         const er = event.rule ?? r;
@@ -903,19 +906,18 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           if (xExact < x0 || xExact > x0 + timelineW) return;
           const crossed = ingressAsCrossed(er, event.entering?.[k] ?? true);
           const shown = crossed.rule;
-          const when = formatExactPretty(exact, a, b, showYear);
+          const when = stayLine(exact, event.leavesAt?.[k] ?? NaN, a, b, showYear);
           const glyphs = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
           const label = rulePairing(shown);
-          const until = staysUntilLine(shown.natal, ms, event.leavesAt?.[k] ?? NaN);
           markers.push({
-            x: xExact, exact, label, glyphs, body: shown.transit, until,
+            x: xExact, exact, label, glyphs, body: shown.transit,
             card: {
               title: label,
               descKey: `${shown.transit}-${shown.aspect}-${shown.natal}${crossed.back ? "-back" : ""}`,
               range: when,
               mythKey: "",
               exactLabel: "",
-              positions: until ? [until] : [],
+              positions: [],
               calendar: () => ({ title: rulePairing(shown, { glyphs: true }), segmentStart: exact, segmentEnd: exact, exactTime: exact })
             }
           });
@@ -943,9 +945,9 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         const lead = leadMarker(cluster);
         const first = cluster[0].exact;
         const last = cluster[cluster.length - 1].exact;
-        // A folded card is one section per crossing, each with its own time,
-        // its own stay and its own prose: the lead gives the card its name,
-        // and no crossing is read for it.
+        // A folded card is one section per crossing, each with its own dates
+        // and its own prose: the lead gives the card its name, and no crossing
+        // is read for it.
         const card = single ? cluster[0].card : {
           title: `${lead.label} and ${cluster.length - 1} more`,
           descKey: "",
@@ -955,8 +957,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           exactLabel: "",
           positions: [],
           sections: cluster.map(m => ({
-            heading: `${m.glyphs}\u00A0 ${m.label} \u00b7 ${formatExactPretty(m.exact, first, last, showYear)}`,
-            sub: m.until || undefined,
+            heading: `${m.glyphs}\u00A0 ${m.label} \u00b7 ${m.card.range}`,
             descKey: m.card.descKey
           })),
           calendar: () => null

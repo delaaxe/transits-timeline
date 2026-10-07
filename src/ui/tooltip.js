@@ -177,10 +177,9 @@ export function refreshTooltipContent(){
  * written out by the timeline.
  *
  * `sections` is for a card standing for several sign changes at once: each
- * crossing gets its own heading, its own sub line and its own prose, looked up
- * by key here so that a card opened before the prose lands fills in when it
- * does.
- * @typedef {{heading: string, sub?: string, descKey: string}} CardSection
+ * crossing gets its own heading and its own prose, looked up by key here so
+ * that a card opened before the prose lands fills in when it does.
+ * @typedef {{heading: string, descKey: string}} CardSection
  * @param {string[]} [positions]
  * @param {CardSection[]} [sections]
  */
@@ -206,9 +205,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     ? ingressProse(descKey)
     : (isWorld ? worldDescription(descKey) : aspectDescription(descKey));
   const sectionsHtml = (sections ?? []).map(s =>
-    `<div class="section"><div class="sub positions">${escapeHtml(s.heading)}</div>`
-    + (s.sub ? `<div class="sub">${escapeHtml(s.sub)}</div>` : "")
-    + `<div class="desc">${escapeHtml(ingressProse(s.descKey))}</div></div>`
+    `<div class="section"><div class="sub positions">${escapeHtml(s.heading)}</div><div class="desc">${escapeHtml(ingressProse(s.descKey))}</div></div>`
   ).join("");
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There
@@ -234,7 +231,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     const titleText = String(calendarData.title || title || "Transit");
     const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
     const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
-    const sectionsText = (sections ?? []).map(s => [s.heading, s.sub, ingressProse(s.descKey)].filter(Boolean).join("\n")).join("\n\n");
+    const sectionsText = (sections ?? []).map(s => `${s.heading}\n${ingressProse(s.descKey)}`).join("\n\n");
     const detailsText = [firstLine, positionText, desc || "", sectionsText, timing, mythLine].filter(Boolean).join("\n\n");
     const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
     const segmentEndForCalendar = segmentAllDay
