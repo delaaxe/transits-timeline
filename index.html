@@ -778,7 +778,10 @@
     @media (hover: none) and (pointer: coarse){
       :root{
         --timeline-nav-h: 36px;
-        --viewbar-min: 60px;
+        /* The chips' own height. The bar used to hold 60px around 40px chips,
+           and the extra went under them: ten pixels of plate between the
+           chips and the arrows, on top of the bar's padding. */
+        --viewbar-min: 40px;
       }
       /* Wide enough to tap, but not the full 44px tall: the arrows sit in a
          row of their own with nothing beside them to miss, and 44px of box
