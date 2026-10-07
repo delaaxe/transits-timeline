@@ -103,12 +103,11 @@
          sticky-header cost. */
       --axis-pad: 8px;
       --axis-pad-top: 4px;
-      /* The arrows are 28px glyphs; the row is them plus a 2px seat for the
-         axis titles below, and not a tap-target's worth of air around them.
-         The total adds that padding and a little slack for the corner block. */
+      /* The arrows are 28px glyphs and the row is exactly that: no padding,
+         no tap-target's worth of air around them. The total adds a little
+         slack for the corner block. */
       --timeline-nav-h: 28px;
-      --timeline-nav-pad-bottom: 2px;
-      --timeline-nav-total: calc(var(--timeline-nav-h) + var(--timeline-nav-pad-bottom) + 4px);
+      --timeline-nav-total: calc(var(--timeline-nav-h) + 4px);
     }
     /* The app's alphabet, vendored, because the platforms disagree about it:
        Android has no Chiron (U+26B7) in its fallback and draws tofu, and both
@@ -396,7 +395,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 16px;
-      padding: 0 0 var(--timeline-nav-pad-bottom);
+      padding: 0;
       margin-left: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) + var(--axis-pad));
       margin-right: 6px;
       user-select: none;
@@ -406,14 +405,27 @@
     .timelineNavBtn{
       background: none;
       border: none;
-      padding: 0;
       color: var(--ink-soft);
       font-size: 28px;
       line-height: 1;
       cursor: pointer;
+      /* A guillemet's ink is about 16px tall and sits low in its em box:
+         nine pixels of air above it and three below, in every system font
+         this has been measured in. The box is fixed at the row's height, and
+         the bottom padding lifts the line box so the ink lands in the middle
+         of it rather than near its floor. */
+      box-sizing: border-box;
+      height: var(--timeline-nav-h);
+      padding: 0 0 6px;
     }
     .timelineNavBtn:disabled{ opacity: 0.5; cursor: not-allowed; }
     #dateAxisSvg{ will-change: transform; position: relative; z-index: 1; }
+    /* --axis-pad-top is the breath between the view bar and the month title
+       when the title is the first thing under the bar. With the arrows open
+       they are, and they bring their own box, so the padding goes - and the
+       corner block, which starts where the padding ends, starts at the top. */
+    .dateAxisScrollInner:has(> .timelineNav:not([hidden])){ padding-top: 0; }
+    .dateAxisScrollInner:has(> .timelineNav:not([hidden])) #axisCornerBlock{ top: 0; }
     #axisCornerBlock{
       position: absolute;
       left: var(--axis-pad);
@@ -777,17 +789,16 @@
        which is what keeps the corner block covering the nav. */
     @media (hover: none) and (pointer: coarse){
       :root{
-        --timeline-nav-h: 36px;
         /* The chips' own height. The bar used to hold 60px around 40px chips,
            and the extra went under them: ten pixels of plate between the
            chips and the arrows, on top of the bar's padding. */
         --viewbar-min: 40px;
       }
-      /* Wide enough to tap, but not the full 44px tall: the arrows sit in a
-         row of their own with nothing beside them to miss, and 44px of box
-         around a 28px glyph read as a band of empty space between the view
-         bar and the month title. */
-      .timelineNavBtn{ min-width: 44px; min-height: 36px; }
+      /* Wide enough to tap, and no taller than the glyph: the arrows sit in
+         a row of their own with nothing above or below them to miss, and
+         every pixel of box around them read as a band of empty space between
+         the view bar and the month title. */
+      .timelineNavBtn{ min-width: 44px; }
       .presetBtn,
       .chartBtn,
       .aspectDropdown > summary{ min-height: 40px; padding-inline: 14px; }
