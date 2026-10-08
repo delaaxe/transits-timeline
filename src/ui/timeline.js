@@ -706,9 +706,11 @@ export function clusterByGap(sorted, width){
  *
  * Against a natal point the transiting body is at the same degree every time
  * the window perfects - the point does not move - so one line says it all. A
- * world pair perfects somewhere different each time, and a triple pass gets a
- * line per hit. Nothing for an ingress, whose degree is the cusp in its name,
- * and nothing for a window that never perfects.
+ * world pair perfects somewhere different each time, and a triple pass has a
+ * degree per hit: in the same two signs they share one line, "(26°54′ ·
+ * 26°23′)", and only a pass that straddles a cusp gets a line of its own.
+ * Nothing for an ingress, whose degree is the cusp in its name, and nothing
+ * for a window that never perfects.
  *
  * @param {import("../core/job.js").Rule} rule
  * @param {import("../core/events.js").AspectEvent} event
@@ -720,15 +722,21 @@ export function positionLines(rule, event){
   if (isIngressRule(rule) || lons.length === 0) return [];
   const transit = endLabel(rule.transit);
   const natal = endLabel(rule.natal);
-  const line = (i) => {
+  const hits = (rule.scope === "world") ? lons.map((_, i) => i) : [0];
+  /** @type {{text:string, degrees:string[]}[]} */
+  const lines = [];
+  for (const i of hits){
     const here = zodiacParts(lons[i]);
     const there = zodiacParts(others[i]);
-    if (!here) return "";
-    if (!there) return `${transit} in ${here.sign} (${here.degrees})`;
-    return `${transit} in ${here.sign} ${rule.aspect} ${rule.scope === "world" ? "" : "natal "}${natal} in ${there.sign} (${here.degrees})`;
-  };
-  const lines = (rule.scope === "world") ? lons.map((_, i) => line(i)) : [line(0)];
-  return lines.filter(Boolean);
+    if (!here) continue;
+    const text = there
+      ? `${transit} in ${here.sign} ${rule.aspect} ${rule.scope === "world" ? "" : "natal "}${natal} in ${there.sign}`
+      : `${transit} in ${here.sign}`;
+    const same = lines.find(l => l.text === text);
+    if (same) same.degrees.push(here.degrees);
+    else lines.push({ text, degrees: [here.degrees] });
+  }
+  return lines.map(l => `${l.text} (${l.degrees.join(" \u00b7 ")})`);
 }
 
 // Narrower than this and a bar stops reading as a segment; narrower than the
