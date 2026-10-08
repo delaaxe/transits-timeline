@@ -4,7 +4,7 @@ import { INGRESS_ROW_LABEL, PHASE_ROW_LABEL, aspectColors, aspectSymbol, endGlyp
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
-import { fmtDatePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
+import { fmtDatePretty, fmtTimePretty, formatExactPretty, formatRangePretty, isMultiDayLocal } from "./format.js";
 import { clearSvg, computeTimelineLayout, getDayStartsLocal, getHourStartsLocal, getMonthStartsLocal, getYearStartsLocal, pickStep, svgEl, svgNs } from "./svg.js";
 import { ensureTooltipListeners, hideTooltip, isCoarsePointer, moveTooltip, showTooltip } from "./tooltip.js";
 
@@ -650,10 +650,20 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
  * @param {boolean} showYear
  */
 export function stayLine(exact, leavesMs, a, b, showYear){
-  if (!Number.isFinite(leavesMs)) return formatExactPretty(exact, a, b, showYear);
+  if (!Number.isFinite(leavesMs)) return momentLine(exact, showYear);
   const leaves = new Date(leavesMs);
   const brief = (leavesMs - exact.getTime()) < 14 * DAY_MS;
   return formatRangePretty(exact, leaves, brief, showYear);
+}
+
+/**
+ * A moment on its own, date and time: "Oct 3, 13:26". Not formatExactPretty,
+ * which shortens to the time when the window it is handed sits inside one
+ * day, and a phase's window always does.
+ * @param {Date} exact @param {boolean} showYear
+ */
+function momentLine(exact, showYear){
+  return `${fmtDatePretty(exact, showYear)}, ${fmtTimePretty(exact)}`;
 }
 
 
@@ -776,6 +786,16 @@ export function clusterByGap(sorted, width){
 }
 
 /**
+ * The aspect as it is said between two placements: "square" and "trine" are
+ * already the word, "conjunct" and "opposite" are what an astrologer says
+ * where "conjunction" and "opposition" would be the name of the thing.
+ * @param {string} aspect
+ */
+function aspectWord(aspect){
+  return { conjunction: "conjunct", opposition: "opposite" }[aspect] ?? aspect;
+}
+
+/**
  * Where a window's exact hits land, written out: "Saturn in Aries square
  * natal Mercury in Cancer (14°04′)". The aspect is a whole number of signs,
  * so at the moment it is exact both ends stand at the same degree of their
@@ -807,7 +827,7 @@ export function positionLines(rule, event){
     const there = zodiacParts(others[i]);
     if (!here) continue;
     const text = there
-      ? `${transit} in ${here.sign} ${rule.aspect} ${rule.scope === "world" ? "" : "natal "}${natal} in ${there.sign}`
+      ? `${transit} in ${here.sign} ${aspectWord(rule.aspect)} ${rule.scope === "world" ? "" : "natal "}${natal} in ${there.sign}`
       : `${transit} in ${here.sign}`;
     const same = lines.find(l => l.text === text);
     if (same) same.degrees.push(here.degrees);
@@ -981,8 +1001,6 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         const phase = phaseFor(er.aspect);
         if (!phase) continue;
         const [key, name, , glyph, aspect] = phase;
-        const a = new Date(event.start);
-        const b = new Date(event.end);
         (event.exacts ?? []).forEach((ms, k) => {
           const exact = new Date(ms);
           const xExact = dateToX(exact);
@@ -990,15 +1008,19 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           const moon = zodiacParts(event.exactLonNatal?.[k] ?? NaN);
           const sun = zodiacParts(event.exactLon?.[k] ?? NaN);
           const label = moon ? `${name} in ${moon.sign}` : name;
-          const joined = aspect === "conjunction" ? "with the" : (aspect === "opposition" ? "opposite the" : "square the");
-          const where = (moon && sun) ? [`Moon in ${moon.sign} ${joined} Sun in ${sun.sign} (${moon.degrees})`] : [];
+          // A New Moon has both in one place; the others set the Moon against the Sun.
+          const where = !(moon && sun) ? []
+            : aspect === "conjunction" ? [`Moon and Sun in ${moon.sign} (${moon.degrees})`]
+            : [`Moon in ${moon.sign} ${aspectWord(aspect)} Sun in ${sun.sign} (${moon.degrees})`];
           markers.push({
             x: xExact, exact, label, body: key,
             glyphs: `${glyph}${moon ? endGlyph(moon.sign.toLowerCase()) : ""}`,
             card: {
               title: label,
               descKey: `sun-${aspect}-moon`,
-              range: stayLine(exact, event.leavesAt?.[k] ?? NaN, a, b, showYear),
+              // A phase is an instant: the week after a quarter is the gibbous
+              // Moon, not the quarter, so there is no stay to put on the line.
+              range: momentLine(exact, showYear),
               mythKey: "",
               exactLabel: "",
               positions: where,
@@ -1033,9 +1055,13 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           if (xExact < x0 || xExact > x0 + timelineW) return;
           const crossed = ingressAsCrossed(er, event.entering?.[k] ?? true);
           const shown = crossed.rule;
-          const when = stayLine(exact, event.leavesAt?.[k] ?? NaN, a, b, showYear);
+          const leavesMs = event.leavesAt?.[k] ?? NaN;
+          const when = stayLine(exact, leavesMs, a, b, showYear);
           const glyphs = `${endGlyph(shown.transit)}${endGlyph(shown.natal)}`;
           const label = rulePairing(shown);
+          // The calendar's period is the stay in the sign, where the scan found
+          // its end; otherwise the crossing alone, and the card offers no period.
+          const leaves = Number.isFinite(leavesMs) ? new Date(leavesMs) : exact;
           markers.push({
             x: xExact, exact, label, glyphs, body: shown.transit,
             card: {
@@ -1045,7 +1071,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
               mythKey: "",
               exactLabel: "",
               positions: [],
-              calendar: () => ({ title: rulePairing(shown, { glyphs: true }), segmentStart: exact, segmentEnd: exact, exactTime: exact })
+              calendar: () => ({ title: rulePairing(shown, { glyphs: true }), segmentStart: exact, segmentEnd: leaves, exactTime: exact })
             }
           });
         });

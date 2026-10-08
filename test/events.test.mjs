@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DAY_MS, aspectTargets, brentRoot, isLeadingStub, scanAspectWindows, wrap180 } from "../src/core/events.js";
-import { computeTransitEvents, groupRules, nextPhase, nextSignChange } from "../src/core/job.js";
+import { computeTransitEvents, groupRules, nextSignChange } from "../src/core/job.js";
 import { buildCandidateRules, buildIngressRules, buildPhaseRules, buildWorldRules, foldPhaseRows } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
 import { ephemerisAstronomy, getBodyLonAt, getBodyLonFromAll } from "../src/core/ephemeris.js";
@@ -667,18 +667,11 @@ test("the Moon's phases are found where the almanac puts them, each its own name
         const ahead = wrap180(event.exactLonNatal[k] - event.exactLon[k]);
         const want = { newmoon: 0, firstquarter: 90, fullmoon: 180, lastquarter: -90 }[res.rules[i].aspect];
         assert.ok(Math.abs(angDist(ahead, want)) < 0.01, `${res.rules[i].aspect}: Moon ${ahead} ahead of the Sun`);
-        // And each lasts until the next phase.
-        assert.ok(event.leavesAt[k] > ms && event.leavesAt[k] - ms < 9 * DAY_MS);
       });
+      // A phase is a moment, not a stay: nothing says when it "leaves".
+      assert.equal(event.leavesAt, undefined);
     }
   }
-  const full = res.events[res.rules.findIndex(r => r.aspect === "fullmoon")][0];
-  assert.equal(full.leavesInto[0], "lastquarter");
-  assert.ok(Math.abs(full.leavesAt[0] - at("lastquarter")) < 1000, "the full Moon lasts exactly until the last quarter");
-
-  const read = (body, ms) => getBodyLonAt(body, new Date(ms), OBSERVER);
-  const next = nextPhase(Date.UTC(2025, 9, 1), read);
-  assert.ok(next && next.into === "fullmoon" && Math.abs(next.at - at("fullmoon")) < 1000);
 
   const folded = foldPhaseRows(res.rules, res.events);
   assert.equal(folded.rules.length, 1);

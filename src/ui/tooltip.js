@@ -237,13 +237,16 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     const segmentEndForCalendar = segmentAllDay
       ? new Date(calendarData.segmentEnd.getFullYear(), calendarData.segmentEnd.getMonth(), calendarData.segmentEnd.getDate() + 1)
       : calendarData.segmentEnd;
-    const segmentUrl = googleCalendarUrl({
+    // A card for a moment - a phase of the Moon, a crossing whose end the scan
+    // did not find - has no period to offer, and offers none.
+    const hasPeriod = calendarData.segmentEnd.getTime() > calendarData.segmentStart.getTime();
+    const segmentUrl = hasPeriod ? googleCalendarUrl({
       title: titleText,
       details: detailsText,
       start: calendarData.segmentStart,
       end: segmentEndForCalendar,
       allDay: segmentAllDay
-    });
+    }) : "";
     const exactDate = calendarData.exactTime instanceof Date ? calendarData.exactTime : null;
     const exactUrl = exactDate ? googleCalendarUrl({
       title: titleText,
@@ -260,8 +263,8 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
         ? `<a class="tooltipAction" href="${escapeHtml(exactDeep || exactUrl)}" data-gcal-web="${escapeHtml(exactUrl)}"${desktopLinkAttrs}>Exact</a>`
         : "Exact";
       const segmentLink = segmentUrl
-        ? `<a class="tooltipAction" href="${escapeHtml(segmentDeep || segmentUrl)}" data-gcal-web="${escapeHtml(segmentUrl)}"${desktopLinkAttrs}>Period</a>`
-        : "Period";
+        ? `<span class="tooltipActionsSep">•</span><a class="tooltipAction" href="${escapeHtml(segmentDeep || segmentUrl)}" data-gcal-web="${escapeHtml(segmentUrl)}"${desktopLinkAttrs}>Period</a>`
+        : "";
       let appLinksHtml = "";
       const exactIOS = exactUrl ? googleCalendarIOSDeepLinks(exactUrl).primary : "";
       const segmentIOS = segmentUrl ? googleCalendarIOSDeepLinks(segmentUrl).primary : "";
@@ -270,11 +273,11 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
           ? `<a class="tooltipAction" href="${escapeHtml(exactIOS)}">Exact</a>`
           : "Exact";
         const segmentAppLink = segmentIOS
-          ? `<a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Period</a>`
-          : "Period";
-        appLinksHtml = `/ native: ${exactAppLink}<span class="tooltipActionsSep">•</span>${segmentAppLink}`;
+          ? `<span class="tooltipActionsSep">•</span><a class="tooltipAction" href="${escapeHtml(segmentIOS)}">Period</a>`
+          : "";
+        appLinksHtml = `/ native: ${exactAppLink}${segmentAppLink}`;
       }
-      calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Google Calendar:</span>${exactLink}<span class="tooltipActionsSep">•</span>${segmentLink}${appLinksHtml}</div></div>`;
+      calendarHtml = `<div class="tooltipCalendarBlock"><div class="tooltipActions"><span class="tooltipActionsLabel">Google Calendar:</span>${exactLink}${segmentLink}${appLinksHtml}</div></div>`;
     }
   }
   // Shown with its label, copied without it: on screen the label is what tells
