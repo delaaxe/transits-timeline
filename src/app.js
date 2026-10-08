@@ -37,6 +37,11 @@ export function wireStaleRefreshOnRefocus(){
   });
 }
 
+// The longest range the Moon's phases are drawn on: half a year, which is
+// the Month view widened a few times and still a dozen markers rather than
+// fifty. The Year view and anything wider go without.
+const PHASES_MAX_DAYS = 183;
+
 /**
  * Every rule the chart is about to draw, in the order the rows start out in.
  *
@@ -52,15 +57,19 @@ export function wireStaleRefreshOnRefocus(){
  *
  * @param {import("./services/chart-context.js").ChartContext} ctx
  * @param {ReturnType<typeof readRuleOptions>} opts
+ * @param {number} spanDays how long the range is
  */
-function buildRules(ctx, opts){
+function buildRules(ctx, opts, spanDays){
   // The sign changes ride with the world transits: same bodies, same plane,
   // and one body is enough to make one where a transit needs a pair. The
-  // Moon's phases ride along too, and need no body picked at all.
+  // Moon's phases ride along too, and need no body picked at all - but only
+  // on a range short enough to read them: a year is forty-nine of them, which
+  // folds into a line of New Moons that says nothing a calendar does not.
+  const phasesFit = spanDays <= PHASES_MAX_DAYS;
   const worldRulesFor = (bodies) => [
     ...((bodies.length >= 2) ? buildWorldRules({ bodies, aspects: opts.aspects, orb: opts.orb }) : []),
     ...(state.showIngresses ? buildIngressRules({ bodies, orb: opts.orb }) : []),
-    ...(state.showPhases ? buildPhaseRules() : [])
+    ...((state.showPhases && phasesFit) ? buildPhaseRules() : [])
   ];
 
   if (ctx.mode === "world"){
@@ -118,9 +127,9 @@ export async function updateTimeline(){
     const ruleOptions = readRuleOptions();
     const aspectsChecked = getCheckedAspects();
     if (aspectsChecked.length === 0) throw new Error("Select at least one aspect.");
-    const candidateRules = buildRules(ctx, ruleOptions);
-
     const spanDays = (endExclusive.getTime() - rangeStartLocal.getTime()) / (24 * 3600 * 1000);
+    const candidateRules = buildRules(ctx, ruleOptions, spanDays);
+
     // Windows now carry real times, so this only decides whether showing them
     // helps: on a multi-year view a date is what the eye wants.
     const showTime = spanDays <= 60;
