@@ -5,7 +5,7 @@
 import { wrap360 } from "./angles.js";
 import { DAY_MS, aspectTargets, brentRoot, scanAspectWindows, wrap180 } from "./events.js";
 import { getBodyLonAt } from "./ephemeris.js";
-import { aspectAngle, ingressCuspDeg, isIngressRule, maxSpeedDegPerDay, signIndexAt, signKeys } from "../data/bodies.js";
+import { aspectAngle, ingressCuspDeg, isIngressRule, maxSpeedDegPerDay, phaseFor, phases, signIndexAt, signKeys } from "../data/bodies.js";
 
 /**
  * @typedef {{transit: string, natal: string, aspect: string, orb: number|string,
@@ -105,8 +105,11 @@ export function groupRules(rules, mode, natalLon){
 
     // An aspect contributes one offset for a conjunction or an opposition and
     // two otherwise, since a sextile is exact both ahead and behind. An ingress
-    // is one cusp, which is the one offset a conjunction would have.
-    const slots = aspectTargets(ingress ? 0 : aspectAngle(r.aspect)).map(sep => {
+    // is one cusp, which is the one offset a conjunction would have, and a
+    // phase of the Moon is one named angle rather than a square's pair.
+    const phase = phaseFor(r.aspect);
+    const targets = phase ? [phase[2]] : aspectTargets(ingress ? 0 : aspectAngle(r.aspect));
+    const slots = targets.map(sep => {
       const offset = isWorld ? wrap360(sep) : wrap360(Number(natalDeg) + sep);
       const found = g.offsets.indexOf(offset);
       if (found !== -1) return found;
@@ -161,6 +164,40 @@ export function nextSignChange(body, fromMs, read){
     const toCusp = Math.max(1e-6, Math.min(within, 30 - within));
     prevT = t;
     t += Math.max(60 * 1000, (toCusp / speed) * DAY_MS);
+  }
+  return null;
+}
+
+/**
+ * The next phase of the Moon after `fromMs`, which is a quarter turn of the
+ * Sun-Moon separation on from wherever it is. Stepped forward the way
+ * nextSignChange is, by the distance still to go at the pair's top speed.
+ *
+ * @param {number} fromMs a phase's moment, or any moment
+ * @param {(body:string, ms:number)=>number} read
+ * @returns {{at:number, into:string}|null}
+ */
+export function nextPhase(fromMs, read){
+  const speed = (maxSpeedDegPerDay.sun ?? 1.05) + (maxSpeedDegPerDay.moon ?? 15.6);
+  const sepAt = (/** @type {number} */ ms) => wrap360(read("moon", ms) - read("sun", ms));
+  // Which phase this is, from the separation; a moment just after a phase is
+  // a hair past its multiple of ninety, so rounding lands on it.
+  const k = Math.round(sepAt(fromMs) / 90) % 4;
+  const target = ((k + 1) * 90) % 360;
+  const into = phases.find(p => p[2] === wrap360(-target))?.[0] ?? "";
+  const f = (/** @type {number} */ ms) => wrap180(sepAt(ms) - target);
+  let prevT = fromMs + 3600 * 1000;
+  let prevF = f(prevT);
+  const horizon = fromMs + 40 * DAY_MS;
+  while (prevT < horizon){
+    const t = prevT + Math.max(3600 * 1000, (Math.abs(prevF) / speed) * DAY_MS);
+    const ft = f(t);
+    if ((ft < 0) !== (prevF < 0)){
+      const root = brentRoot(f, prevT, t, prevF, ft, 1000);
+      return { at: root ?? t, into };
+    }
+    prevT = t;
+    prevF = ft;
   }
   return null;
 }
@@ -236,6 +273,12 @@ export function computeTransitEvents(job, onProgress){
           const leaves = event.exacts.map(ms => nextSignChange(g.transit, ms, lon.read));
           event.leavesAt = leaves.map(l => l ? l.at : NaN);
           event.leavesInto = leaves.map(l => l ? l.into : "");
+        }
+        // A phase lasts until the next one, and its card says so the same way.
+        if (phaseFor(rule.aspect)){
+          const next = event.exacts.map(ms => nextPhase(ms, lon.read));
+          event.leavesAt = next.map(l => l ? l.at : NaN);
+          event.leavesInto = next.map(l => l ? l.into : "");
         }
       }
       byRule[member.ruleIndex] = events;

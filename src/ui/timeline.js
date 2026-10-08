@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { DAY_MS, isLeadingStub } from "../core/events.js";
-import { INGRESS_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, mythKeyFor, needsWorldLabel, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, PHASE_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, isPhaseRow, mythKeyFor, needsWorldLabel, phaseFor, phaseLeadOrder, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -579,9 +579,10 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 
     const transitLabel = useSymbols ? endGlyph(r.transit) : endLabel(r.transit);
     const natalLabel = useSymbols ? endGlyph(r.natal) : endLabel(r.natal);
-    // The strip of sign changes is several things on one line, so it has a
-    // name rather than a pairing, in words whichever way the other labels go.
-    const parts = isIngressRow(r) ? [{ text: INGRESS_ROW_LABEL }] : [
+    // A strip is several things on one line, so it has a name rather than a
+    // pairing, in words whichever way the other labels go.
+    const stripLabel = isIngressRow(r) ? INGRESS_ROW_LABEL : (isPhaseRow(r) ? PHASE_ROW_LABEL : "");
+    const parts = stripLabel ? [{ text: stripLabel }] : [
       { text: transitLabel + " " },
       { text: aspectSymbol(r.aspect) + " " },
       // The underline says "this is your chart's ruler", which a body in the
@@ -599,9 +600,9 @@ export function renderLabelsSVG({svg, rules, chartRuler, layout, useSymbols=fals
 
     svg.appendChild(t);
 
-    // Nothing to follow on the strip: "when does this happen next" is a
+    // Nothing to follow on a strip: "when does this happen next" is a
     // question about one body and one cusp, and the line holds a dozen.
-    if (isIngressRow(r)) continue;
+    if (stripLabel) continue;
 
     // The label itself is a line of text a couple of pixels tall in the places
     // between the glyphs, so the row's whole strip is what is tapped. It sits
@@ -655,6 +656,81 @@ export function stayLine(exact, leavesMs, a, b, showYear){
   return formatRangePretty(exact, leaves, brief, showYear);
 }
 
+
+/**
+ * A strip's markers, drawn. Markers that would print over each other are
+ * folded into one, which shows the one that matters most with a plus after
+ * it and opens a card listing every one in it. A year of the Sun, Mercury
+ * and Venus is forty-odd crossings on one line, and drawn as glyphs on top
+ * of glyphs they say nothing at all; "☉♏+" says the Sun went into Scorpio
+ * and something else happened around then, and keeps every date reachable.
+ * Two glyphs and the plus are about 1.8 of the font size wide, and a little
+ * air on top of that keeps neighbours from reading as one word.
+ *
+ * @param {SVGSVGElement} svg
+ * @param {{x:number, exact:Date, label:string, glyphs:string, body:string, card:TooltipCard}[]} markers in x order
+ * @param {{cy:number, fontSize:number, x0:number, timelineW:number, showYear:boolean,
+ *          bindTooltip:(target:Element, card:TooltipCard)=>void}} ctx
+ */
+function drawStrip(svg, markers, { cy, fontSize, x0, timelineW, showYear, bindTooltip }){
+  const markerW = fontSize * 2.1;
+  const clusters = clusterByGap(markers, markerW);
+  for (const cluster of clusters){
+      // Drawn at the first crossing in it and clamped at the edges, where a
+      // crossing on the first day of the range would otherwise put half its
+      // glyphs over the label column.
+      const xText = Math.max(x0 + fontSize, Math.min(cluster[0].x, x0 + timelineW - fontSize));
+      const single = cluster.length === 1;
+      const lead = leadMarker(cluster);
+      const first = cluster[0].exact;
+      const last = cluster[cluster.length - 1].exact;
+      // A folded card is one section per crossing, each with its own dates
+      // and its own prose: the lead gives the card its name, and no crossing
+      // is read for it.
+      const card = single ? cluster[0].card : {
+        title: `${lead.label} and ${cluster.length - 1} more`,
+        descKey: "",
+        // The days they span, and each one's own time on its line below.
+        range: isMultiDayLocal(first, last) ? formatRangePretty(first, last, false, showYear) : fmtDatePretty(first, showYear),
+        mythKey: "",
+        exactLabel: "",
+        positions: [],
+        sections: cluster.map(m => ({
+          heading: `${m.glyphs}\u00A0 ${m.label} \u00b7 ${m.card.range}`,
+          descKey: m.card.descKey
+        })),
+        calendar: () => null
+      };
+      const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
+      bindTooltip(hit, card);
+      svg.appendChild(hit);
+      // Not faded with the world bars: these are two thin glyphs rather
+      // than a block of colour, and at the bars' opacity they are hard to
+      // read. The dimmed label is what places the row one plane back.
+      const text = svgEl("text", {
+        x: xText, y: cy,
+        "font-size": String(fontSize),
+        "text-anchor": "middle",
+        "dominant-baseline": "central",
+        fill: "var(--ink)",
+        class: "symbolGlyphText",
+        "pointer-events": "none"
+      });
+      text.textContent = lead.glyphs;
+      if (!single){
+        // The plus is the UI font's, smaller and dimmer: a footnote on the
+        // marker rather than a third glyph.
+        const plus = document.createElementNS(svgNs, "tspan");
+        plus.textContent = "+";
+        plus.setAttribute("font-size", String(Math.round(fontSize * 0.75)));
+        plus.setAttribute("fill", "var(--muted)");
+        plus.setAttribute("font-family", "var(--font-ui)");
+        text.appendChild(plus);
+      }
+      svg.appendChild(text);
+    }
+}
+
 /**
  * The crossing a folded marker shows: the first in ingressLeadOrder, and the
  * earliest of those where a body crosses twice in the run.
@@ -664,9 +740,10 @@ export function stayLine(exact, leavesMs, a, b, showYear){
  * @returns {T}
  */
 export function leadMarker(cluster){
+  const order = [...ingressLeadOrder, ...phaseLeadOrder];
   const rank = (/** @type {string} */ body) => {
-    const i = ingressLeadOrder.indexOf(body);
-    return i < 0 ? ingressLeadOrder.length : i;
+    const i = order.indexOf(body);
+    return i < 0 ? order.length : i;
   };
   let best = cluster[0];
   for (const m of cluster) if (rank(m.body) < rank(best.body)) best = m;
@@ -891,6 +968,50 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
 
     const events = eventsByRule[idx] ?? [];
 
+    // The Moon's phases, drawn like the sign changes: each the moment it is
+    // exact, with the Moon's sign beside the phase glyph, since "Full Moon in
+    // Aries" is what gets looked up.
+    if (isPhaseRow(r)){
+      const cy = y + rowH / 2;
+      const fontSize = Math.round(rowH * 0.66);
+      /** @type {{x:number, exact:Date, label:string, glyphs:string, body:string, card:TooltipCard}[]} */
+      const markers = [];
+      for (const event of events){
+        const er = event.rule ?? r;
+        const phase = phaseFor(er.aspect);
+        if (!phase) continue;
+        const [key, name, , glyph, aspect] = phase;
+        const a = new Date(event.start);
+        const b = new Date(event.end);
+        (event.exacts ?? []).forEach((ms, k) => {
+          const exact = new Date(ms);
+          const xExact = dateToX(exact);
+          if (xExact < x0 || xExact > x0 + timelineW) return;
+          const moon = zodiacParts(event.exactLonNatal?.[k] ?? NaN);
+          const sun = zodiacParts(event.exactLon?.[k] ?? NaN);
+          const label = moon ? `${name} in ${moon.sign}` : name;
+          const joined = aspect === "conjunction" ? "with the" : (aspect === "opposition" ? "opposite the" : "square the");
+          const where = (moon && sun) ? [`Moon in ${moon.sign} ${joined} Sun in ${sun.sign} (${moon.degrees})`] : [];
+          markers.push({
+            x: xExact, exact, label, body: key,
+            glyphs: `${glyph}${moon ? endGlyph(moon.sign.toLowerCase()) : ""}`,
+            card: {
+              title: label,
+              descKey: `sun-${aspect}-moon`,
+              range: stayLine(exact, event.leavesAt?.[k] ?? NaN, a, b, showYear),
+              mythKey: "",
+              exactLabel: "",
+              positions: where,
+              calendar: () => ({ title: `${glyph} ${label}`, segmentStart: exact, segmentEnd: exact, exactTime: exact })
+            }
+          });
+        });
+      }
+      markers.sort((m, n) => m.x - n.x);
+      drawStrip(svg, markers, { cy, fontSize, x0, timelineW, showYear, bindTooltip });
+      continue;
+    }
+
     // The strip of sign changes is crossings rather than windows. A window is
     // the body within orb of the cusp, which for Chiron is seven weeks either
     // side, and a dozen of those on one line is one long bar hiding every
@@ -930,72 +1051,7 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
         });
       }
       markers.sort((m, n) => m.x - n.x);
-
-      // Markers that would print over each other are folded into one, which
-      // shows the crossing that matters most with a plus after it and opens a
-      // card listing every crossing in it. A year of the Sun, Mercury and
-      // Venus is forty-odd crossings on one line, and drawn as glyphs on top
-      // of glyphs they say nothing at all; "☉♏+" says the Sun went into
-      // Scorpio and something else happened around then, and keeps every
-      // date reachable. Two glyphs and the plus are about 1.8 of the font
-      // size wide, and a little air on top of that keeps neighbours from
-      // reading as one word.
-      const markerW = fontSize * 2.1;
-      const clusters = clusterByGap(markers, markerW);
-      for (const cluster of clusters){
-        // Drawn at the first crossing in it and clamped at the edges, where a
-        // crossing on the first day of the range would otherwise put half its
-        // glyphs over the label column.
-        const xText = Math.max(x0 + fontSize, Math.min(cluster[0].x, x0 + timelineW - fontSize));
-        const single = cluster.length === 1;
-        const lead = leadMarker(cluster);
-        const first = cluster[0].exact;
-        const last = cluster[cluster.length - 1].exact;
-        // A folded card is one section per crossing, each with its own dates
-        // and its own prose: the lead gives the card its name, and no crossing
-        // is read for it.
-        const card = single ? cluster[0].card : {
-          title: `${lead.label} and ${cluster.length - 1} more`,
-          descKey: "",
-          // The days they span, and each one's own time on its line below.
-          range: isMultiDayLocal(first, last) ? formatRangePretty(first, last, false, showYear) : fmtDatePretty(first, showYear),
-          mythKey: "",
-          exactLabel: "",
-          positions: [],
-          sections: cluster.map(m => ({
-            heading: `${m.glyphs}\u00A0 ${m.label} \u00b7 ${m.card.range}`,
-            descKey: m.card.descKey
-          })),
-          calendar: () => null
-        };
-        const hit = svgEl("circle", { cx: xText, cy, r: 12, fill: "transparent", class: "bar" });
-        bindTooltip(hit, card);
-        svg.appendChild(hit);
-        // Not faded with the world bars: these are two thin glyphs rather
-        // than a block of colour, and at the bars' opacity they are hard to
-        // read. The dimmed label is what places the row one plane back.
-        const text = svgEl("text", {
-          x: xText, y: cy,
-          "font-size": String(fontSize),
-          "text-anchor": "middle",
-          "dominant-baseline": "central",
-          fill: "var(--ink)",
-          class: "symbolGlyphText",
-          "pointer-events": "none"
-        });
-        text.textContent = lead.glyphs;
-        if (!single){
-          // The plus is the UI font's, smaller and dimmer: a footnote on the
-          // marker rather than a third glyph.
-          const plus = document.createElementNS(svgNs, "tspan");
-          plus.textContent = "+";
-          plus.setAttribute("font-size", String(Math.round(fontSize * 0.75)));
-          plus.setAttribute("fill", "var(--muted)");
-          plus.setAttribute("font-family", "var(--font-ui)");
-          text.appendChild(plus);
-        }
-        svg.appendChild(text);
-      }
+      drawStrip(svg, markers, { cy, fontSize, x0, timelineW, showYear, bindTooltip });
       continue;
     }
 

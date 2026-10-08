@@ -58,6 +58,7 @@ export const el = {
   worldBodyChips: $("worldBodyChips"),
   showWorldRows: $("showWorldRows"),
   showIngresses: $("showIngresses"),
+  showPhases: $("showPhases"),
   ingressPane: $("ingressPane"),
   bodyModeWrap: $("bodyModeWrap"),
   rowFocus: $("rowFocus"),

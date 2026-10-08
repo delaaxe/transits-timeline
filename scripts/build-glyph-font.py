@@ -58,7 +58,9 @@ SOURCES = [
         # monogram Percival Lowell's initials gave the planet in 1930. The chart
         # symbol is the one astrologers draw, and it is the only one of the two
         # this font has.
-        [0x2609, 0x25A1, 0x25B3, 0x2BD3],
+        # And the four phases of the Moon as the strip draws them: an open
+        # circle, a filled one, and the two halves.
+        [0x2609, 0x25A1, 0x25B3, 0x2BD3, 0x25CB, 0x25CF, 0x25D0, 0x25D1],
     ),
 ]
 

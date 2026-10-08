@@ -1,6 +1,6 @@
 // Which transits to look for. The looking itself is core/events.js.
 
-import { INGRESS, aspectAngle, isAngle, maxSeparation, natalKeys, normalizeBodies, signKeys, transitingKeys } from "../data/bodies.js";
+import { INGRESS, PHASE, aspectAngle, isAngle, maxSeparation, natalKeys, normalizeBodies, phases, signKeys, transitingKeys } from "../data/bodies.js";
 
 /**
  * Every transiting-body-to-natal-point pair the selection asks for.
@@ -135,19 +135,35 @@ export function buildIngressRules({ bodies, orb }){
 }
 
 /**
- * The scan's answer with every sign change on one row.
+ * The Moon's four phases as rules: Sun and Moon, one named angle each. They
+ * ride with the world transits whatever the world list holds, since the
+ * lunation is the calendar every chart is read against, and they fold onto
+ * one strip the way the sign changes do. The orb is the scan's bracket and
+ * nothing the reader sees: the strip draws the moment alone.
+ */
+export function buildPhaseRules(){
+  /** @type {import("./job.js").Rule[]} */
+  const rules = [];
+  for (const [key] of phases) rules.push({ transit: "sun", aspect: key, natal: "moon", orb: 1, scope: "world" });
+  return rules;
+}
+
+/**
+ * The scan's answer with every rule `isStrip` picks out folded onto one row.
  *
- * The windows keep the rule they were found for, so a bar on the strip still
- * knows it is Jupiter entering Gemini. Only windows with a crossing in them
- * count: the strip draws the moment a sign changes and nothing else, so a
- * body merely within orb of a cusp would be a row with nothing on it, and a
- * range in which nothing changes sign gets no strip at all.
+ * The windows keep the rule they were found for, so a marker on the strip
+ * still knows it is Jupiter entering Gemini. Only windows with an exact hit
+ * count: the strip draws the moment and nothing else, so a body merely within
+ * orb would be a row with nothing on it, and a range holding no such moment
+ * gets no strip at all.
  *
  * @param {import("./job.js").Rule[]} rules
  * @param {import("./events.js").AspectEvent[][]} events one list per rule
+ * @param {(rule: import("./job.js").Rule) => boolean} isStrip
+ * @param {string} kind the key the strip's own rule wears on all three ends
  * @returns {{rules: import("./job.js").Rule[], events: import("./events.js").AspectEvent[][]}}
  */
-export function foldIngressRows(rules, events){
+export function foldStripRows(rules, events, isStrip, kind){
   /** @type {import("./job.js").Rule[]} */
   const keptRules = [];
   /** @type {import("./events.js").AspectEvent[][]} */
@@ -158,7 +174,7 @@ export function foldIngressRows(rules, events){
   let first = null;
   for (let i = 0; i < rules.length; i++){
     const rule = rules[i];
-    if (rule.aspect !== INGRESS){
+    if (!isStrip(rule)){
       keptRules.push(rule);
       keptEvents.push(events[i]);
       continue;
@@ -171,8 +187,21 @@ export function foldIngressRows(rules, events){
   }
   if (first){
     strip.sort((a, b) => a.start - b.start);
-    keptRules.push({ transit: INGRESS, aspect: INGRESS, natal: INGRESS, orb: first.orb, scope: "world" });
+    keptRules.push({ transit: kind, aspect: kind, natal: kind, orb: first.orb, scope: "world" });
     keptEvents.push(strip);
   }
   return { rules: keptRules, events: keptEvents };
+}
+
+/** Every sign change on one row. See foldStripRows.
+ * @param {import("./job.js").Rule[]} rules @param {import("./events.js").AspectEvent[][]} events */
+export function foldIngressRows(rules, events){
+  return foldStripRows(rules, events, r => r.aspect === INGRESS, INGRESS);
+}
+
+/** Every phase of the Moon on one row. See foldStripRows.
+ * @param {import("./job.js").Rule[]} rules @param {import("./events.js").AspectEvent[][]} events */
+export function foldPhaseRows(rules, events){
+  const keys = new Set(phases.map(p => p[0]));
+  return foldStripRows(rules, events, r => keys.has(r.aspect), PHASE);
 }

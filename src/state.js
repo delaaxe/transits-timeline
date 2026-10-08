@@ -13,6 +13,8 @@ export const showRangeNavKey = "tt_show_range_nav";
 
 export const showIngressesKey = "tt_show_ingresses";
 
+export const showPhasesKey = "tt_show_phases";
+
 /**
  * The last completed computation, kept so "Show more" can paginate without
  * recomputing. It is the shape the whole chart is drawn from - timeline.js
@@ -46,6 +48,9 @@ export const state = {
   // for the same reason the world rows are: Jupiter entering Gemini is weather
   // every chart is read in, and it is a row or two a year, not a flood.
   showIngresses: loadShowIngresses(),
+  // And the Moon's phases, on their own strip, on by default for the same
+  // reason: the lunation is the oldest calendar there is.
+  showPhases: loadShowPhases(),
   // The body chooser's selection. Three lists rather than two: world transits
   // ask about one set of bodies, and losing a personal selection because the
   // World view was glanced at would be its own small annoyance.
@@ -121,6 +126,20 @@ function loadShowIngresses(){
 export function setShowIngresses(on){
   state.showIngresses = !!on;
   remember(showIngressesKey, on);
+}
+
+function loadShowPhases(){
+  try {
+    return localStorage.getItem(showPhasesKey) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/** @param {boolean} on */
+export function setShowPhases(on){
+  state.showPhases = !!on;
+  remember(showPhasesKey, on);
 }
 
 // The other way round from the one above: absent means off, because the arrows

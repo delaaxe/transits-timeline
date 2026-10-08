@@ -2,8 +2,8 @@ import { state } from "./state.js";
 import { onRequestUpdate } from "./refresh.js";
 import { ephemerisAstronomy } from "./core/ephemeris.js";
 import { addDaysLocal, parseLocalDateOnly } from "./core/time.js";
-import { buildCandidateRules, buildIngressRules, buildWorldRules, foldIngressRows } from "./core/transits.js";
-import { isIngressRow, orderMap } from "./data/bodies.js";
+import { buildCandidateRules, buildIngressRules, buildPhaseRules, buildWorldRules, foldIngressRows, foldPhaseRows } from "./core/transits.js";
+import { isIngressRow, isPhaseRow, orderMap } from "./data/bodies.js";
 import { chartRulerKeyFor, currentChartContext, natalLongitudes } from "./services/chart-context.js";
 import { cancelCompute, computeEvents } from "./services/compute.js";
 import { loadInterpretations, onInterpretationsArrived } from "./data/interpretations.js";
@@ -55,17 +55,18 @@ export function wireStaleRefreshOnRefocus(){
  */
 function buildRules(ctx, opts){
   // The sign changes ride with the world transits: same bodies, same plane,
-  // and one body is enough to make one where a transit needs a pair.
+  // and one body is enough to make one where a transit needs a pair. The
+  // Moon's phases ride along too, and need no body picked at all.
   const worldRulesFor = (bodies) => [
     ...((bodies.length >= 2) ? buildWorldRules({ bodies, aspects: opts.aspects, orb: opts.orb }) : []),
-    ...(state.showIngresses ? buildIngressRules({ bodies, orb: opts.orb }) : [])
+    ...(state.showIngresses ? buildIngressRules({ bodies, orb: opts.orb }) : []),
+    ...(state.showPhases ? buildPhaseRules() : [])
   ];
 
   if (ctx.mode === "world"){
-    if (opts.worldBodies.length < 2 && !(state.showIngresses && opts.worldBodies.length === 1)){
-      throw new Error("Pick at least two bodies: a world transit needs both ends.");
-    }
-    return worldRulesFor(opts.worldBodies);
+    const rules = worldRulesFor(opts.worldBodies);
+    if (rules.length === 0) throw new Error("Pick at least two bodies: a world transit needs both ends.");
+    return rules;
   }
 
   const worldRules = state.showWorldRows ? worldRulesFor(opts.worldBodies) : [];
@@ -152,17 +153,21 @@ export async function updateTimeline(){
     });
 
     // One strip for every sign change rather than a row per body per sign:
-    // they are small, there are several, and they all say the same kind of thing.
-    const { rules: rulesOut, events: eventsByRule } = foldIngressRows(scanned, scannedEvents);
+    // they are small, there are several, and they all say the same kind of
+    // thing. The Moon's phases get a strip of their own on the same terms.
+    const folded = foldIngressRows(scanned, scannedEvents);
+    const { rules: rulesOut, events: eventsByRule } = foldPhaseRows(folded.rules, folded.events);
 
     const firstHitByRule = eventsByRule.map(events => events[0].start);
 
     const idxs = rulesOut.map((_, i) => i);
     idxs.sort((a,b) => {
-      // The strip of sign changes is the calendar the rest is read against,
-      // so it stays at the top whatever is first to happen.
-      const sa = isIngressRow(rulesOut[a]) ? 0 : 1;
-      const sb = isIngressRow(rulesOut[b]) ? 0 : 1;
+      // The strips are the calendar the rest is read against - sign changes,
+      // then the Moon's phases - so they stay at the top whatever is first
+      // to happen.
+      const tier = (/** @type {import("./core/job.js").Rule} */ r) => isIngressRow(r) ? 0 : (isPhaseRow(r) ? 1 : 2);
+      const sa = tier(rulesOut[a]);
+      const sb = tier(rulesOut[b]);
       if (sa !== sb) return sa - sb;
       const da = firstHitByRule[a] - firstHitByRule[b];
       if (da !== 0) return da;

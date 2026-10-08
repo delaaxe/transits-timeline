@@ -272,6 +272,38 @@ export function isIngressRule(rule){ return !!rule && rule.aspect === INGRESS; }
 // and a half days, and a cluster is never about that.
 export const ingressLeadOrder = ["sun","saturn","jupiter","mars","venus","mercury","pluto","neptune","uranus","chiron","node","moon"];
 
+// The Moon's phases: the four Sun-Moon angles that have names. Each is one
+// offset on the pair's separation as the scan reads it, Sun minus Moon, so the
+// first quarter - the Moon ninety degrees ahead of the Sun - is an offset of
+// 270. The glyphs are the sky as it looks on this dark page: a dark disc for
+// the new Moon, a bright one for the full, and the lit half on the side it is
+// actually lit, which is the right as it waxes.
+/** @type {[string, string, number, string, string][]} key, name, offset, glyph, the aspect it is */
+export const phases = [
+  ["newmoon",      "New Moon",      0,   "○", "conjunction"],
+  ["firstquarter", "First Quarter", 270, "◑", "square"],
+  ["fullmoon",     "Full Moon",     180, "●", "opposition"],
+  ["lastquarter",  "Last Quarter",  90,  "◐", "square"]
+];
+
+/** @param {string} key */
+export function phaseFor(key){ return phases.find(p => p[0] === key) ?? null; }
+
+/** @param {{aspect?: string}|null|undefined} rule */
+export function isPhaseRule(rule){ return !!rule && !!phaseFor(rule.aspect ?? ""); }
+
+/** The one row the phases are drawn on, like the sign changes. */
+export const PHASE = "phase";
+
+export const PHASE_ROW_LABEL = "Moon phases";
+
+/** @param {{transit?: string, aspect?: string}|null|undefined} rule */
+export function isPhaseRow(rule){ return !!rule && rule.aspect === PHASE; }
+
+// Which phase a folded marker shows: the New Moon, the start of the cycle,
+// then the Full, then the quarters.
+export const phaseLeadOrder = ["newmoon", "fullmoon", "firstquarter", "lastquarter"];
+
 // The one row every sign change is drawn on. A row per body per sign was a
 // dozen lines saying the same small thing, so they are folded into one strip
 // after the scan: each window on it remembers the rule it came from, which is

@@ -4,8 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DAY_MS, aspectTargets, brentRoot, isLeadingStub, scanAspectWindows, wrap180 } from "../src/core/events.js";
-import { computeTransitEvents, groupRules, nextSignChange } from "../src/core/job.js";
-import { buildCandidateRules, buildIngressRules, buildWorldRules } from "../src/core/transits.js";
+import { computeTransitEvents, groupRules, nextPhase, nextSignChange } from "../src/core/job.js";
+import { buildCandidateRules, buildIngressRules, buildPhaseRules, buildWorldRules, foldPhaseRows } from "../src/core/transits.js";
 import { angDist } from "../src/core/angles.js";
 import { ephemerisAstronomy, getBodyLonAt, getBodyLonFromAll } from "../src/core/ephemeris.js";
 import { aspectAngle, ingressCuspDeg, maxSeparation, maxSpeedDegPerDay } from "../src/data/bodies.js";
@@ -641,4 +641,47 @@ test("a sign change knows when the body leaves the sign, and by which door", () 
   // The Moon is in a sign for two and a half days.
   const moon = nextSignChange("moon", Date.UTC(2026, 0, 1), read);
   assert.ok(moon && moon.at - Date.UTC(2026, 0, 1) < 3 * DAY_MS);
+});
+
+test("the Moon's phases are found where the almanac puts them, each its own named angle", () => {
+  const rules = buildPhaseRules();
+  assert.deepEqual(rules.map(r => r.aspect), ["newmoon", "firstquarter", "fullmoon", "lastquarter"]);
+  const groups = groupRules(rules, undefined, null);
+  assert.equal(groups.length, 1, "one scan of the pair serves all four");
+  assert.deepEqual(groups[0].offsets, [0, 270, 180, 90], "one offset each, not a square's pair");
+
+  const res = computeTransitEvents({ startMs: Date.UTC(2025, 9, 1), endMs: Date.UTC(2025, 10, 1), observer: OBSERVER, natalLon: null, rules });
+  const at = (aspect) => res.events[res.rules.findIndex(r => r.aspect === aspect)][0].exacts[0];
+  const hour = 3600 * 1000;
+  // October 2025: full on the 7th at 03:48 UTC, last quarter the 13th 18:13,
+  // new the 21st 12:25, first quarter the 29th 16:21.
+  assert.ok(Math.abs(at("fullmoon") - Date.UTC(2025, 9, 7, 3, 48)) < hour, new Date(at("fullmoon")).toISOString());
+  assert.ok(Math.abs(at("lastquarter") - Date.UTC(2025, 9, 13, 18, 13)) < hour, new Date(at("lastquarter")).toISOString());
+  assert.ok(Math.abs(at("newmoon") - Date.UTC(2025, 9, 21, 12, 25)) < hour, new Date(at("newmoon")).toISOString());
+  assert.ok(Math.abs(at("firstquarter") - Date.UTC(2025, 9, 29, 16, 21)) < hour, new Date(at("firstquarter")).toISOString());
+
+  // The quarters are told apart by which side of the Sun the Moon is on.
+  for (let i = 0; i < res.rules.length; i++){
+    for (const event of res.events[i]){
+      event.exacts.forEach((ms, k) => {
+        const ahead = wrap180(event.exactLonNatal[k] - event.exactLon[k]);
+        const want = { newmoon: 0, firstquarter: 90, fullmoon: 180, lastquarter: -90 }[res.rules[i].aspect];
+        assert.ok(Math.abs(angDist(ahead, want)) < 0.01, `${res.rules[i].aspect}: Moon ${ahead} ahead of the Sun`);
+        // And each lasts until the next phase.
+        assert.ok(event.leavesAt[k] > ms && event.leavesAt[k] - ms < 9 * DAY_MS);
+      });
+    }
+  }
+  const full = res.events[res.rules.findIndex(r => r.aspect === "fullmoon")][0];
+  assert.equal(full.leavesInto[0], "lastquarter");
+  assert.ok(Math.abs(full.leavesAt[0] - at("lastquarter")) < 1000, "the full Moon lasts exactly until the last quarter");
+
+  const read = (body, ms) => getBodyLonAt(body, new Date(ms), OBSERVER);
+  const next = nextPhase(Date.UTC(2025, 9, 1), read);
+  assert.ok(next && next.into === "fullmoon" && Math.abs(next.at - at("fullmoon")) < 1000);
+
+  const folded = foldPhaseRows(res.rules, res.events);
+  assert.equal(folded.rules.length, 1);
+  assert.equal(folded.rules[0].aspect, "phase");
+  assert.deepEqual(folded.events[0].map(e => e.rule.aspect), ["fullmoon", "lastquarter", "newmoon", "firstquarter"], "one strip, in date order");
 });

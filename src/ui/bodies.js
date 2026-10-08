@@ -10,7 +10,7 @@
 // selection is a set that can be anything.
 
 import { requestUpdate } from "../refresh.js";
-import { setShowIngresses, setShowWorldRows, state } from "../state.js";
+import { setShowIngresses, setShowPhases, setShowWorldRows, state } from "../state.js";
 import { bodyPresets, isAngle, natalKeys, normalizeBodies, planetLabel, planetSymbols, sameBodies, transitingKeys } from "../data/bodies.js";
 import { el } from "./dom.js";
 
@@ -239,6 +239,7 @@ export function renderBodyPicker(){
   if (el.worldPaneBody) el.worldPaneBody.hidden = !state.showWorldRows;
   if (el.showWorldRows) el.showWorldRows.checked = !!state.showWorldRows;
   if (el.showIngresses) el.showIngresses.checked = !!state.showIngresses;
+  if (el.showPhases) el.showPhases.checked = !!state.showPhases;
   // The switch follows the world list: into the first pane in world mode, and
   // under the world pane's chips on a personal chart. It goes away with the
   // list it applies to.
@@ -274,6 +275,12 @@ export function wireBodyPicker(){
   if (el.showIngresses){
     el.showIngresses.addEventListener("change", () => {
       setShowIngresses(el.showIngresses.checked);
+      requestUpdate();
+    });
+  }
+  if (el.showPhases){
+    el.showPhases.addEventListener("change", () => {
+      setShowPhases(el.showPhases.checked);
       requestUpdate();
     });
   }
