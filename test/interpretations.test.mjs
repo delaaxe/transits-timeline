@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCandidateRules, buildWorldRules } from "../src/core/transits.js";
-import { aspects, mythKeyFor, natalKeys, planets, signKeys, transitingKeys, transitTiming } from "../src/data/bodies.js";
+import { aspects, mythKeyFor, natalKeys, phases, planets, signKeys, transitingKeys, transitTiming } from "../src/data/bodies.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (name) => JSON.parse(await readFile(join(repoRoot, name), "utf8"));
@@ -135,4 +135,34 @@ test("signs.json covers every body in every sign, in the collective voice", asyn
   assert.deepEqual(missing, [], "every body in every sign");
   const extra = Object.keys(signs).filter(k => !transitingKeys.some(b => signKeys.some(s => k === `${b}-in-${s}`)));
   assert.deepEqual(extra, [], "no key the strip can never ask for");
+});
+
+// A phase of the Moon is read in two parts: a few lines on the phase itself,
+// then the phase in the Moon's sign. The first is kept short because the second
+// is what the card is for, and both are the sky's weather, nobody's chart.
+test("phases.json covers every phase, alone and in every sign, in the collective voice", async () => {
+  const prose = await readJson("phases.json");
+  const expected = new Set();
+  for (const [phase] of phases){
+    expected.add(phase);
+    const generic = prose[phase];
+    assert.ok(generic, `${phase} has no description`);
+    const words = generic.trim().split(/\s+/).length;
+    assert.ok(words >= 25 && words <= 55, `${phase} is ${words} words, and the sign passage below it carries the reading`);
+    for (const sign of signKeys){
+      const key = `${phase}-in-${sign}`;
+      expected.add(key);
+      const text = prose[key];
+      assert.ok(text, `${key} has no description`);
+      const n = text.trim().split(/\s+/).length;
+      assert.ok(n >= 30 && n <= 60, `${key} is ${n} words`);
+    }
+  }
+  for (const [key, text] of Object.entries(prose)){
+    assert.ok(expected.has(key), `${key} is a key no phase card can ask for`);
+    assert.equal(text, text.trim(), `${key} has stray whitespace`);
+    assert.match(text, /[.!?]$/, `${key} stops mid-thought`);
+    assert.doesNotMatch(text, /\b(you|your|yours|natal)\b/i, `${key} is written as a personal transit`);
+    assert.doesNotMatch(text, /[—;]/, `${key} has an em-dash or a semicolon`);
+  }
 });

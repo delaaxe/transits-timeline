@@ -1,5 +1,5 @@
-import { INGRESS, ingressDescription, titleWithoutWorldSuffix, transitTimingFor } from "../data/bodies.js";
-import { aspectDescription, mythDescription, signDescription, worldDescription } from "../data/interpretations.js";
+import { INGRESS, PHASE, ingressDescription, titleWithoutWorldSuffix, transitTimingFor } from "../data/bodies.js";
+import { aspectDescription, mythDescription, phaseDescription, signDescription, worldDescription } from "../data/interpretations.js";
 import { copyTextToClipboard, escapeHtml, tooltip, tooltipBackdrop } from "./dom.js";
 import { isMultiDayLocal } from "./format.js";
 
@@ -199,13 +199,26 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     const [t, , n, way] = String(key).split("-");
     return [ingressDescription({ transit: t, natal: n }, way === "back"), signDescription(t, n)].filter(Boolean).join(" ");
   };
+  // A phase of the Moon reads in two paragraphs: the phase itself, briefly, and
+  // then the phase in the sign - "phase-fullmoon-aries" - which is the reading
+  // the card was opened for. Both come from the phases' own file.
+  /** @param {string} key @returns {string[]} */
+  const phaseProse = (key) => { const [, phase, sign] = String(key).split("-"); return phaseDescription(phase, sign); };
+  /** The paragraphs a key stands for, whichever kind of card asked. @param {string} key @returns {string[]} */
+  const proseFor = (key) => {
+    const [t, a] = String(key).split("-");
+    if (t === PHASE) return phaseProse(key);
+    if (a === INGRESS) return [ingressProse(key)].filter(Boolean);
+    return [isWorld ? worldDescription(key) : aspectDescription(key)].filter(Boolean);
+  };
   const [keyTransit, keyAspect] = String(descKey).split("-");
   const isIngress = keyAspect === INGRESS;
-  const desc = isIngress
-    ? ingressProse(descKey)
-    : (isWorld ? worldDescription(descKey) : aspectDescription(descKey));
+  const paragraphs = proseFor(descKey);
+  const desc = paragraphs.join("\n\n");
+  /** @param {string[]} parts */
+  const descHtml = (parts) => parts.map(p => `<div class="desc">${escapeHtml(p)}</div>`).join("");
   const sectionsHtml = (sections ?? []).map(s =>
-    `<div class="section"><div class="sub positions">${escapeHtml(s.heading)}</div><div class="desc">${escapeHtml(ingressProse(s.descKey))}</div></div>`
+    `<div class="section"><div class="sub positions">${escapeHtml(s.heading)}</div>${descHtml(proseFor(s.descKey))}</div>`
   ).join("");
   const myth = mythDescription(mythKey);
   // Derived from the key rather than passed in, like the prose above it. There
@@ -231,7 +244,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
     const titleText = String(calendarData.title || title || "Transit");
     const firstLine = `${range || ""}${exactLabel ? ` (exact: ${exactLabel})` : ""}`.trim();
     const mythLine = safeMyth ? `Mythologically: ${myth}` : "";
-    const sectionsText = (sections ?? []).map(s => `${s.heading}\n${ingressProse(s.descKey)}`).join("\n\n");
+    const sectionsText = (sections ?? []).map(s => `${s.heading}\n${proseFor(s.descKey).join("\n\n")}`).join("\n\n");
     const detailsText = [firstLine, positionText, desc || "", sectionsText, timing, mythLine].filter(Boolean).join("\n\n");
     const segmentAllDay = isMultiDayLocal(calendarData.segmentStart, calendarData.segmentEnd);
     const segmentEndForCalendar = segmentAllDay
@@ -287,7 +300,7 @@ export function setTooltipContent(title, descKey, range, mythKey, popupMode, exa
   tooltip.innerHTML = `${closeBtn}<div class="tooltipTitle" data-copy-text="${escapeHtml(copyText)}">${escapeHtml(title)}<span class="copiedHint">(copied)</span></div>`
     + `<div class="sub">${escapeHtml(range)}${exactHtml}</div>`
     + positionHtml
-    + (desc ? `<div class="desc">${escapeHtml(desc)}</div>` : "")
+    + descHtml(paragraphs)
     + sectionsHtml
     + timingHtml
     + mythHtml

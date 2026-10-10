@@ -12,6 +12,9 @@ export let worldDescriptions = {};
 /** @type {Record<string, string>} */
 export let signDescriptions = {};
 
+/** @type {Record<string, string>} */
+export let phaseDescriptions = {};
+
 // Batches of prose that have landed. The files are independent, so none waits
 // on another: whichever arrives first is usable immediately.
 let arrived = 0;
@@ -34,7 +37,8 @@ export function loadInterpretations(){
     loadAspectDescriptions().then(data => { aspectDescriptions = data; announce(); }),
     loadMythDescriptions().then(data => { mythDescriptions = data; announce(); }),
     loadWorldDescriptions().then(data => { worldDescriptions = data; announce(); }),
-    loadSignDescriptions().then(data => { signDescriptions = data; announce(); })
+    loadSignDescriptions().then(data => { signDescriptions = data; announce(); }),
+    loadPhaseDescriptions().then(data => { phaseDescriptions = data; announce(); })
   ]).then(() => undefined);
   return loading;
 }
@@ -57,6 +61,17 @@ export function worldDescription(key){ return worldDescriptions[key] || ""; }
 
 /** A body in a sign, keyed "jupiter-in-gemini". @param {string} body @param {string} sign */
 export function signDescription(body, sign){ return signDescriptions[`${body}-in-${sign}`] || ""; }
+
+/**
+ * A phase of the Moon in two parts: what the phase is, in a few lines, and then
+ * what it is like in the sign the Moon is in - "fullmoon" and "fullmoon-in-aries".
+ * Either half may be missing, and a card shows whichever has landed.
+ * @param {string} phase @param {string} [sign]
+ * @returns {string[]}
+ */
+export function phaseDescription(phase, sign = ""){
+  return [phaseDescriptions[phase] || "", sign ? (phaseDescriptions[`${phase}-in-${sign}`] || "") : ""].filter(Boolean);
+}
 
 /**
  * A missing file leaves the rest of the app working, so a failed fetch warns and
@@ -84,3 +99,5 @@ export function loadMythDescriptions(){ return loadJson("myths.json", "Myth desc
 export function loadWorldDescriptions(){ return loadJson("world.json", "World descriptions"); }
 
 export function loadSignDescriptions(){ return loadJson("signs.json", "Sign descriptions"); }
+
+export function loadPhaseDescriptions(){ return loadJson("phases.json", "Phase descriptions"); }
