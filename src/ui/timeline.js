@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { DAY_MS, isLeadingStub } from "../core/events.js";
-import { INGRESS_ROW_LABEL, PHASE_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, isPhaseRow, mythKeyFor, needsWorldLabel, phaseFor, phaseLeadOrder, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, PHASE, PHASE_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, isPhaseRow, mythKeyFor, needsWorldLabel, phaseFor, phaseLeadOrder, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -1017,7 +1017,9 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
             glyphs: `${glyph}${moon ? endGlyph(moon.sign.toLowerCase()) : ""}`,
             card: {
               title: label,
-              descKey: `sun-${aspect}-moon`,
+              // Its own prose rather than the natal Sun-Moon transit's: a New
+              // Moon in the sky is not the Sun crossing a birth chart's Moon.
+              descKey: moon ? `${PHASE}-${key}-${moon.sign.toLowerCase()}` : `${PHASE}-${key}`,
               // A phase is an instant: the week after a quarter is the gibbous
               // Moon, not the quarter, so there is no stay to put on the line.
               range: momentLine(exact, showYear),
