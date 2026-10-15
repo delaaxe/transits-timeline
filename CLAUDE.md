@@ -15,11 +15,14 @@ preview. So pushing is publishing, and the last step of the work is telling me
 where it landed.
 
 After pushing, wait for the run and read the URL out of the "Deploy to Cloudflare
-Pages" step, then give it to me with the summary:
+Pages" step, then give it to me with the summary as a bare URL on its own line,
+like this:
 
-```
-✨ Deployment alias URL: https://claude-planet-chooser-ux-qw7.transits-timeline.pages.dev
-```
+https://claude-planet-chooser-ux-qw7.transits-timeline.pages.dev
+
+Not in a code fence and not behind the "✨ Deployment alias URL:" prefix the log
+prints it with: a fenced or prefixed URL is not tappable in the Claude app, and
+I read these on my phone.
 
 Read it rather than deriving it. Cloudflare lowercases the branch, turns
 everything but letters and digits into dashes, and then truncates to 28
