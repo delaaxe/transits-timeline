@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTodayRules, formatTodaySummary, todayTransitBodies } from "../src/services/today.js";
+import { buildTodayRules, exactRules, formatTodaySummary, todayTransitBodies } from "../src/services/today.js";
 import { aspects, natalKeys } from "../src/data/bodies.js";
 
 test("the day's reading moves every body but the Moon, over every natal point, in every aspect", () => {
@@ -37,4 +37,17 @@ test("the summary is one line per kind, in words and glyphs", () => {
   assert.equal(formatTodaySummary({ personal: [], world: [] }), "- Transits: none\n- World transits: none");
   // No chart, no natal line.
   assert.equal(formatTodaySummary({ personal: null, world: [marsSaturn] }), "- World transits: Mars △ Saturn");
+});
+
+test("only a transit exact at some moment of the day is in the reading", () => {
+  const a = { transit: "venus", aspect: "sextile", natal: "uranus", orb: 1, scope: "personal" };
+  const b = { transit: "pluto", aspect: "square", natal: "sun", orb: 1, scope: "personal" };
+  const c = { transit: "mars", aspect: "trine", natal: "saturn", orb: 1, scope: "world" };
+  const window = (exacts) => ({ start: 0, end: 1, exacts, startClipped: true, endClipped: true, peakOrb: 0.1 });
+  const kept = exactRules([a, b, c], [
+    [window([5])],                 // perfects today
+    [window([])],                  // in orb all day, exact some other day
+    [window([]), window([7, 9])]   // a second window with hits still counts
+  ]);
+  assert.deepEqual(kept, [a, c]);
 });

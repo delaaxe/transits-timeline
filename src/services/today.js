@@ -1,4 +1,4 @@
-// Everything within orb today, as two lines of text.
+// Everything that perfects today, as two lines of text.
 //
 // This is what the hidden corner of the chart copies: a complete reading of the
 // day rather than the chart's current view of it. The chooser narrows the chart
@@ -55,14 +55,27 @@ export function formatTodaySummary({ personal, world }){
 }
 
 /**
+ * The rules whose transit perfects inside the scanned range. The scan clips
+ * every window to the range and lists the exact hits inside it, so a rule
+ * counts when any of its windows has one. A body merely within orb all day -
+ * Pluto sits in orb of something for months - is left out: the line is what
+ * happens today, not what is hanging over it.
+ *
+ * @param {import("../core/job.js").Rule[]} rules
+ * @param {import("../core/events.js").AspectEvent[][]} events one list per rule
+ */
+export function exactRules(rules, events){
+  return rules.filter((_, i) => events[i].some(e => (e.exacts ?? []).length > 0));
+}
+
+/**
  * The reading itself. Scanned here on the main thread rather than in the
  * worker: a day without the Moon is a few dozen longitude reads, and the
  * answer has to be ready inside the tap that asked for it, because that is
  * the only moment the clipboard will take it from.
  *
- * "Today" is the reader's local day, and a transit is happening today if its
- * orb window touches any part of it - the scan clips windows to the range, so
- * anything it returns qualifies.
+ * "Today" is the reader's local day, and a transit is happening today if it
+ * is exact at some moment of it.
  *
  * @param {import("./chart-context.js").ChartContext} ctx
  * @param {number} orb
@@ -80,8 +93,9 @@ export function todaySummary(ctx, orb, now = new Date()){
     natalLon,
     rules
   });
+  const exact = exactRules(found.rules, found.events);
   return formatTodaySummary({
-    personal: personal ? found.rules.filter(r => r.scope !== "world") : null,
-    world: found.rules.filter(r => r.scope === "world")
+    personal: personal ? exact.filter(r => r.scope !== "world") : null,
+    world: exact.filter(r => r.scope === "world")
   });
 }
