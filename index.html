@@ -374,12 +374,14 @@
          writes the keyframes, since the stop depends on the layout. */
       #aspectAxisWrap{ animation-name: aspectAxisNarrow; }
       #aspectAxisSvg{ animation-name: aspectAxisSlide; }
-      #axisCornerBlock{ animation-name: aspectAxisCornerNarrow; }
+      #axisCornerBlock,
+      #axisCorner{ animation-name: aspectAxisCornerNarrow; }
       .timelineNav{ animation-name: aspectAxisNavIndent; }
 
       #aspectAxisWrap,
       #aspectAxisSvg,
       #axisCornerBlock,
+      #axisCorner,
       .timelineNav{
         animation-duration: auto;
         animation-timing-function: linear;
@@ -438,6 +440,38 @@
       z-index: 2;
       pointer-events: none;
       display: none;
+    }
+    /* The same square as a hit target, in every layout: nothing is drawn in it,
+       but three taps on it copy today's reading (ui/corner.js). It sits over
+       the block and the axis, and takes its width from the same animation the
+       block does. touch-action keeps a phone from reading the taps as a zoom. */
+    #axisCorner{
+      position: absolute;
+      left: var(--axis-pad);
+      top: 0;
+      width: calc(calc(var(--aspect-axis-w, 150px) + var(--aspect-axis-shift, 0px)) - 1px);
+      height: calc(var(--date-axis-h, 80px) + var(--timeline-nav-total, 0px) + var(--axis-pad-top));
+      z-index: 3;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* The clipboard is silent, so the square glows once when it has copied. On
+       a pseudo-element, since the square's own animation slot is the width. */
+    #axisCorner::after{
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--star);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #axisCorner.copied::after{ animation: cornerCopied .7s ease-out; }
+    @keyframes cornerCopied{
+      from{ opacity: .35; }
+      to{ opacity: 0; }
     }
     .chartFrame{
       position: relative;
@@ -1632,6 +1666,7 @@
       </div>
       <svg id="dateAxisSvg" width="1200" height="80" viewBox="0 0 1200 80" role="img" aria-label="Date axis"></svg>
       <div id="axisCornerBlock" aria-hidden="true"></div>
+      <div id="axisCorner" aria-hidden="true"></div>
     </div>
   </div>
   <div class="chartFrame">

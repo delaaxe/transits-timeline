@@ -85,6 +85,7 @@ export const el = {
   rangeShiftForward: $("rangeShiftForward"),
   dateAxisSvg: $("dateAxisSvg"),
   dateAxisScroll: $("dateAxisScroll"),
+  axisCorner: $("axisCorner"),
   timelineScroll: $("timelineScroll"),
   aspectAxisSvg: $("aspectAxisSvg"),
   timelineSvg: $("timelineSvg"),

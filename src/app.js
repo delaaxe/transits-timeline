@@ -14,6 +14,7 @@ import { bootPresets, initCharts, readRuleOptions, renderPresetSection, wireAdva
 import { clearRowFocus, renderRowFocus, wireRowFocus } from "./ui/rowfocus.js";
 import { clearTimeline, renderFromCache, updateShowMore, visibleRowIndexOf, wireAxisScrollSync, wireTimelineResize } from "./ui/timeline.js";
 import { refreshTooltipContent, wireTooltipDismiss } from "./ui/tooltip.js";
+import { wireCornerTap } from "./ui/corner.js";
 import { errorMessage } from "./core/errors.js";
 
 export function maybeRefreshTimelineOnRefocus(){
@@ -274,6 +275,7 @@ async function boot(){
   wireTooltipDismiss();
   wireStaleRefreshOnRefocus();
   wireInstallHint();
+  wireCornerTap();
 
   el.updateBtn.addEventListener("click", () => {
     if (!state.isComputing) return;
