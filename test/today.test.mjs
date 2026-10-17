@@ -39,7 +39,9 @@ test("the summary is one line per kind, in words and glyphs", () => {
     formatTodaySummary({ personal: [venusUranus, { ...venusUranus, natal: "mc", aspect: "square" }], world: [marsSaturn] }),
     "- Transits: Venus ⚹ Uranus, Venus □ Mc\n- World transits: Mars △ Saturn"
   );
-  assert.equal(formatTodaySummary({ personal: [], world: [] }), "- Transits: none\n- World transits: none");
+  // Nothing in the chart is "na"; nothing in the sky is no line at all.
+  assert.equal(formatTodaySummary({ personal: [], world: [] }), "- Transits: na");
+  assert.equal(formatTodaySummary({ personal: null, world: [] }), "");
   // No chart, no natal line.
   assert.equal(formatTodaySummary({ personal: null, world: [marsSaturn] }), "- World transits: Mars △ Saturn");
   // A phase leads, and sign changes close the world line.

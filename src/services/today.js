@@ -96,22 +96,25 @@ export function summarizeToday(rules, events){
 /**
  * The lines. A phase of the Moon leads, and only on a day that has one: the
  * lunation is the calendar the rest is read against, and a line saying there
- * is no phase today would be most days. The natal line is left out altogether
- * where there is no chart to read against - world view - rather than written
- * as empty, since "none" would be saying something about a chart nobody
- * picked. Sign changes close the world line, after the aspects, since they
- * are the same weather.
+ * is no phase today would be most days. The world line goes the same way -
+ * sign changes close it, after the aspects, since they are the same weather,
+ * and a day with neither has no world line. The natal line is the one that is
+ * always written where there is a chart, as "na" when nothing perfects: a
+ * reading of a chart that says nothing about the chart has left something
+ * out. Where there is no chart to read against - world view - it is left out
+ * altogether, since "na" would be saying something about a chart nobody
+ * picked.
  *
  * @param {{personal: import("../core/job.js").Rule[]|null, world: import("../core/job.js").Rule[],
  *          ingresses?: string[], phases?: string[]}} found
  */
 export function formatTodaySummary({ personal, world, ingresses = [], phases = [] }){
-  const list = (/** @type {string[]} */ items) => items.length ? items.join(", ") : "none";
   const named = (/** @type {import("../core/job.js").Rule[]} */ rules) => rules.map(r => rulePairing(r));
   const lines = [];
-  if (phases.length) lines.push(`- Moon phase: ${list(phases)}`);
-  if (personal) lines.push(`- Transits: ${list(named(personal))}`);
-  lines.push(`- World transits: ${list([...named(world), ...ingresses])}`);
+  if (phases.length) lines.push(`- Moon phase: ${phases.join(", ")}`);
+  if (personal) lines.push(`- Transits: ${personal.length ? named(personal).join(", ") : "na"}`);
+  const sky = [...named(world), ...ingresses];
+  if (sky.length) lines.push(`- World transits: ${sky.join(", ")}`);
   return lines.join("\n");
 }
 
