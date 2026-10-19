@@ -98,12 +98,13 @@ export function summarizeToday(rules, events){
  * lunation is the calendar the rest is read against, and a line saying there
  * is no phase today would be most days. The world line goes the same way -
  * sign changes close it, after the aspects, since they are the same weather,
- * and a day with neither has no world line. The natal line is the one that is
- * always written where there is a chart, as "na" when nothing perfects: a
- * reading of a chart that says nothing about the chart has left something
- * out. Where there is no chart to read against - world view - it is left out
- * altogether, since "na" would be saying something about a chart nobody
- * picked.
+ * and a day with neither has no world line. The natal line is written when
+ * something perfects, and otherwise only when it would be the whole reading:
+ * a copy that comes back empty looks like a tap that did nothing, so a chart
+ * with a quiet day says "na" - but not beside a phase or a world line, where
+ * the day has already said what it has to say. Where there is no chart to
+ * read against - world view - it is left out altogether, since "na" would be
+ * saying something about a chart nobody picked.
  *
  * @param {{personal: import("../core/job.js").Rule[]|null, world: import("../core/job.js").Rule[],
  *          ingresses?: string[], phases?: string[]}} found
@@ -112,9 +113,10 @@ export function formatTodaySummary({ personal, world, ingresses = [], phases = [
   const named = (/** @type {import("../core/job.js").Rule[]} */ rules) => rules.map(r => rulePairing(r));
   const lines = [];
   if (phases.length) lines.push(`- Moon phase: ${phases.join(", ")}`);
-  if (personal) lines.push(`- Transits: ${personal.length ? named(personal).join(", ") : "na"}`);
+  if (personal?.length) lines.push(`- Transits: ${named(personal).join(", ")}`);
   const sky = [...named(world), ...ingresses];
   if (sky.length) lines.push(`- World transits: ${sky.join(", ")}`);
+  if (personal && lines.length === 0) lines.push("- Transits: na");
   return lines.join("\n");
 }
 
