@@ -81,6 +81,7 @@ export const el = {
   status: $("status"),
   rangeShiftBack: $("rangeShiftBack"),
   rangeExpandBack: $("rangeExpandBack"),
+  rangeExpandAhead: $("rangeExpandAhead"),
   rangeExpandForward: $("rangeExpandForward"),
   rangeShiftForward: $("rangeShiftForward"),
   dateAxisSvg: $("dateAxisSvg"),

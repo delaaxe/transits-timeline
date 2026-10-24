@@ -51,6 +51,25 @@ export function expandRange(direction){
 }
 
 /**
+ * Doubles how far ahead of today the range reaches, and puts a short lead-in
+ * before today to match, the way the presets do: a quarter of the time ahead,
+ * which is the Month and Year presets' proportion. When today is outside the
+ * range, the nearer end stands in for it, so the button still widens whatever
+ * is on screen rather than jumping back to now.
+ */
+export function expandAhead(){
+  const start = parseLocalDateOnly(el.rangeStart.value);
+  const end = parseLocalDateOnly(el.rangeEnd.value);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const anchor = today < start ? start : today > end ? end : today;
+  const aheadDays = Math.round((end.getTime() - anchor.getTime()) / (24 * 3600 * 1000)) + 1;
+  const newAhead = aheadDays * 2;
+  const pastDays = Math.round(newAhead / 4);
+  setRangeDates(addDaysLocal(anchor, -pastDays), addDaysLocal(anchor, newAhead - 1));
+}
+
+/**
  * Shows or hides the arrows that move the range.
  *
  * The corner block is sized from --timeline-nav-total, because it has to cover
@@ -113,6 +132,7 @@ export function wireRangeNav(){
   if (el.rangeShiftForward) el.rangeShiftForward.addEventListener("click", () => shiftRange(1));
   if (el.rangeExpandBack) el.rangeExpandBack.addEventListener("click", () => expandRange(-1));
   if (el.rangeExpandForward) el.rangeExpandForward.addEventListener("click", () => expandRange(1));
+  if (el.rangeExpandAhead) el.rangeExpandAhead.addEventListener("click", expandAhead);
   setRangeNavVisible(state.showRangeNav, { animate: false });
   if (el.timelineNavToggle){
     el.timelineNavToggle.addEventListener("click", () => setRangeNavVisible(!state.showRangeNav));
