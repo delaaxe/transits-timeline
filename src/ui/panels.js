@@ -51,22 +51,19 @@ export function expandRange(direction){
 }
 
 /**
- * Doubles how far ahead of today the range reaches, and puts a short lead-in
- * before today to match, the way the presets do: a quarter of the time ahead,
- * which is the Month and Year presets' proportion. When today is outside the
- * range, the nearer end stands in for it, so the button still widens whatever
- * is on screen rather than jumping back to now.
+ * Doubles the range around today, half before and half after, so it opens out
+ * from the present rather than only to the right as the » button does. When
+ * today is outside the range it opens out from the range's middle instead, so
+ * the button widens whatever is on screen rather than jumping back to now.
  */
-export function expandAhead(){
+export function expandAroundToday(){
   const start = parseLocalDateOnly(el.rangeStart.value);
   const end = parseLocalDateOnly(el.rangeEnd.value);
+  const span = rangeSpanDays();
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const anchor = today < start ? start : today > end ? end : today;
-  const aheadDays = Math.round((end.getTime() - anchor.getTime()) / (24 * 3600 * 1000)) + 1;
-  const newAhead = aheadDays * 2;
-  const pastDays = Math.round(newAhead / 4);
-  setRangeDates(addDaysLocal(anchor, -pastDays), addDaysLocal(anchor, newAhead - 1));
+  const center = today < start || today > end ? addDaysLocal(start, Math.floor(span / 2)) : today;
+  setRangeDates(addDaysLocal(center, -span), addDaysLocal(center, span - 1));
 }
 
 /**
@@ -132,7 +129,7 @@ export function wireRangeNav(){
   if (el.rangeShiftForward) el.rangeShiftForward.addEventListener("click", () => shiftRange(1));
   if (el.rangeExpandBack) el.rangeExpandBack.addEventListener("click", () => expandRange(-1));
   if (el.rangeExpandForward) el.rangeExpandForward.addEventListener("click", () => expandRange(1));
-  if (el.rangeExpandAhead) el.rangeExpandAhead.addEventListener("click", expandAhead);
+  if (el.rangeExpandAround) el.rangeExpandAround.addEventListener("click", expandAroundToday);
   setRangeNavVisible(state.showRangeNav, { animate: false });
   if (el.timelineNavToggle){
     el.timelineNavToggle.addEventListener("click", () => setRangeNavVisible(!state.showRangeNav));
