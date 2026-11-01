@@ -5,7 +5,7 @@
 import { wrap360 } from "./angles.js";
 import { DAY_MS, aspectTargets, brentRoot, scanAspectWindows, wrap180 } from "./events.js";
 import { getBodyLonAt } from "./ephemeris.js";
-import { aspectAngle, ingressCuspDeg, isIngressRule, maxSpeedDegPerDay, phaseFor, signIndexAt, signKeys } from "../data/bodies.js";
+import { aspectAngle, ingressCuspDeg, isIngressRule, isPhaseRule, maxSpeedDegPerDay, phaseFor, signIndexAt, signKeys } from "../data/bodies.js";
 
 /**
  * @typedef {{transit: string, natal: string, aspect: string, orb: number|string,
@@ -223,6 +223,10 @@ export function computeTransitEvents(job, onProgress){
         event.exactLonNatal = (g.scope === "world")
           ? event.exacts.map(ms => lon.read(g.natal, ms))
           : event.exacts.map(() => ingress ? cusp : Number(natalLon?.[rule.natal]));
+        // A phase of the Moon is an eclipse when the Sun is near a node, so
+        // a phase also remembers where the node was. The mean node is a
+        // formula rather than an ephemeris read, so it is nearly free.
+        if (isPhaseRule(rule)) event.exactLonNode = event.exacts.map(ms => lon.read("node", ms));
         // Which way the cusp was crossed. A body a few hours before the
         // crossing is on one side of it or the other, and the side says
         // whether it entered the rule's sign or fell back out of it. The node

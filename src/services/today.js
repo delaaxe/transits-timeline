@@ -13,7 +13,7 @@ import { getBodyLonAt } from "../core/ephemeris.js";
 import { computeTransitEvents } from "../core/job.js";
 import { addDaysLocal } from "../core/time.js";
 import { buildCandidateRules, buildIngressRules, buildPhaseRules, buildWorldRules } from "../core/transits.js";
-import { aspects, endLabel, ingressAsCrossed, isIngressRule, natalKeys, phaseFor, rulePairing, transitingKeys, zodiacSign } from "../data/bodies.js";
+import { aspects, eclipseKind, endLabel, ingressAsCrossed, isIngressRule, natalKeys, phaseFor, rulePairing, transitingKeys, zodiacSign } from "../data/bodies.js";
 import { locale } from "../storage/charts.js";
 import { natalLongitudes } from "./chart-context.js";
 
@@ -55,8 +55,9 @@ export function buildTodayRules({ personal, orb }){
 
 /**
  * @typedef {Object} MoonMoments what the scan found of the Moon's own day
- * @property {{name:string, sign:string, at:number}|null} phase the phase exact
- *   today, with the Moon's sign at that moment, or null
+ * @property {{name:string, sign:string, at:number, eclipse:string}|null} phase
+ *   the phase exact today, with the Moon's sign at that moment and "solar
+ *   eclipse", "lunar eclipse" or "" for what kind of eclipse it is, or null
  * @property {{sign:string, at:number}|null} ingress the sign the Moon enters
  *   today and when, or null; the Moon never turns, so it only ever enters
  */
@@ -96,7 +97,12 @@ export function summarizeToday(rules, events){
         (event.exacts ?? []).forEach((at, k) => {
           if (phase){
             // Two phases cannot fall on one day; the first found stands.
-            moon.phase ??= { name: phase[1], sign: zodiacSign(event.exactLonNatal?.[k] ?? NaN), at };
+            moon.phase ??= {
+              name: phase[1],
+              sign: zodiacSign(event.exactLonNatal?.[k] ?? NaN),
+              at,
+              eclipse: eclipseKind(phase[0], event.exactLon?.[k] ?? NaN, event.exactLonNode?.[k] ?? NaN)
+            };
           } else if (rule.transit === "moon"){
             // The rule names the sign; the longitude at the exact moment sits
             // on the cusp and rounds to either side of it.
@@ -129,23 +135,97 @@ export function moonPhaseName(moonLon, sunLon){
   return "Waning Crescent";
 }
 
+// The bodies whose aspects end a void of course. The Sun through Pluto, which
+// is the modern reading; the traditional one stops at Saturn, and nobody
+// counts the node or Chiron.
+export const voidOfCourseBodies = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"];
+
+/**
+ * The void of course around `now`: from the Moon's last exact aspect in its
+ * sign to the moment it leaves the sign. Pure, so it can be tested: the
+ * scan's exact moments come in, the window comes out.
+ *
+ * The sign's start is the last sign change at or before now and its end the
+ * first after; the void begins at the last aspect between the two, or at the
+ * sign's start if the Moon makes none - the rare void that lasts a whole
+ * sign. Null when the scan did not reach a sign change on either side.
+ *
+ * @param {number[]} ingressTimes when the Moon changed sign, around now
+ * @param {number[]} aspectTimes when the Moon was exact to another body
+ * @param {number} now
+ * @returns {{from:number, until:number}|null}
+ */
+export function voidWindow(ingressTimes, aspectTimes, now){
+  const before = ingressTimes.filter(t => t <= now);
+  const after = ingressTimes.filter(t => t > now);
+  if (!before.length || !after.length) return null;
+  const start = Math.max(...before);
+  const until = Math.min(...after);
+  const inSign = aspectTimes.filter(t => t > start && t < until);
+  return { from: inSign.length ? Math.max(...inSign) : start, until };
+}
+
 /**
  * The Moon's line. Where it is and what phase it is in, as of now - and on a
  * day with an exact phase, that phase and its time instead, with the Moon's
- * sign at that moment, since "Full Moon in Taurus" is what gets looked up.
- * Then the sign it enters today, with the time, if it does.
+ * sign at that moment, since "Full Moon in Taurus" is what gets looked up,
+ * and whether it is an eclipse. Then the sign it enters today, with the time,
+ * if it does. Then the void of course, where it touches the rest of today:
+ * "until" a time if the Moon is void now, "from ... to" if it goes void later
+ * today, and nothing if the day's void is already over or there is none. A
+ * time past midnight says "tomorrow".
  *
  * @param {{sign:string, phase:string}} now where the Moon is as this is read
  * @param {MoonMoments} moments
- * @param {(ms:number)=>string} fmtTime
+ * @param {{from:number, until:number}|null} voc
+ * @param {{now:number, dayEnd:number, fmtTime:(ms:number)=>string}} clock
  */
-export function describeMoon(now, moments, fmtTime){
+export function describeMoon(now, moments, voc, { now: nowMs, dayEnd, fmtTime }){
+  const when = (/** @type {number} */ ms) => (ms >= dayEnd ? `tomorrow ${fmtTime(ms)}` : fmtTime(ms));
   const head = moments.phase
-    ? `${moments.phase.name} in ${moments.phase.sign} ${fmtTime(moments.phase.at)}`
+    ? `${moments.phase.name} in ${moments.phase.sign} ${fmtTime(moments.phase.at)}${moments.phase.eclipse ? `, ${moments.phase.eclipse}` : ""}`
     : `${now.phase} in ${now.sign}`;
-  const tail = moments.ingress ? `, enters ${moments.ingress.sign} ${fmtTime(moments.ingress.at)}` : "";
-  return `${head}${tail}`;
+  const parts = [head];
+  if (moments.ingress) parts.push(`enters ${moments.ingress.sign} ${fmtTime(moments.ingress.at)}`);
+  if (voc){
+    if (voc.from <= nowMs && nowMs < voc.until) parts.push(`void of course until ${when(voc.until)}`);
+    else if (voc.from > nowMs && voc.from < dayEnd) parts.push(`void of course from ${fmtTime(voc.from)} to ${when(voc.until)}`);
+  }
+  return parts.join(", ");
 }
+
+/**
+ * The void of course around now, from a scan of its own: the Moon's aspects
+ * and sign changes over the week around today. Three days back reaches the
+ * start of the Moon's sign, which it never stays in longer; four days ahead
+ * reaches the end.
+ * @param {{lon:number, lat:number, height:number}} observer @param {number} nowMs
+ */
+export function voidOfCourse(observer, nowMs){
+  const rules = [
+    ...buildWorldRules({ bodies: voidOfCourseBodies, aspects: todayAspects, orb: 1 })
+      .filter(r => r.transit === "moon" || r.natal === "moon"),
+    ...buildIngressRules({ bodies: ["moon"], orb: 1 })
+  ];
+  const found = computeTransitEvents({
+    startMs: nowMs - 3 * DAY_MS,
+    endMs: nowMs + 4 * DAY_MS,
+    observer,
+    natalLon: null,
+    rules
+  });
+  /** @type {number[]} */
+  const ingressTimes = [];
+  /** @type {number[]} */
+  const aspectTimes = [];
+  found.rules.forEach((rule, i) => {
+    const into = isIngressRule(rule) ? ingressTimes : aspectTimes;
+    for (const event of found.events[i]) into.push(...(event.exacts ?? []));
+  });
+  return voidWindow(ingressTimes, aspectTimes, nowMs);
+}
+
+const DAY_MS = 24 * 3600 * 1000;
 
 /**
  * The lines. The Moon leads, every day: the lunation is the calendar the rest
@@ -201,7 +281,8 @@ export function todaySummary(ctx, orb, now = new Date()){
   const moon = describeMoon(
     { sign: zodiacSign(moonLon), phase: moonPhaseName(moonLon, sunLon) },
     day.moon,
-    ms => timeFmt.format(new Date(ms))
+    voidOfCourse(ctx.observer, now.getTime()),
+    { now: now.getTime(), dayEnd: addDaysLocal(start, 1).getTime(), fmtTime: ms => timeFmt.format(new Date(ms)) }
   );
   return formatTodaySummary({ moon, personal: personal ? day.personal : null, world: day.world, ingresses: day.ingresses });
 }

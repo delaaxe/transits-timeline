@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { DAY_MS, isLeadingStub } from "../core/events.js";
-import { INGRESS_ROW_LABEL, PHASE, PHASE_ROW_LABEL, aspectColors, aspectSymbol, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, isPhaseRow, mythKeyFor, needsWorldLabel, phaseFor, phaseLeadOrder, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
+import { INGRESS_ROW_LABEL, PHASE, PHASE_ROW_LABEL, aspectColors, aspectSymbol, eclipseKind, endGlyph, endLabel, ingressAsCrossed, ingressLeadOrder, isIngressRow, isIngressRule, isPhaseRow, mythKeyFor, needsWorldLabel, phaseFor, phaseLeadOrder, returnColor, ruleKey, rulePairing, worldTitleSuffix, zodiacParts } from "../data/bodies.js";
 import { darken, isHexColor, lighten } from "./color.js";
 import { locale } from "../storage/charts.js";
 import { el, tooltip } from "./dom.js";
@@ -1007,7 +1007,10 @@ export function renderTimelineSVG({svg, start, endExclusive, rules, eventsByRule
           if (xExact < x0 || xExact > x0 + timelineW) return;
           const moon = zodiacParts(event.exactLonNatal?.[k] ?? NaN);
           const sun = zodiacParts(event.exactLon?.[k] ?? NaN);
-          const label = moon ? `${name} in ${moon.sign}` : name;
+          // An eclipse is named on the label: it is the one thing about a
+          // syzygy that the glyph and the sign do not already say.
+          const eclipse = eclipseKind(key, event.exactLon?.[k] ?? NaN, event.exactLonNode?.[k] ?? NaN);
+          const label = (moon ? `${name} in ${moon.sign}` : name) + (eclipse ? `, ${eclipse}` : "");
           // A New Moon has both in one place; the others set the Moon against the Sun.
           const where = !(moon && sun) ? []
             : aspect === "conjunction" ? [`Moon and Sun in ${moon.sign} (${moon.degrees})`]

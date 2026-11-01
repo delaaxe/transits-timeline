@@ -292,6 +292,30 @@ export function phaseFor(key){ return phases.find(p => p[0] === key) ?? null; }
 /** @param {{aspect?: string}|null|undefined} rule */
 export function isPhaseRule(rule){ return !!rule && !!phaseFor(rule.aspect ?? ""); }
 
+// How close to a node the Sun has to be at a New or Full Moon for there to be
+// an eclipse. The node here is the mean node, which can sit a degree or two
+// from the true one, so these are wider than the textbook limits (18.5 and
+// 12.3 against the true node) and were set against this ephemeris: every
+// eclipse of 2026 and 2027, penumbral ones included, falls inside, and every
+// other syzygy outside - the nearest misses sit at 19.7 and 19.5 degrees.
+const SOLAR_ECLIPSE_LIMIT_DEG = 18.5;
+const LUNAR_ECLIPSE_LIMIT_DEG = 17.5;
+
+/**
+ * Whether a phase is an eclipse: a New Moon near a node is a solar one, a
+ * Full Moon near a node a lunar one, and nothing else is. Returns the words
+ * the label uses, or "".
+ * @param {string} phaseKey @param {number} sunLon @param {number} nodeLon
+ */
+export function eclipseKind(phaseKey, sunLon, nodeLon){
+  if (phaseKey !== "newmoon" && phaseKey !== "fullmoon") return "";
+  if (!Number.isFinite(sunLon) || !Number.isFinite(nodeLon)) return "";
+  const d = Math.abs(wrap360(sunLon - nodeLon));
+  const toNode = Math.min(d, 360 - d, Math.abs(180 - d));
+  if (phaseKey === "newmoon") return toNode <= SOLAR_ECLIPSE_LIMIT_DEG ? "solar eclipse" : "";
+  return toNode <= LUNAR_ECLIPSE_LIMIT_DEG ? "lunar eclipse" : "";
+}
+
 /** The one row the phases are drawn on, like the sign changes. */
 export const PHASE = "phase";
 

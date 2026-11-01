@@ -109,6 +109,8 @@ export function brentRoot(f, a, b, fa, fb, tol, maxIter = 60){
  *   hit, filled in by the job once it knows which body the window belongs to
  * @property {number[]} [exactLonNatal] the far end's longitude at each exact
  *   hit: the natal point, the cusp, or the other moving body
+ * @property {number[]} [exactLonNode] on a phase of the Moon, the mean node's
+ *   longitude at each exact hit, which is what says whether it is an eclipse
  * @property {boolean[]} [entering] on a sign change, whether each crossing put
  *   the body into the rule's sign (true) or back out of it (false)
  * @property {number[]} [leavesAt] on a sign change, when the body next changes
