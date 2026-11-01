@@ -8,11 +8,19 @@
 // out is the transiting Moon, which is in orb of something every few hours and
 // would be half the list.
 
+import { wrap360 } from "../core/angles.js";
+import { getBodyLonAt } from "../core/ephemeris.js";
 import { computeTransitEvents } from "../core/job.js";
 import { addDaysLocal } from "../core/time.js";
 import { buildCandidateRules, buildIngressRules, buildPhaseRules, buildWorldRules } from "../core/transits.js";
-import { aspects, ingressAsCrossed, isIngressRule, natalKeys, phaseFor, rulePairing, transitingKeys, zodiacSign } from "../data/bodies.js";
+import { aspects, endLabel, ingressAsCrossed, isIngressRule, natalKeys, phaseFor, rulePairing, transitingKeys, zodiacSign } from "../data/bodies.js";
+import { locale } from "../storage/charts.js";
 import { natalLongitudes } from "./chart-context.js";
+
+// The Moon's moments carry a time. The same clock as the chart's labels, built
+// once here rather than borrowed from ui/format, which the typed half of the
+// app does not import.
+const timeFmt = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /** Every body that moves, the Moon aside. */
 export const todayTransitBodies = transitingKeys.filter(k => k !== "moon");
@@ -27,10 +35,9 @@ export const todayAspects = aspects.map(a => a[0]);
  * since it is the one number on the aspect panel that says what "in orb"
  * means to them.
  *
- * The Moon is back for the sign changes. It is left out of the aspects
- * because it is in orb of something every few hours; it changes sign every
- * two and a half days, and "Moon enters Scorpio" is the one line of the
- * day's weather everyone reads.
+ * The Moon is back for the sign changes and the phases, which feed its own
+ * line rather than the world's. It is left out of the aspects because it is
+ * in orb of something every few hours.
  *
  * @param {{personal: boolean, orb: number}} opts
  * @returns {import("../core/job.js").Rule[]}
@@ -47,20 +54,31 @@ export function buildTodayRules({ personal, orb }){
 }
 
 /**
- * The scan's answer sorted into the four lists the reading is made of. Only
- * what perfects inside the range counts, for all four: the scan clips every
- * window to the range and lists the exact hits inside it, so a rule is in
- * when any of its windows has one. A body merely within orb all day - Pluto
- * sits in orb of something for months - is left out: the line is what
- * happens today, not what is hanging over it.
+ * @typedef {Object} MoonMoments what the scan found of the Moon's own day
+ * @property {{name:string, sign:string, at:number}|null} phase the phase exact
+ *   today, with the Moon's sign at that moment, or null
+ * @property {{sign:string, at:number}|null} ingress the sign the Moon enters
+ *   today and when, or null; the Moon never turns, so it only ever enters
+ */
+
+/**
+ * The scan's answer sorted into what the reading is made of. Only what
+ * perfects inside the range counts: the scan clips every window to the range
+ * and lists the exact hits inside it, so a rule is in when any of its windows
+ * has one. A body merely within orb all day - Pluto sits in orb of something
+ * for months - is left out: the line is what happens today, not what is
+ * hanging over it.
  *
- * A sign change and a phase are moments rather than rows, so they come back
- * as text in the order they happen, named the way the chart names them: the
- * sign the body is in afterwards, which for a retrograde slipping back is the
- * one it came from, and the phase with the Moon's sign beside it.
+ * A sign change is a moment rather than a row, so it comes back as text in
+ * the order it happens, named the way the chart names it: the sign the body
+ * is in afterwards, which for a retrograde slipping back is the one it came
+ * from. The Moon's own moments - its phase and its sign change - go to its
+ * line rather than the world's.
  *
  * @param {import("../core/job.js").Rule[]} rules
  * @param {import("../core/events.js").AspectEvent[][]} events one list per rule
+ * @returns {{personal: import("../core/job.js").Rule[], world: import("../core/job.js").Rule[],
+ *            ingresses: string[], moon: MoonMoments}}
  */
 export function summarizeToday(rules, events){
   /** @type {import("../core/job.js").Rule[]} */
@@ -69,16 +87,20 @@ export function summarizeToday(rules, events){
   const world = [];
   /** @type {{at:number, text:string}[]} */
   const ingresses = [];
-  /** @type {{at:number, text:string}[]} */
-  const phases = [];
+  /** @type {MoonMoments} */
+  const moon = { phase: null, ingress: null };
   rules.forEach((rule, i) => {
     const phase = phaseFor(rule.aspect);
     if (phase || isIngressRule(rule)){
       for (const event of events[i]){
         (event.exacts ?? []).forEach((at, k) => {
           if (phase){
-            const sign = zodiacSign(event.exactLonNatal?.[k] ?? NaN);
-            phases.push({ at, text: sign ? `${phase[1]} in ${sign}` : phase[1] });
+            // Two phases cannot fall on one day; the first found stands.
+            moon.phase ??= { name: phase[1], sign: zodiacSign(event.exactLonNatal?.[k] ?? NaN), at };
+          } else if (rule.transit === "moon"){
+            // The rule names the sign; the longitude at the exact moment sits
+            // on the cusp and rounds to either side of it.
+            moon.ingress ??= { sign: endLabel(ingressAsCrossed(rule, event.entering?.[k] ?? true).rule.natal), at };
           } else {
             ingresses.push({ at, text: rulePairing(ingressAsCrossed(rule, event.entering?.[k] ?? true).rule) });
           }
@@ -89,34 +111,62 @@ export function summarizeToday(rules, events){
     if (!events[i].some(e => (e.exacts ?? []).length > 0)) return;
     (rule.scope === "world" ? world : personal).push(rule);
   });
-  const inOrder = (/** @type {{at:number, text:string}[]} */ list) => list.sort((a, b) => a.at - b.at).map(m => m.text);
-  return { personal, world, ingresses: inOrder(ingresses), phases: inOrder(phases) };
+  return { personal, world, ingresses: ingresses.sort((a, b) => a.at - b.at).map(m => m.text), moon };
 }
 
 /**
- * The lines. A phase of the Moon leads, and only on a day that has one: the
- * lunation is the calendar the rest is read against, and a line saying there
- * is no phase today would be most days. The world line goes the same way -
- * sign changes close it, after the aspects, since they are the same weather,
- * and a day with neither has no world line. The natal line is written when
- * something perfects, and otherwise only when it would be the whole reading:
- * a copy that comes back empty looks like a tap that did nothing, so a chart
- * with a quiet day says "na" - but not beside a phase or a world line, where
- * the day has already said what it has to say. Where there is no chart to
- * read against - world view - it is left out altogether, since "na" would be
- * saying something about a chart nobody picked.
- *
- * @param {{personal: import("../core/job.js").Rule[]|null, world: import("../core/job.js").Rule[],
- *          ingresses?: string[], phases?: string[]}} found
+ * The Moon's phase as a name, from how far it is ahead of the Sun. The four
+ * exact phases have their own names and their own moments, which the scan
+ * finds; between them the Moon is a crescent or gibbous, waxing to the full
+ * and waning after it, and that is what this says.
+ * @param {number} moonLon @param {number} sunLon
  */
-export function formatTodaySummary({ personal, world, ingresses = [], phases = [] }){
+export function moonPhaseName(moonLon, sunLon){
+  const ahead = wrap360(moonLon - sunLon);
+  if (ahead < 90) return "Waxing Crescent";
+  if (ahead < 180) return "Waxing Gibbous";
+  if (ahead < 270) return "Waning Gibbous";
+  return "Waning Crescent";
+}
+
+/**
+ * The Moon's line. Where it is and what phase it is in, as of now - and on a
+ * day with an exact phase, that phase and its time instead, with the Moon's
+ * sign at that moment, since "Full Moon in Taurus" is what gets looked up.
+ * Then the sign it enters today, with the time, if it does.
+ *
+ * @param {{sign:string, phase:string}} now where the Moon is as this is read
+ * @param {MoonMoments} moments
+ * @param {(ms:number)=>string} fmtTime
+ */
+export function describeMoon(now, moments, fmtTime){
+  const head = moments.phase
+    ? `${moments.phase.name} in ${moments.phase.sign} ${fmtTime(moments.phase.at)}`
+    : `${now.phase} in ${now.sign}`;
+  const tail = moments.ingress ? `, enters ${moments.ingress.sign} ${fmtTime(moments.ingress.at)}` : "";
+  return `${head}${tail}`;
+}
+
+/**
+ * The lines. The Moon leads, every day: the lunation is the calendar the rest
+ * is read against, and the Moon is always somewhere, so its line is never
+ * empty. The natal line is written when something perfects, and "na" where
+ * there is a chart and nothing does - a reading of a chart that said nothing
+ * about the chart would have left something out. Where there is no chart to
+ * read against - world view - it is left out altogether, since "na" would be
+ * saying something about a chart nobody picked. The world line closes with
+ * the sign changes, after the aspects, since they are the same weather, and
+ * a day with neither has no world line.
+ *
+ * @param {{moon: string, personal: import("../core/job.js").Rule[]|null,
+ *          world: import("../core/job.js").Rule[], ingresses?: string[]}} found
+ */
+export function formatTodaySummary({ moon, personal, world, ingresses = [] }){
   const named = (/** @type {import("../core/job.js").Rule[]} */ rules) => rules.map(r => rulePairing(r));
-  const lines = [];
-  if (phases.length) lines.push(`- Moon phase: ${phases.join(", ")}`);
-  if (personal?.length) lines.push(`- Transits: ${named(personal).join(", ")}`);
+  const lines = [`- Moon: ${moon}`];
+  if (personal) lines.push(`- Transits: ${personal.length ? named(personal).join(", ") : "na"}`);
   const sky = [...named(world), ...ingresses];
   if (sky.length) lines.push(`- World transits: ${sky.join(", ")}`);
-  if (personal && lines.length === 0) lines.push("- Transits: na");
   return lines.join("\n");
 }
 
@@ -146,5 +196,12 @@ export function todaySummary(ctx, orb, now = new Date()){
     rules
   });
   const day = summarizeToday(found.rules, found.events);
-  return formatTodaySummary({ ...day, personal: personal ? day.personal : null });
+  const moonLon = getBodyLonAt("moon", now, ctx.observer);
+  const sunLon = getBodyLonAt("sun", now, ctx.observer);
+  const moon = describeMoon(
+    { sign: zodiacSign(moonLon), phase: moonPhaseName(moonLon, sunLon) },
+    day.moon,
+    ms => timeFmt.format(new Date(ms))
+  );
+  return formatTodaySummary({ moon, personal: personal ? day.personal : null, world: day.world, ingresses: day.ingresses });
 }
