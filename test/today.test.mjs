@@ -107,18 +107,21 @@ test("the void is a window of the day, with its ends named where they fall outsi
 });
 
 test("a void the day's sign change ends is said before the move, and the move is its end", () => {
-  const clock = { dayStart: 0, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
+  // Real milliseconds: a tick is a minute, so the "same moment" tolerance
+  // (under a minute) cannot swallow the gap between two different moments.
+  const M = 60 * 1000;
+  const clock = { dayStart: 0, dayEnd: 1000 * M, fmtTime: (ms) => `t${ms / M}` };
   const day = { sign: "♎", phase: "Waning Crescent" };
-  const move = { phase: null, ingress: { sign: "♏", at: 700 } };
-  assert.equal(describeMoon(day, move, [{ from: 300, until: 700 }], clock), "Waning Crescent, void from t300, ♎ → ♏ t700");
-  assert.equal(describeMoon(day, move, [{ from: -50, until: 700 }], clock), "Waning Crescent, void from yesterday t-50, ♎ → ♏ t700");
+  const move = { phase: null, ingress: { sign: "♏", at: 700 * M } };
+  assert.equal(describeMoon(day, move, [{ from: 300 * M, until: 700 * M }], clock), "Waning Crescent, void from t300, ♎ → ♏ t700");
+  assert.equal(describeMoon(day, move, [{ from: -50 * M, until: 700 * M }], clock), "Waning Crescent, void from yesterday t-50, ♎ → ♏ t700");
   // The scan finds the two moments separately; a few seconds apart is the same moment.
-  assert.equal(describeMoon(day, move, [{ from: 300, until: 700 + 5000 }], clock), "Waning Crescent, void from t300, ♎ → ♏ t700");
+  assert.equal(describeMoon(day, move, [{ from: 300 * M, until: 700 * M + 5000 }], clock), "Waning Crescent, void from t300, ♎ → ♏ t700");
   // After an exact phase the move still comes after the void it ends.
-  assert.equal(describeMoon(day, { phase: { name: "New Moon", sign: "♎", at: 200, eclipse: "solar eclipse" }, ingress: { sign: "♏", at: 700 } }, [{ from: 200, until: 700 }], clock),
+  assert.equal(describeMoon(day, { phase: { name: "New Moon", sign: "♎", at: 200 * M, eclipse: "solar eclipse" }, ingress: { sign: "♏", at: 700 * M } }, [{ from: 200 * M, until: 700 * M }], clock),
     "New Moon in ♎ t200, solar eclipse, void from t200, ♎ → ♏ t700");
   // Two in one day: one the morning's move ends, one starting at night.
-  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♏", at: 100 } }, [{ from: -50, until: 100 }, { from: 900, until: 1300 }], clock),
+  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♏", at: 100 * M } }, [{ from: -50 * M, until: 100 * M }, { from: 900 * M, until: 1300 * M }], clock),
     "Waning Crescent, void from yesterday t-50, ♎ → ♏ t100, void t900 to tomorrow t1300");
 });
 
