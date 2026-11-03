@@ -180,9 +180,12 @@ export function voidWindows(ingressTimes, aspectTimes, dayStart, dayEnd){
  * during the day, the line is the move, "♍ → ♎ 14:39". On a day with an
  * exact phase that phase leads instead, with its time, the Moon's sign at
  * that moment and whether it is an eclipse, since "Full Moon in ♍" is what
- * gets looked up. Then the void, as a window: its ends on the clock, or
- * "yesterday" and "tomorrow" where they fall outside the day, and "all day"
- * when both do.
+ * gets looked up. Then the void. A void always ends at a sign change, so a
+ * void that ends at today's is written "void from 13:20" and placed before
+ * the move, which is its end: the line then reads in the order things
+ * happen, and the time is not said twice. Any other void is a window with
+ * both ends on the clock, "yesterday" and "tomorrow" where they fall outside
+ * the day, and "all day" when both do.
  *
  * @param {{sign:string, phase:string}} day the glyph of the sign the Moon is
  *   in as the day begins, and the phase word at its middle
@@ -191,20 +194,26 @@ export function voidWindows(ingressTimes, aspectTimes, dayStart, dayEnd){
  * @param {{dayStart:number, dayEnd:number, fmtTime:(ms:number)=>string}} clock
  */
 export function describeMoon(day, moments, voids, { dayStart, dayEnd, fmtTime }){
+  const ingress = moments.ingress;
+  const start = (/** @type {{from:number}} */ v) => v.from < dayStart ? `yesterday ${fmtTime(v.from)}` : fmtTime(v.from);
+  // The void the move ends, and the rest. The scan finds both to the second,
+  // so "the same moment" allows the rounding between the two.
+  const endsAtMove = (/** @type {{until:number}} */ v) => !!ingress && Math.abs(v.until - ingress.at) < 60 * 1000;
   const parts = [];
-  const move = moments.ingress ? `${day.sign} → ${moments.ingress.sign} ${fmtTime(moments.ingress.at)}` : "";
   if (moments.phase){
     const p = moments.phase;
     parts.push(`${p.name} in ${p.sign} ${fmtTime(p.at)}${p.eclipse ? `, ${p.eclipse}` : ""}`);
-    if (move) parts.push(move);
   } else {
-    parts.push(move ? `${day.phase}, ${move}` : `${day.phase} in ${day.sign}`);
+    parts.push(ingress ? day.phase : `${day.phase} in ${day.sign}`);
   }
+  for (const v of voids) if (endsAtMove(v)) parts.push(`void from ${start(v)}`);
+  if (ingress) parts.push(`${day.sign} → ${ingress.sign} ${fmtTime(ingress.at)}`);
   for (const v of voids){
+    if (endsAtMove(v)) continue;
     const before = v.from < dayStart;
     const after = v.until >= dayEnd;
     if (before && after) parts.push("void all day");
-    else parts.push(`void ${before ? `from yesterday ${fmtTime(v.from)}` : fmtTime(v.from)} to ${after ? `tomorrow ${fmtTime(v.until)}` : fmtTime(v.until)}`);
+    else parts.push(`void ${v.from < dayStart ? "from " : ""}${start(v)} to ${after ? `tomorrow ${fmtTime(v.until)}` : fmtTime(v.until)}`);
   }
   return parts.join(", ");
 }
