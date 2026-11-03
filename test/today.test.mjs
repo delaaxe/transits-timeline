@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTodayRules, describeMoon, formatTodaySummary, moonPhaseName, summarizeToday, todayTransitBodies, voidWindow } from "../src/services/today.js";
+import { buildTodayRules, describeMoon, formatTodaySummary, moonPhaseName, summarizeToday, todayTransitBodies, voidWindows } from "../src/services/today.js";
 import { INGRESS, eclipseKind, isIngressRule, isPhaseRule } from "../src/data/bodies.js";
 import { aspects, natalKeys } from "../src/data/bodies.js";
 
@@ -80,46 +80,49 @@ test("the Moon's moments go to its line and the other sign changes to the sky's,
     [window([15], { exactLon: [195], exactLonNatal: [15] })]
   ]);
   assert.deepEqual(day.ingresses, ["Sun → Scorpio", "Mars → Cancer"]);
-  assert.deepEqual(day.moon, { phase: { name: "Full Moon", sign: "Aries", at: 15, eclipse: "" }, ingress: { sign: "Scorpio", at: 20 } });
+  assert.deepEqual(day.moon, { phase: { name: "Full Moon", sign: "♈", at: 15, eclipse: "" }, ingress: { sign: "♏", at: 20 } });
   assert.deepEqual(day.personal, []);
   assert.deepEqual(day.world, []);
 });
 
-test("the Moon's line says where it is and what phase, or the exact phase and when", () => {
-  const clock = { now: 100, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
-  const now = { sign: "Scorpio", phase: "Waxing Gibbous" };
+test("the Moon's line is the day's: its phase, its sign or its move, or the exact phase and when", () => {
+  const clock = { dayStart: 0, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
+  const day = { sign: "♏", phase: "Waxing Gibbous" };
   const quiet = { phase: null, ingress: null };
-  assert.equal(describeMoon(now, quiet, null, clock), "Waxing Gibbous in Scorpio");
-  assert.equal(describeMoon(now, { phase: null, ingress: { sign: "Sagittarius", at: 700 } }, null, clock),
-    "Waxing Gibbous in Scorpio, enters Sagittarius t700");
-  assert.equal(describeMoon(now, { phase: { name: "Full Moon", sign: "Taurus", at: 400, eclipse: "" }, ingress: null }, null, clock),
-    "Full Moon in Taurus t400");
-  assert.equal(describeMoon(now, { phase: { name: "New Moon", sign: "Scorpio", at: 400, eclipse: "solar eclipse" }, ingress: { sign: "Sagittarius", at: 900 } }, null, clock),
-    "New Moon in Scorpio t400, solar eclipse, enters Sagittarius t900");
+  assert.equal(describeMoon(day, quiet, [], clock), "Waxing Gibbous in ♏");
+  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♐", at: 700 } }, [], clock), "Waxing Gibbous, ♏ → ♐ t700");
+  assert.equal(describeMoon(day, { phase: { name: "Full Moon", sign: "♉", at: 400, eclipse: "" }, ingress: null }, [], clock), "Full Moon in ♉ t400");
+  assert.equal(describeMoon(day, { phase: { name: "New Moon", sign: "♏", at: 400, eclipse: "solar eclipse" }, ingress: { sign: "♐", at: 900 } }, [], clock),
+    "New Moon in ♏ t400, solar eclipse, ♏ → ♐ t900");
 });
 
-test("the void of course is said where it touches the rest of the day", () => {
-  const clock = { now: 100, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
-  const now = { sign: "Scorpio", phase: "Waxing Gibbous" };
+test("the void is a window of the day, with its ends named where they fall outside it", () => {
+  const clock = { dayStart: 0, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
+  const day = { sign: "♏", phase: "Waxing Gibbous" };
   const quiet = { phase: null, ingress: null };
-  // Void now: until it ends, today or tomorrow.
-  assert.equal(describeMoon(now, quiet, { from: 50, until: 700 }, clock), "Waxing Gibbous in Scorpio, void of course until t700");
-  assert.equal(describeMoon(now, quiet, { from: 50, until: 1200 }, clock), "Waxing Gibbous in Scorpio, void of course until tomorrow t1200");
-  // Void later today: from when to when.
-  assert.equal(describeMoon(now, quiet, { from: 600, until: 1200 }, clock), "Waxing Gibbous in Scorpio, void of course from t600 to tomorrow t1200");
-  // A void that starts tomorrow, or ended earlier today, is not today's.
-  assert.equal(describeMoon(now, quiet, { from: 1100, until: 1300 }, clock), "Waxing Gibbous in Scorpio");
-  assert.equal(describeMoon(now, quiet, { from: 10, until: 90 }, clock), "Waxing Gibbous in Scorpio");
+  assert.equal(describeMoon(day, quiet, [{ from: 50, until: 700 }], clock), "Waxing Gibbous in ♏, void t50 to t700");
+  assert.equal(describeMoon(day, quiet, [{ from: -50, until: 700 }], clock), "Waxing Gibbous in ♏, void from yesterday t-50 to t700");
+  assert.equal(describeMoon(day, quiet, [{ from: 600, until: 1200 }], clock), "Waxing Gibbous in ♏, void t600 to tomorrow t1200");
+  assert.equal(describeMoon(day, quiet, [{ from: -50, until: 1200 }], clock), "Waxing Gibbous in ♏, void all day");
+  // Two in one day: one ending in the morning, one starting at night.
+  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♐", at: 100 } }, [{ from: -50, until: 100 }, { from: 900, until: 1300 }], clock),
+    "Waxing Gibbous, ♏ → ♐ t100, void from yesterday t-50 to t100, void t900 to tomorrow t1300");
 });
 
-test("the void runs from the last aspect in the sign to the sign change", () => {
-  // Sign changes at 0 and 1000, now at 500; aspects at 200, 400, and 1200 in the next sign.
-  assert.deepEqual(voidWindow([-900, 0, 1000], [200, 400, 1200, -950], 500), { from: 400, until: 1000 });
-  // No aspect in the sign at all: void the whole sign.
-  assert.deepEqual(voidWindow([0, 1000], [-50, 1200], 500), { from: 0, until: 1000 });
-  // Without a sign change on both sides there is no window to name.
-  assert.equal(voidWindow([1000], [200], 500), null);
-  assert.equal(voidWindow([0], [200], 500), null);
+test("each void runs from the last aspect in a sign to the sign change, and only those touching the day count", () => {
+  // Sign changes at -900, 0, 1000, 1900; the day is [0, 1000).
+  const changes = [1900, -900, 0, 1000];
+  // Aspects: -950 (before the first sign), 200 and 400 in the day's sign, 1200 in the next.
+  assert.deepEqual(voidWindows(changes, [-950, 200, 400, 1200], 0, 1000),
+    [{ from: -900, until: 0 }, { from: 400, until: 1000 }].filter(v => v.until > 0));
+  // The void of the sign before, ending at midnight exactly, does not touch the day.
+  assert.deepEqual(voidWindows(changes, [-950, 200, 400, 1200], 0, 1000), [{ from: 400, until: 1000 }]);
+  // The next sign's void starts tonight and runs into tomorrow.
+  assert.deepEqual(voidWindows(changes, [-950, 200, 400, 950, 1200], 0, 2000), [{ from: 950, until: 1000 }, { from: 1200, until: 1900 }]);
+  // No aspect in a sign at all: void the whole sign.
+  assert.deepEqual(voidWindows([0, 1000], [-50, 1200], 0, 1000), [{ from: 0, until: 1000 }]);
+  // A sign the scan did not see both ends of is not named.
+  assert.deepEqual(voidWindows([1000], [200], 0, 1000), []);
 });
 
 test("a New Moon near a node is a solar eclipse, a Full Moon a lunar one, nothing else is", () => {
