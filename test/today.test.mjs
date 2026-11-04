@@ -88,44 +88,31 @@ test("the Moon's moments go to its line and the other sign changes to the sky's,
   assert.deepEqual(day.world, []);
 });
 
-test("the Moon's line is the day's: its phase, its sign or its move, or the exact phase and when", () => {
+test("the Moon's line is the same shape every day: the phase, the sign or the move, the void", () => {
   const clock = { dayStart: 0, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
   const day = { sign: "♏", phase: "Waxing Gibbous" };
   const quiet = { phase: null, ingress: null };
-  assert.equal(describeMoon(day, quiet, [], clock), "Waxing Gibbous in ♏");
-  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♐", at: 700 } }, [], clock), "Waxing Gibbous, ♏ → ♐ t700");
-  assert.equal(describeMoon(day, { phase: { name: "Full Moon", sign: "♉", at: 400, eclipse: "" }, ingress: null }, [], clock), "Full Moon in ♉ t400");
-  assert.equal(describeMoon(day, { phase: { name: "New Moon", sign: "♏", at: 400, eclipse: "solar eclipse" }, ingress: { sign: "♐", at: 900 } }, [], clock),
-    "New Moon in ♏ t400, solar eclipse, ♏ → ♐ t900");
+  assert.equal(describeMoon(day, quiet, [], clock), "Waxing Gibbous ♏");
+  // The move carries no time: the void that ends at it says when.
+  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♐", at: 700 } }, [{ from: 300, until: 700 }], clock),
+    "Waxing Gibbous ♏ → ♐, void t300 to t700");
+  assert.equal(describeMoon(day, { phase: { name: "Full Moon", sign: "♉", at: 400, eclipse: "" }, ingress: null }, [], clock), "Full Moon ♉ t400");
+  // An exact phase leads; the move is still written in full after it.
+  assert.equal(describeMoon(day, { phase: { name: "New Moon", sign: "♏", at: 400, eclipse: "solar eclipse" }, ingress: { sign: "♐", at: 900 } }, [{ from: 400, until: 900 }], clock),
+    "New Moon ♏ t400, solar eclipse, ♏ → ♐, void t400 to t900");
 });
 
-test("the void is a window of the day, with its ends named where they fall outside it", () => {
+test("the void is a window with both ends on the clock, named where they fall outside the day", () => {
   const clock = { dayStart: 0, dayEnd: 1000, fmtTime: (ms) => `t${ms}` };
   const day = { sign: "♏", phase: "Waxing Gibbous" };
   const quiet = { phase: null, ingress: null };
-  assert.equal(describeMoon(day, quiet, [{ from: 50, until: 700 }], clock), "Waxing Gibbous in ♏, void t50 to t700");
-  assert.equal(describeMoon(day, quiet, [{ from: -50, until: 700 }], clock), "Waxing Gibbous in ♏, void from yesterday t-50 to t700");
-  assert.equal(describeMoon(day, quiet, [{ from: 600, until: 1200 }], clock), "Waxing Gibbous in ♏, void t600 to tomorrow t1200");
-  assert.equal(describeMoon(day, quiet, [{ from: -50, until: 1200 }], clock), "Waxing Gibbous in ♏, void all day");
-});
-
-test("a void the day's sign change ends is said before the move, and the move is its end", () => {
-  // Real milliseconds: a tick is a minute, so the "same moment" tolerance
-  // (under a minute) cannot swallow the gap between two different moments.
-  const M = 60 * 1000;
-  const clock = { dayStart: 0, dayEnd: 1000 * M, fmtTime: (ms) => `t${ms / M}` };
-  const day = { sign: "♎", phase: "Waning Crescent" };
-  const move = { phase: null, ingress: { sign: "♏", at: 700 * M } };
-  assert.equal(describeMoon(day, move, [{ from: 300 * M, until: 700 * M }], clock), "Waning Crescent, void from t300, ♎ → ♏ t700");
-  assert.equal(describeMoon(day, move, [{ from: -50 * M, until: 700 * M }], clock), "Waning Crescent, void from yesterday t-50, ♎ → ♏ t700");
-  // The scan finds the two moments separately; a few seconds apart is the same moment.
-  assert.equal(describeMoon(day, move, [{ from: 300 * M, until: 700 * M + 5000 }], clock), "Waning Crescent, void from t300, ♎ → ♏ t700");
-  // After an exact phase the move still comes after the void it ends.
-  assert.equal(describeMoon(day, { phase: { name: "New Moon", sign: "♎", at: 200 * M, eclipse: "solar eclipse" }, ingress: { sign: "♏", at: 700 * M } }, [{ from: 200 * M, until: 700 * M }], clock),
-    "New Moon in ♎ t200, solar eclipse, void from t200, ♎ → ♏ t700");
+  assert.equal(describeMoon(day, quiet, [{ from: 50, until: 1200 }], clock), "Waxing Gibbous ♏, void t50 to tomorrow t1200");
+  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♐", at: 700 } }, [{ from: -50, until: 700 }], clock),
+    "Waxing Gibbous ♏ → ♐, void from yesterday t-50 to t700");
+  assert.equal(describeMoon(day, quiet, [{ from: -50, until: 1200 }], clock), "Waxing Gibbous ♏, void from yesterday t-50 to tomorrow t1200");
   // Two in one day: one the morning's move ends, one starting at night.
-  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♏", at: 100 * M } }, [{ from: -50 * M, until: 100 * M }, { from: 900 * M, until: 1300 * M }], clock),
-    "Waning Crescent, void from yesterday t-50, ♎ → ♏ t100, void t900 to tomorrow t1300");
+  assert.equal(describeMoon(day, { phase: null, ingress: { sign: "♐", at: 100 } }, [{ from: -50, until: 100 }, { from: 900, until: 1300 }], clock),
+    "Waxing Gibbous ♏ → ♐, void from yesterday t-50 to t100, void t900 to tomorrow t1300");
 });
 
 test("each void runs from the last aspect in a sign to the sign change, and only those touching the day count", () => {

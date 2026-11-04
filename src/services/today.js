@@ -183,19 +183,17 @@ export function voidWindows(ingressTimes, aspectTimes, dayStart, dayEnd){
 }
 
 /**
- * The Moon's line, fixed by the day rather than by the moment it is read.
+ * The Moon's line, fixed by the day rather than by the moment it is read, and
+ * the same shape every day: the phase, the sign, the void.
  *
- * Its phase and where it is: the phase word is the day's, read at noon, and
- * the sign is the one it is in as the day begins - and where it changes sign
- * during the day, the line is the move, "♍ → ♎ 14:39". On a day with an
- * exact phase that phase leads instead, with its time, the Moon's sign at
- * that moment and whether it is an eclipse, since "Full Moon in ♍" is what
- * gets looked up. Then the void. A void always ends at a sign change, so a
- * void that ends at today's is written "void from 13:20" and placed before
- * the move, which is its end: the line then reads in the order things
- * happen, and the time is not said twice. Any other void is a window with
- * both ends on the clock, "yesterday" and "tomorrow" where they fall outside
- * the day, and "all day" when both do.
+ * The phase word is the day's, read at noon - or, on a day with an exact
+ * phase, that phase with the Moon's sign at that moment and the time, and
+ * whether it is an eclipse. The sign is the one the Moon is in as the day
+ * begins, or the move where it changes sign during the day, "♍ → ♎". The
+ * move carries no time: a sign change always ends a void, so the void that
+ * follows ends at the move, and its window says when. Each void that touches
+ * the day is a window with both ends on the clock, "yesterday" and "tomorrow"
+ * where an end falls outside the day.
  *
  * @param {{sign:string, phase:string}} day the glyph of the sign the Moon is
  *   in as the day begins, and the phase word at its middle
@@ -204,26 +202,20 @@ export function voidWindows(ingressTimes, aspectTimes, dayStart, dayEnd){
  * @param {{dayStart:number, dayEnd:number, fmtTime:(ms:number)=>string}} clock
  */
 export function describeMoon(day, moments, voids, { dayStart, dayEnd, fmtTime }){
-  const ingress = moments.ingress;
-  const start = (/** @type {{from:number}} */ v) => v.from < dayStart ? `yesterday ${fmtTime(v.from)}` : fmtTime(v.from);
-  // The void the move ends, and the rest. The scan finds both to the second,
-  // so "the same moment" allows the rounding between the two.
-  const endsAtMove = (/** @type {{until:number}} */ v) => !!ingress && Math.abs(v.until - ingress.at) < 60 * 1000;
   const parts = [];
+  const sign = moments.ingress ? `${day.sign} → ${moments.ingress.sign}` : day.sign;
   if (moments.phase){
     const p = moments.phase;
-    parts.push(`${p.name} in ${p.sign} ${fmtTime(p.at)}${p.eclipse ? `, ${p.eclipse}` : ""}`);
+    parts.push(`${p.name} ${p.sign} ${fmtTime(p.at)}`);
+    if (p.eclipse) parts.push(p.eclipse);
+    if (moments.ingress) parts.push(sign);
   } else {
-    parts.push(ingress ? day.phase : `${day.phase} in ${day.sign}`);
+    parts.push(`${day.phase} ${sign}`);
   }
-  for (const v of voids) if (endsAtMove(v)) parts.push(`void from ${start(v)}`);
-  if (ingress) parts.push(`${day.sign} → ${ingress.sign} ${fmtTime(ingress.at)}`);
   for (const v of voids){
-    if (endsAtMove(v)) continue;
-    const before = v.from < dayStart;
-    const after = v.until >= dayEnd;
-    if (before && after) parts.push("void all day");
-    else parts.push(`void ${v.from < dayStart ? "from " : ""}${start(v)} to ${after ? `tomorrow ${fmtTime(v.until)}` : fmtTime(v.until)}`);
+    const from = v.from < dayStart ? `from yesterday ${fmtTime(v.from)}` : fmtTime(v.from);
+    const until = v.until >= dayEnd ? `tomorrow ${fmtTime(v.until)}` : fmtTime(v.until);
+    parts.push(`void ${from} to ${until}`);
   }
   return parts.join(", ");
 }
