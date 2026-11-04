@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTodayRules, describeMoon, formatTodaySummary, moonPhaseName, summarizeToday, todayTransitBodies, voidWindows } from "../src/services/today.js";
+import { buildTodayRules, describeMoon, formatTodaySummary, moonPhaseName, summarizeToday, todayTransitBodies, voidWindows, TEXT_PRESENTATION } from "../src/services/today.js";
 import { INGRESS, eclipseKind, isIngressRule, isPhaseRule } from "../src/data/bodies.js";
 import { aspects, natalKeys } from "../src/data/bodies.js";
 
@@ -80,7 +80,10 @@ test("the Moon's moments go to its line and the other sign changes to the sky's,
     [window([15], { exactLon: [195], exactLonNatal: [15] })]
   ]);
   assert.deepEqual(day.ingresses, ["Sun → Scorpio", "Mars → Cancer"]);
-  assert.deepEqual(day.moon, { phase: { name: "Full Moon", sign: "♈", at: 15, eclipse: "" }, ingress: { sign: "♏", at: 20 } });
+  // Each sign glyph carries the text-presentation selector, so a phone pastes
+  // it as a glyph rather than an emoji.
+  assert.deepEqual(day.moon, { phase: { name: "Full Moon", sign: "♈\uFE0E", at: 15, eclipse: "" }, ingress: { sign: "♏\uFE0E", at: 20 } });
+  assert.equal(TEXT_PRESENTATION, "\uFE0E");
   assert.deepEqual(day.personal, []);
   assert.deepEqual(day.world, []);
 });

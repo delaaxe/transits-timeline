@@ -17,6 +17,16 @@ import { aspects, eclipseKind, endGlyph, ingressAsCrossed, isIngressRule, natalK
 import { locale } from "../storage/charts.js";
 import { natalLongitudes } from "./chart-context.js";
 
+// A sign glyph for the copied text. The zodiac signs are emoji by default on
+// iOS, which pastes them as purple tiles; U+FE0E, the text-presentation
+// selector, asks for the monochrome glyph from the text font instead. It is
+// invisible, travels with the text, and does nothing where the signs are
+// text already. The aspect glyphs and the arrow have no emoji form.
+export const TEXT_PRESENTATION = "\uFE0E";
+
+/** @param {number} deg */
+const signGlyph = (deg) => zodiacSignSymbol(deg) + TEXT_PRESENTATION;
+
 // The Moon's moments carry a time. The same clock as the chart's labels, built
 // once here rather than borrowed from ui/format, which the typed half of the
 // app does not import.
@@ -101,14 +111,14 @@ export function summarizeToday(rules, events){
             // Two phases cannot fall on one day; the first found stands.
             moon.phase ??= {
               name: phase[1],
-              sign: zodiacSignSymbol(event.exactLonNatal?.[k] ?? NaN),
+              sign: signGlyph(event.exactLonNatal?.[k] ?? NaN),
               at,
               eclipse: eclipseKind(phase[0], event.exactLon?.[k] ?? NaN, event.exactLonNode?.[k] ?? NaN)
             };
           } else if (rule.transit === "moon"){
             // The rule names the sign; the longitude at the exact moment sits
             // on the cusp and rounds to either side of it.
-            moon.ingress ??= { sign: endGlyph(ingressAsCrossed(rule, event.entering?.[k] ?? true).rule.natal), at };
+            moon.ingress ??= { sign: endGlyph(ingressAsCrossed(rule, event.entering?.[k] ?? true).rule.natal) + TEXT_PRESENTATION, at };
           } else {
             ingresses.push({ at, text: rulePairing(ingressAsCrossed(rule, event.entering?.[k] ?? true).rule) });
           }
@@ -308,7 +318,7 @@ export function todaySummary(ctx, orb, now = new Date()){
   const dayEnd = addDaysLocal(start, 1).getTime();
   const noon = new Date(dayStart + DAY_MS / 2);
   const moon = describeMoon(
-    { sign: zodiacSignSymbol(getBodyLonAt("moon", start, ctx.observer)),
+    { sign: signGlyph(getBodyLonAt("moon", start, ctx.observer)),
       phase: moonPhaseName(getBodyLonAt("moon", noon, ctx.observer), getBodyLonAt("sun", noon, ctx.observer)) },
     day.moon,
     voidsOfCourse(ctx.observer, dayStart, dayEnd),
